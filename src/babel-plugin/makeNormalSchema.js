@@ -54,7 +54,6 @@ export const makeNormalSchema = (doc,schema) => {
     },
     OperationDefinition(node){
       const operationKey = `${node.operation}Type`;
-      console.log('OPNAME', operationKey, schema[operationKey])
       const operationName = schema[operationKey].name;
       if (!operationName) {
         console.error(`${operationKey} does not exist in your schema! Try queryType, mutationType, or subscriptionType`)
