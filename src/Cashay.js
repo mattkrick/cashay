@@ -10,6 +10,8 @@ export default class Cashay {
     const {string, schema} = queryString;
     const {dispatch} = this._store;
 
+    // see what data we have in the store
+
     dispatch({type: FETCH_DATA_REQUEST});
     const {error, data} = await this._transport({query: string});
     if (error) {
