@@ -16,7 +16,7 @@ For example, I put the clientSchema in my `build` folder.
 I also need to drain my database connection pool that is filled when the `rootSchema` is accessed.
 So, my file looks like this:
 
-```
+```javascript
 // updateSchema.js
 require('babel-register');
 require('babel-polyfill');
@@ -42,7 +42,7 @@ If you want to get fancy, you can put a watcher on your GraphQL folder to run it
 
 Next, we'll need to make a babel plugin. Don't worry, cashay already has a babel plugin factory. All you need to do is inject the schema you just made:
 
-```
+```javascript
 // cashayPlugin.js
 const createPlugin = require('cashay/lib/babel-plugin');
 const schema = require('../build/schema.json');
@@ -51,7 +51,7 @@ module.exports = createPlugin(schema);
 
 Now, we need to include that plugin in our `.babelrc`:
 
-```
+```javascript
 {
   "plugins": [
     ["./cashayPlugin.js"]
@@ -65,11 +65,13 @@ This means our client bundle stays tiny.
 
 Cashay provides 3 useful items:
 
-`import {CashayQL, Cashay, cashayReducer} from 'cashay';`
+```javascript
+import {CashayQL, Cashay, cashayReducer} from 'cashay';
+```
 
 Prefixing all your query strings with `CashayQL` tells Babel to do its magic. For example:
 
-```
+```javascript
 const queryString = CashayQL`
 query {
   getComments {
@@ -81,12 +83,14 @@ query {
 
 `Cashay` is a class that takes a redux store and transport (AKA fetcher function).
 
-`const cashay = new Cashay({store: myReduxStore, transport: graphQLFetcher});`
+```javascript
+const cashay = new Cashay({store: myReduxStore, transport: graphQLFetcher});
+```
 
 Your transport should call your GraphQL endpoint and return an object with a `data` and `error` prop.
 If you call multiple GraphQL servers, you'll need multiple transports.
 
-```
+```javascript
 export const fetchGraphQL = async graphParams => {
   const authToken = localStorage.getItem('myToken');
   const res = await fetch('http://localhost:3000/graphql', {
@@ -107,7 +111,9 @@ export const fetchGraphQL = async graphParams => {
  
 ##API
  
-`cashay.query(queryString, options)`
+```javascript
+cashay.query(queryString, options)
+```
 
 Calling `query` will fetch your queryString from the graphQL server and put it in your redux store.
 Currently, it's very naive. 
