@@ -5,18 +5,56 @@ import {Schema, arrayOf, unionOf} from 'normalizr';
 const {OperationDefinition, Document} = QueryDocumentKeys;
 const {UNION, LIST, OBJECT} = TypeKind;
 
-class NormalizrSchema {
+class CashaySchema {
   define(obj) {
     Object.assign(this, obj);
   }
 }
 
-const getNormalizrValue = (schema, {kind, ofType, name}) => {
+const paginationWords = ['before', 'after', 'first', 'last'];
+const getRootTypeName = type => {
+  while (type.ofType) type = type.ofType;
+  return type.name;
+};
+
+const separateArgs = (schemaArgs, suppliedArgs) => {
+  const regularArgs = {};
+  const paginationArgs = {};
+  schemaArgs
+    .sort((a,b) => a.name < b.name)
+    .forEach(arg => {
+      const argObject = paginationWords.some(word => arg.name !== word) ? regularArgs : paginationArgs;
+      const hardcodedValue = suppliedArgs.find(suppliedArg => suppliedArg.name.value === arg.name);
+      argObject[arg.name] = hardcodedValue ? hardcodedValue.value.value : undefined
+    });
+  const {before, after, first, last} = paginationArgs;
+  if (before && after) {
+    console.warn(`You cannot include a before and after cursor. The before cursor will be ignored`);
+    delete paginationArgs.before;
+  }
+  if (first && last) {
+    let toDelete = paginationArgs.after ? 'last' : 'first';
+    console.warn(`You cannot include a first and last limit. The ${toDelete} limit will be ignored`);
+    delete paginationArgs[toDelete];
+  }
+
+  return {regularArgs, paginationArgs};
+};
+
+const getNormalizrValue = (schema, {args, type}, suppliedArgs) => {
+  const {kind, ofType, name} = type;
+  const {regularArgs, paginationArgs} = separateArgs(args, suppliedArgs);
   if (kind === OBJECT) {
     const childType = schema.types.find(field => field.name === name);
     const isEntity = childType.fields.some(field => field.name === 'id');
     if (isEntity) {
-      return new Schema(name);
+      const newEntity = new Schema(name);
+      debugger;
+      return Object.assign(newEntity, {
+        __args: Object.keys(regularArgs).length ? {...regularArgs} : undefined
+      })
+    } else {
+      //TODO handle objects w/o ids
     }
   } else {
     let normalizingFn;
@@ -26,23 +64,26 @@ const getNormalizrValue = (schema, {kind, ofType, name}) => {
       normalizingFn = unionOf;
     }
     if (normalizingFn) {
-      return normalizingFn(new Schema(ofType.name))
+      //TODO handle getting the right ofType
+      const arrOrUnion = normalizingFn(new Schema(ofType.name));
+      return Object.assign(arrOrUnion, {
+        __args: Object.keys(regularArgs).length ? {...regularArgs} : undefined,
+        __paginationArgs: Object.keys(paginationArgs).length ? {...paginationArgs} : undefined
+      });
     }
   }
 };
 
 const getNestedSchema = (obj, stack) => {
-  const firstEntity = obj[stack[0]];
-  const remainingStack = stack.slice(1);
-  const lastEntity = remainingStack.reduce((reduction, level) => {
-    return reduction.getItemSchema()[level];
-  }, firstEntity);
-  return lastEntity.getItemSchema();
-}
+  return stack.reduce((reduction, level) => {
+    const nextLevel = reduction[level];
+    return nextLevel.getItemSchema ? nextLevel.getItemSchema() : nextLevel;
+  }, obj);
+};
 
 export const makeNormalSchema = (doc,schema) => {
   schema = schema.data.__schema;
-  const normalizrSchema = new NormalizrSchema();
+  const cashaySchema = new CashaySchema();
   const stack = [];
   let operationSchema;
 
@@ -62,24 +103,26 @@ export const makeNormalSchema = (doc,schema) => {
     },
     Field: {
       enter(node) {
+        if (node.name.value === 'lane') {
+          debugger
+        }
+        const parentEntity = getNestedSchema(cashaySchema, stack);
         if (node.selectionSet) {
           let childField;
-          let parentEntity;
           const fieldKey = node.name.value;
-          childField = operationSchema.fields.find(field => field.name === fieldKey);
-          if (childField) { /* Is it a query? */
-            parentEntity = normalizrSchema;
-          } else {
-            parentEntity = getNestedSchema(normalizrSchema, stack);
+          childField = operationSchema.fields.find(field => field.name === fieldKey); //check inside rootQuery
+          if (!childField) { /* Is it not a query? */
             const parentTypeName = parentEntity.getKey();
             const parentType = schema.types.find(field => field.name === parentTypeName);
             childField = parentType.fields.find(field => field.name === fieldKey);
           }
-          const fieldValue = getNormalizrValue(schema, childField.type);
+          const fieldValue = getNormalizrValue(schema, childField, node.arguments);
           if (fieldValue) {
             parentEntity.define({[fieldKey]: fieldValue})
           }
           stack.push(fieldKey);
+        } else {
+          parentEntity[node.name.value] = true;
         }
       },
       leave(node) {
@@ -89,5 +132,7 @@ export const makeNormalSchema = (doc,schema) => {
       }
     }
   });
-  return normalizrSchema;
-}
+  //console.log('cashaySchema', cashaySchema);
+  return cashaySchema;
+};
+
