@@ -7,29 +7,32 @@ export default class Cashay {
     this._store = store;
     this._transport = transport;
     this._schema = schema;
-    // if memoizing is too slow, use a map inside the object & set vars as map keys so we don't stringify anything
     this._denormalizedQueries = {};
   }
 
   query(queryString, options = {}) {
-    //if you call forceFetch in a mapStateToProps, you're gonna have a bad time
-    const {variables, clientSchema, forceFetch, paginationWords, idFieldName} = options;
-    // create memoized key
-    const memoizedKey = `${queryString}${JSON.stringify(variables)}`;
+    //if you call forceFetch in a mapStateToProps, you're gonna have a bad time (it'll refresh on EVERY dispatch)
+    const {variables, forceFetch} = options;
 
-    // return memoized result if it exists
-    const storedDenormResult = this._denormalizedQueries[memoizedKey];
+    // return a map where the unique variable object is the key & the denormalized result is the value
+    let denormalizedQueryMap = this._denormalizedQueries[queryString];
 
-    // if the storedDenormResult exists & is complete & we aren't going to do a forceFetch, return it FAST
-    if (storedDenormResult && storedDenormResult._isComplete && !forceFetch) {
-      return storedDenormResult;
+    if (denormalizedQueryMap) {
+      const storedDenormResult = denormalizedQueryMap.get(variables);
+
+      // if the storedDenormResult exists & is complete & we aren't going to do a forceFetch, return it FAST
+      if (storedDenormResult && storedDenormResult._isComplete && !forceFetch) {
+        return storedDenormResult;
+      }
+    } else {
+      // if we've never used the queryString before, save it
+      denormalizedQueryMap = this._denormalizedQueries[queryString] = new Map();
     }
 
     // the request query + vars combo are not stored
-    const {dispatch} = this._store;
     const queryAST = parse(queryString, {noLocation: true, noSource: true});
-
     // denormalize queryAST from store data and create dependencies, return minimziedAST
+    const {clientSchema, paginationWords, idFieldName} = options;
     const context = buildExecutionContext(clientSchema, queryAST, {
       variables,
       paginationWords,
@@ -40,45 +43,50 @@ export default class Cashay {
     const {denormalizedPartialResult, minimizedAST} = denormFromStore(queryAST, context);
 
     // store the possibly full result in cashay
-    this._denormalizedQueries[memoizedKey] = denormalizedPartialResult;
-    if (minimizedAST) {
-      (async () => {
-        // print (minimizedAST)
-        const minimizedQueryString = print(minimizedAST);
+    denormalizedQueryMap.set(variables, denormalizedPartialResult);
 
-        // send minimizedQueryString to server and await minimizedQueryResponse
-        const minimizedQueryResponse = await this._transport(minimizedQueryString, variables);
-
-        // normalize response and add the memoizedKey to every object as a dep
-        const normalizedMinimizedQueryResponse = normalizeAndAddDeps(minimizedQueryResponse, context, memoizedKey);
-
-        // get current state data
-        const cashayDataStore = this._store.getState().getIn(['cashay', 'data']);
-
-        // walk the minimized response & at each location, find it in the current state. if it exists, add its deps
-        const flushSet = makeFlushSet(normalizedMinimizedQueryResponse, cashayDataStore);
-
-        // invalidate all denormalized results that depended on this data
-        for (let entry of flushSet) {
-          // is it safe to hot patch here instead of starting from scratch? i think not
-          // eg queryA and queryB. B' causes A to invalidate, A' now requires something B' didn't give it
-          this._denormalizedQueries[entry] = undefined;
-        }
-
-        // combine partial query with the new minimal response (a little hacky to get a result before the dispatch)
-        const {minimalResult, minimizedAST} = combinePartialAndMinimal(denormalizedPartialResult, normalizedMinimizedQueryResponse);
-        this._denormalizedQueries[memoizedKey] = minimalResult;
-
-        // stick normalize data in store
-        dispatch({
-          type: '@@cashay/INSERT_NORMALIZED',
-          payload: {
-            response: normalizedMinimizedQueryResponse
-
-          }
-        });
-      })();
+    // if all the data is obtained locally, we're done!
+    if (!minimizedAST) {
+      return denormalizedQueryMap.get(variables)
     }
-    return this._denormalizedQueries[memoizedKey];
+
+    // fetch the missing data
+    (async () => {
+      // print (minimizedAST)
+      const minimizedQueryString = print(minimizedAST);
+
+      // send minimizedQueryString to server and await minimizedQueryResponse
+      const minimizedQueryResponse = await this._transport(minimizedQueryString, variables);
+
+      // create an object unique to the queryString + vars
+      const dependencyKey = {queryString, variables};
+
+      // normalize response and add the storedDenormResults  to every object as a dep
+      const normalizedMinimizedQueryResponse = normalizeAndAddDeps(minimizedQueryResponse, context, dependencyKey);
+
+      // get current state data
+      const cashayDataStore = this._store.getState().getIn(['cashay', 'data']);
+
+      // walk the minimized response & at each location, find it in the current state. if it exists, add its deps
+      const flushSet = makeFlushSet(normalizedMinimizedQueryResponse, cashayDataStore);
+
+      // invalidate all denormalized results that depended on this data
+      for (let entry of flushSet) {
+        this._denormalizedQueries[entry.queryString][entry.variables] = undefined;
+      }
+
+      // combine partial query with the new minimal response (a little hacky to get a result before the dispatch)
+      // fullResult should come with an _isComplete flag set to true
+      const fullResult = combinePartialAndMinimal(denormalizedPartialResult, normalizedMinimizedQueryResponse);
+      denormalizedQueryMap.set(variables, fullResult);
+
+      // stick normalize data in store and recreate any invalidated denormalized structures
+      this._store.dispatch({
+        type: '@@cashay/INSERT_NORMALIZED',
+        payload: {
+          response: normalizedMinimizedQueryResponse
+        }
+      });
+    })();
   }
 }
