@@ -277,16 +277,16 @@ export const nestedStore = {
       ]
     }
   },
-  denormalizedResults: {
-    "recentPosts": {
-      JSON
-    }
-  },
-  dependencies: {
-    //recent posts depends on all posts and specific comments
-    //you depend on normalized end data
-    "recentPosts":{"comments":[o1,o7,o19], "posts":[postsObject, o1,o2,o3,o4,o5]}
-  }
+  //denormalizedResults: {
+  //  "recentPosts": {
+  //    JSON
+  //  }
+  //},
+  //dependencies: {
+  //  //recent posts depends on all posts and specific comments
+  //  //you depend on normalized end data
+  //  "recentPosts":{"comments":[o1,o7,o19], "posts":[postsObject, o1,o2,o3,o4,o5]}
+  //}
 };
 
 

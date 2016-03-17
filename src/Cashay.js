@@ -1,6 +1,5 @@
 import {FETCH_DATA_REQUEST, FETCH_DATA_SUCCESS, FETCH_DATA_ERROR} from './duck';
 import {normalize} from 'normalizr';
-<<<<<<< HEAD
 import {parse} from 'graphql/language/parser';
 
 export default class Cashay {
@@ -8,138 +7,78 @@ export default class Cashay {
     this._store = store;
     this._transport = transport;
     this._schema = schema;
+    // if memoizing is too slow, use a map inside the object & set vars as map keys so we don't stringify anything
+    this._denormalizedQueries = {};
   }
 
-  async query(queryString, options = {}) {
-    //const {string, schema} = queryString;
+  query(queryString, options = {}) {
+    //if you call forceFetch in a mapStateToProps, you're gonna have a bad time
     const {variables, clientSchema, forceFetch, paginationWords, idFieldName} = options;
+    // create memoized key
+    const memoizedKey = `${queryString}${JSON.stringify(variables)}`;
+
+    // return memoized result if it exists
+    const storedDenormResult = this._denormalizedQueries[memoizedKey];
+
+    // if the storedDenormResult exists & is complete & we aren't going to do a forceFetch, return it FAST
+    if (storedDenormResult && storedDenormResult._isComplete && !forceFetch) {
+      return storedDenormResult;
+    }
+
+    // the request query + vars combo are not stored
     const {dispatch} = this._store;
-    const cahsayDataStore = this._store.getState().getIn(['cashay', 'data']);
     const queryAST = parse(queryString, {noLocation: true, noSource: true});
-    // based on query name + args, does it exist in cashay.denomralizedResults
-    const denormLocationInCashayState = getDenormLocationFromQueryAST(queryAST, clientSchema, variables);
-    const existsInStore = isDenormLocationInStore(this._store, denormLocationInCashayState);
-    // if yes && !forceFetch, return
-    if (existsInStore && !forceFetch) return;
+
     // denormalize queryAST from store data and create dependencies, return minimziedAST
-    const context = buildExecutionContext(clientSchema, queryAST, {variables, paginationWords, idFieldName, store: this._store})
-    const {dependencies, denormalizedResult, minimizedAST} = denormalizeAndCreateDependencies(queryAST, context);
-    // insert denomralized JSON object in state.cashay.denormalizedResults
-    dispatch({
-      type: '@@cashay/INSERT_DENORMALIZED',
-      payload: {
-        dependencies,
-        location: denormLocationInCashayState,
-        result: denormalizedResult
-      }
-    })
-    //if not complete,
-    if (minimizedAST) {
-      // print (minimizedAST)
-      const minimizedQuerySTring = print(minimizedAST);
-      // send minimizedQueryString to server and await minimizedQueryResponse
-      const minimizedQueryResponse = await this._transport(minimizedQuerySTring, variables)
-      // normalize response
-      const context = buildExecutionContext(clientSchema, queryAST, {variables, paginationWords, idFieldName})
-      const normalizedMinimizedQueryResponse = normalize(minimizedQueryResponse, context)
-      // stick normalize data in store
-      dispatch({
-        type: '@@cashay/INSERT_NORMALIZED',
-        payload: {
-          response: normalizedMinimizedQueryResponse
-        }
-      })
-      // denormalize queryAST from store data and create dependencies
-      const {dependencies, denormalizedResult, minimizedAST} = denormalizeAndCreateDependencies(queryAST, this._store);
-      dispatch({
-        type: '@@cashay/INSERT_DENORMALIZED',
-        payload: {
-          dependencies,
-          location: denormLocationInCashayState,
-          result: denormalizedResult
-        }
-      })
-
-    }
-
-
-    //const partial = denormalize(cahsayDataStore.toJS(), varSchema, queryAST)
-    // see what data we have in the store
-    //const schemaKeys = Object.keys(schema);
-    //schemaKeys.forEach(key => {
-    //  if (schema[key].constructor.name === 'EntitySchema') {
-    //    console.log('checking key', key)
-    //    const entityId = cahsayDataState.getIn(['result', key]);
-    //    console.log('entId', entityId, cahsayDataState)
-    //    if (entityId) {
-    //      const subStateName = schema[key].getKey();
-    //      const obj = cahsayDataState.getIn(['entities', subStateName, entityId]);
-    //      console.log('CACHED RES', obj);
-    //    }
-    //  }
-    //})
-
-    //dispatch({type: FETCH_DATA_REQUEST});
-    //const {error, data} = await this._transport({query: string});
-    //if (error) {
-    //  return dispatch({
-    //    type: FETCH_DATA_ERROR,
-    //    error
-    //  })
-    //}
-    //console.log('RESP', data)
-    //const payload = normalize(data, schema);
-    ////const ans = denormalize(payload, schema);
-    //dispatch({
-    //  type: FETCH_DATA_SUCCESS,
-    //  payload
-    //});
-=======
-//import {denormalize} from './denormalize';
-
-export default class Cashay {
-  constructor({store, transport}) {
-    this._store = store;
-    this._transport = transport;
-  }
-
-  async query(queryString, options) {
-    const {string, schema} = queryString;
-    const {dispatch} = this._store;
-
-    // see what data we have in the store
-    const cahsayDataState = this._store.getState().getIn(['cashay', 'data']);
-    const schemaKeys = Object.keys(schema);
-    console.log('going through keys')
-    schemaKeys.forEach(key => {
-      if (schema[key].constructor.name === 'EntitySchema') {
-        console.log('checking key', key)
-        const entityId = cahsayDataState.getIn(['result', key]);
-        console.log('entId', entityId, cahsayDataState)
-        if (entityId) {
-          const subStateName = schema[key].getKey();
-          const obj = cahsayDataState.getIn(['entities', subStateName, entityId]);
-          console.log('CACHED RES', obj);
-        }
-      }
-    })
-
-    dispatch({type: FETCH_DATA_REQUEST});
-    const {error, data} = await this._transport({query: string});
-    if (error) {
-      return dispatch({
-        type: FETCH_DATA_ERROR,
-        error
-      })
-    }
-    console.log('RESP', data)
-    const payload = normalize(data, schema);
-    //const ans = denormalize(payload, schema);
-    dispatch({
-      type: FETCH_DATA_SUCCESS,
-      payload
+    const context = buildExecutionContext(clientSchema, queryAST, {
+      variables,
+      paginationWords,
+      idFieldName,
+      store: this._store
     });
->>>>>>> f554171bf3cb40ca1d86da8b9d138acf7eb2e3ae
+    //denormalizedPartialResult.isComplete = !minimizedAST; // done in denormFromStore
+    const {denormalizedPartialResult, minimizedAST} = denormFromStore(queryAST, context);
+
+    // store the possibly full result in cashay
+    this._denormalizedQueries[memoizedKey] = denormalizedPartialResult;
+    if (minimizedAST) {
+      (async () => {
+        // print (minimizedAST)
+        const minimizedQueryString = print(minimizedAST);
+
+        // send minimizedQueryString to server and await minimizedQueryResponse
+        const minimizedQueryResponse = await this._transport(minimizedQueryString, variables);
+
+        // normalize response and add the memoizedKey to every object as a dep
+        const normalizedMinimizedQueryResponse = normalizeAndAddDeps(minimizedQueryResponse, context, memoizedKey);
+
+        // get current state data
+        const cashayDataStore = this._store.getState().getIn(['cashay', 'data']);
+
+        // walk the minimized response & at each location, find it in the current state. if it exists, add its deps
+        const flushSet = makeFlushSet(normalizedMinimizedQueryResponse, cashayDataStore);
+
+        // invalidate all denormalized results that depended on this data
+        for (let entry of flushSet) {
+          // is it safe to hot patch here instead of starting from scratch? i think not
+          // eg queryA and queryB. B' causes A to invalidate, A' now requires something B' didn't give it
+          this._denormalizedQueries[entry] = undefined;
+        }
+
+        // combine partial query with the new minimal response (a little hacky to get a result before the dispatch)
+        const {minimalResult, minimizedAST} = combinePartialAndMinimal(denormalizedPartialResult, normalizedMinimizedQueryResponse);
+        this._denormalizedQueries[memoizedKey] = minimalResult;
+
+        // stick normalize data in store
+        dispatch({
+          type: '@@cashay/INSERT_NORMALIZED',
+          payload: {
+            response: normalizedMinimizedQueryResponse
+
+          }
+        });
+      })();
+    }
+    return this._denormalizedQueries[memoizedKey];
   }
 }
-

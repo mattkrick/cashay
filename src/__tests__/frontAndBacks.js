@@ -32,7 +32,7 @@ export const back5Response = {
 
 export const back5Query = `
 query {
-  recentPosts(count:5 before: "2014-05-27T00:00:00.000Z") {
+  recentPosts(count:5, before: "2014-05-27T00:00:00.000Z") {
     _id,
     cursor,
     title
@@ -71,8 +71,64 @@ export const front5Response = {
   }
 };
 
+export const front3Response = {
+  "data": {
+    "recentPosts": [
+      {
+        "_id": "03390abb5570ce03ae524397d215713b",
+        "cursor": "2015-09-01T00:00:00.000Z",
+        "title": "New Feature: Tracking Error Status with Kadira"
+      },
+      {
+        "_id": "2f6b59fd0b182dc6e2f0051696c70d70",
+        "cursor": "2015-08-24T00:00:00.000Z",
+        "title": "Understanding Mean, Histogram and Percentiles"
+      },
+      {
+        "_id": "3d7a3853bf435c0f00e46e15257a94d9",
+        "cursor": "2015-07-20T00:00:00.000Z",
+        "title": "Introducing Kadira Debug, Version 2"
+      }
+    ]
+  }
+};
+
+export const front2AfterResponse = {
+  "data": {
+    "recentPosts": [
+      {
+        "_id": "0176413761b289e6d64c2c14a758c1c7",
+        "cursor": "2015-07-07T00:00:00.000Z",
+        "title": "Sharing the Meteor Login State Between Subdomains"
+      },
+      {
+        "_id": "1bd16dfab1de982317d2ba4382ec8c86",
+        "cursor": "2015-07-01T00:00:00.000Z",
+        "title": "Meteor Server Side Rendering Support with FlowRouter and React"
+      }
+    ]
+  }
+};
+
+
 export const front5Query = `query {
   recentPosts(count:5) {
+    _id,
+      cursor,
+      title
+  }
+}`;
+
+export const front3Query = `query {
+  recentPosts(count:3) {
+    _id,
+      cursor,
+      title
+  }
+}`;
+
+export const front2AfterQuery = `query {
+  recentPosts(count:2, after: "2015-07-20T00:00:00.000Z") {
     _id,
       cursor,
       title
@@ -184,3 +240,8 @@ export const back5Normalized = {
     }
   }
 }
+
+export const frontPaginationWords = {
+  first: 'count',
+  last: 'count'
+};
