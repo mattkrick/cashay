@@ -1,5 +1,3 @@
-///* Code from hueypetersen.com */
-//
 //import {Schema, arrayOf, unionOf} from 'normalizr';
 //
 //const CashayQL = (string, ...args) => {
