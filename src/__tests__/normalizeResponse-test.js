@@ -1,3 +1,4 @@
+//import fs from 'fs';
 import test from 'ava';
 import 'babel-register';
 import 'babel-polyfill';
@@ -17,7 +18,7 @@ import {back5Response, back5Query, back5Normalized,
 import {mergeDeepWithArrs} from '../mergeDeep';
 
 export const same = (t, actual, expected, message) => {
-  //writeFileSync('avaTests.js', `
+  //fs.writeFileSync('avaTests.js', `
   //Actual:
   //  ${JSON.stringify(actual, null, 2).split("\n").join("\n    ")}
   //
@@ -68,7 +69,7 @@ test('normalize front 5', t => {
   t.same(normalizedResponse, front5Normalized);
 });
 
-test('normalize back 5', t => {
+test('normalize back 5 (skip 1)', t => {
   t.plan(1);
   const queryAST = parse(back5Query, {noLocation: true, noSource: true});
   const context = buildExecutionContext(clientSchema, queryAST, {idFieldName: '_id', paginationWords: frontPaginationWords});
@@ -86,20 +87,18 @@ test('normalize front 3 then additional 2', t => {
   const normalizedResponse2 = normalizeResponse(front2AfterResponse.data, context2);
 
   const newState = mergeDeepWithArrs(normalizedResponse3, normalizedResponse2);
-  same(t,newState, front5Normalized);
+  t.same(newState, front5Normalized);
 });
 
-test('normalize back 3 then additional 2', t => {
+test('normalize back 3 (skip 1) then additional 2', t => {
   const queryAST3 = parse(back3Query, {noLocation: true, noSource: true});
   const context3 = buildExecutionContext(clientSchema, queryAST3, {idFieldName: '_id', paginationWords: frontPaginationWords});
   const normalizedResponse3 = normalizeResponse(back3Response.data, context3);
   const queryAST2 = parse(back2BeforeQuery, {noLocation: true, noSource: true});
   const context2 = buildExecutionContext(clientSchema, queryAST2, {idFieldName: '_id', paginationWords: frontPaginationWords});
   const normalizedResponse2 = normalizeResponse(back2BeforeResponse.data, context2);
-
-  console.log(normalizedResponse2)
   const newState = mergeDeepWithArrs(normalizedResponse3, normalizedResponse2);
-  same(t,newState, back5Normalized);
+  t.same(newState, back5Normalized);
 });
 
 test('normalize front 5 request next 5, get 4, set to full', t => {
@@ -111,10 +110,10 @@ test('normalize front 5 request next 5, get 4, set to full', t => {
   const normalizedResponse4 = normalizeResponse(front5ResponseAfter5.data, context4);
 
   const newState = mergeDeepWithArrs(normalizedResponse5, normalizedResponse4);
-  same(t,newState, front9Normalized);
+  t.same(newState, front9Normalized);
 });
 
-test('normalize back 5 request next 5, get 4, set to full', t => {
+test('normalize back 5 (skip 1) request next 5, get 3, set to full', t => {
   // only returns 4 results because we don't start at the last because we use count instead of before so it needs a cursor
   // in able to know we're going backwards
   const queryAST5 = parse(back5Query, {noLocation: true, noSource: true});
@@ -125,9 +124,29 @@ test('normalize back 5 request next 5, get 4, set to full', t => {
   const normalizedResponse3 = normalizeResponse(back5ResponseAfter5.data, context3);
 
   const newState = mergeDeepWithArrs(normalizedResponse5, normalizedResponse3);
-  same(t,newState, back9Normalized);
+  t.same(newState, back9Normalized);
 });
 
-// grab first 5 then grab last 5 and combine the 2 into 1 and flag as complete
+test('normalize front 5 request back 5 skip 1, set to full', t => {
+  const queryAST5 = parse(front5Query, {noLocation: true, noSource: true});
+  const context5 = buildExecutionContext(clientSchema, queryAST5, {idFieldName: '_id', paginationWords: frontPaginationWords});
+  const normalizedResponse5 = normalizeResponse(front5Response.data, context5);
+  const queryAST5back = parse(back5Query, {noLocation: true, noSource: true});
+  const context5Back = buildExecutionContext(clientSchema, queryAST5back, {idFieldName: '_id', paginationWords: frontPaginationWords});
+  const normalizedResponse5Back = normalizeResponse(back5Response.data, context5Back);
 
-// grab last 5 then grab first 5 and combine into 1 and flag as complete
+  const newState = mergeDeepWithArrs(normalizedResponse5, normalizedResponse5Back);
+  t.same(newState, back9Normalized);
+});
+
+test('normalize back 5 (skip 1), request front 5, set to full', t => {
+  const queryAST5 = parse(back5Query, {noLocation: true, noSource: true});
+  const context5 = buildExecutionContext(clientSchema, queryAST5, {idFieldName: '_id', paginationWords: frontPaginationWords});
+  const normalizedResponse5 = normalizeResponse(back5Response.data, context5);
+  const queryAST5front = parse(front5Query, {noLocation: true, noSource: true});
+  const context5Front = buildExecutionContext(clientSchema, queryAST5front, {idFieldName: '_id', paginationWords: frontPaginationWords});
+  const normalizedResponse5Front = normalizeResponse(front5Response.data, context5Front);
+
+  const newState = mergeDeepWithArrs(normalizedResponse5, normalizedResponse5Front);
+  t.same(newState, back9Normalized);
+});
