@@ -47,6 +47,3 @@ test('merge front and back to full', t => {
   const normalizedResponseBack = normalizeResponse(back5Response.data, contextBack);
   const newState = mergeDeepWithArrs(normalizedResponseFront, normalizedResponseBack);
 });
-//TODO merge into full if front & back overlap
-
-//Maybe back shouldn't be reversed. Instead, we should prepend new things onto it instead of appending.

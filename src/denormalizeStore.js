@@ -3,8 +3,30 @@ import {buildExecutionContext} from './buildExecutionContext';
 import {mergeDeepWithArrs, mergeArrays, isObject} from './mergeDeep';
 import {separateArgs} from './separateArgs';
 import {FRAGMENT_SPREAD, INLINE_FRAGMENT} from 'graphql/language/kinds';
-import {ensureRootType, getRegularArgsKey} from './utils';
+import {ensureRootType, getRegularArgsKey, ensureTypeFromNonNull} from './utils';
 const {UNION, INTERFACE, LIST, OBJECT, NON_NULL, SCALAR} = TypeKind;
+
+const handleMissingData = (aliasOrFieldName, field, fieldSchema, context) => {
+  const fieldType = ensureTypeFromNonNull(fieldSchema.type);
+  if (fieldType.kind === SCALAR) {
+    return null;
+  } else if (fieldType.kind === LIST) {
+    return [];
+  } else {
+    const newFieldSchema = context.schema.types.find(type => type.name === fieldType.name);
+    if (fieldType.kind === UNION) {
+      // since we don't know what the shape will look like, make it look like everything
+      const omniPartial = newFieldSchema.possibleTypes.reduce((reduction, objType) => {
+        const newFieldSchema = context.schema.types.find(type => type.name === objType.name);
+        Object.assign(reduction, visit(reduction, field, newFieldSchema, context));
+        return reduction;
+      }, {});
+      omniPartial.__typename = null;
+      return omniPartial;
+    }
+    return visit({}, field, newFieldSchema, context);
+  }
+};
 
 const getFieldState = (fieldState, regularArgs, paginationArgs) => {
   if (regularArgs) {
@@ -53,6 +75,7 @@ const getFieldState = (fieldState, regularArgs, paginationArgs) => {
 const visitObject = (subState, reqAST, subSchema, context, baseReduction = {}) => {
   return reqAST.selectionSet.selections.reduce((reduction, field) => {
     if (field.kind === INLINE_FRAGMENT) {
+      debugger
       if (field.typeCondition.name.value === subSchema.name) {
         visitObject(subState, field, subSchema, context, reduction);
       }
@@ -65,12 +88,18 @@ const visitObject = (subState, reqAST, subSchema, context, baseReduction = {}) =
       const fieldName = field.name.value;
       const aliasOrFieldName = field.alias && field.alias.value || fieldName;
       const fieldSchema = subSchema.fields.find(field => field.name === fieldName);
-      let fieldState = subState[fieldName];
-      if (fieldSchema.args && fieldSchema.args.length) {
-        const {regularArgs, paginationArgs} = separateArgs(fieldSchema, field.arguments, context);
-        fieldState = getFieldState(fieldState, regularArgs, paginationArgs);
+      const hasData = subState.hasOwnProperty(fieldName);
+
+      if (hasData) {
+        let fieldState = subState[fieldName];
+        if (fieldSchema.args && fieldSchema.args.length) {
+          const {regularArgs, paginationArgs} = separateArgs(fieldSchema, field.arguments, context);
+          fieldState = getFieldState(fieldState, regularArgs, paginationArgs);
+        }
+        reduction[aliasOrFieldName] = visit(fieldState, field, fieldSchema, context);
+      } else {
+        reduction[aliasOrFieldName] = handleMissingData(aliasOrFieldName, field, fieldSchema, context)
       }
-      reduction[aliasOrFieldName] = visit(fieldState, field, fieldSchema, context);
     }
     return reduction
   }, baseReduction);
@@ -119,6 +148,6 @@ export const denormalizeStore = context => {
     reduction[aliasOrName] = visit(fieldState, selection, subSchema, context);
     return reduction
   }, {});
-  console.log('FINAL', queryReduction);
+  //console.log('FINAL', queryReduction);
   return queryReduction;
 };

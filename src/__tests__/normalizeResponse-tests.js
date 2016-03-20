@@ -17,29 +17,6 @@ import {back5Response, back5Query, back5Normalized,
   back5QueryAfter5, back5ResponseAfter5, back9Normalized} from './_back';
 import {mergeDeepWithArrs} from '../mergeDeep';
 
-export const same = (t, actual, expected, message) => {
-  //fs.writeFileSync('avaTests.js', `
-  //Actual:
-  //  ${JSON.stringify(actual, null, 2).split("\n").join("\n    ")}
-  //
-  //  Expected:
-  //  ${JSON.stringify(expected, null, 2).split("\n").join("\n    ")}
-  //
-  //`)
-
-  return t.same(actual, expected, `
-
-    ${message}
-
-    Actual:
-    ${JSON.stringify(actual, null, 2).split("\n").join("\n    ")}
-
-    Expected:
-    ${JSON.stringify(expected, null, 2).split("\n").join("\n    ")}
-
-  `);
-};
-
 test('normalizes unions', t => {
   t.plan(1);
   const queryAST = parse(unionQueryString, {noLocation: true, noSource: true});
