@@ -68,7 +68,7 @@ export const unionResponse = {
 }
 
 
-export const unionStore ={
+export const unionNormalized ={
   entities: {
     Group: {
       allEmployees: {
@@ -95,31 +95,11 @@ export const unionStore ={
         "_id": "pahan",
         "name": "Pahan Sarathchandra"
       }
-    },
+    }
   },
   result: {
     getGroup: {
       '{"_id":"allEmployees"}': 'Group:allEmployees'
     }
   }
-}
-
-//desiredResult = {
-//  beds: {
-//    guest: 'martin'
-//  }
-//}
-//
-//
-//beds: {
-//  guest: null
-//}
-//}
-//
-//beds && beds.guest
-//beds : null
-//
-//beds:[
-//  {id:1, guest:null},
-//  {id:2, guest: {'Guest:123'}
-//]
+};

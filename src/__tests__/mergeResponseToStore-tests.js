@@ -2,7 +2,7 @@ import test from 'ava';
 import 'babel-register';
 import 'babel-polyfill';
 import {mergeDeepWithArrs} from '../mergeDeep';
-import {front5Response, front5Query, front5Normalized, back5Response, back5Query, back5Normalized} from './frontAndBacks';
+import {front5Response, front5Query, front5Normalized, back5Response, back5Query, back5Normalized} from './_back';
 import clientSchema from './clientSchema.json';
 import {normalizeResponse} from '../normalizeResponse';
 

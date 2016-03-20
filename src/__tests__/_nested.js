@@ -1,3 +1,52 @@
+export const nestedPaginationWords = {
+  first: 'count'
+};
+
+export const nestedVariableValues = {
+  language: 'english'
+};
+
+export const nestedQueryString = `
+query getPosts($language: String) {
+  recentPosts(count: 2) {
+    _id,
+    title,
+    author {
+      ...getAuthor
+    },
+    comments {
+      _id,
+      replies {
+        _id,
+        content
+      }
+    }
+  },
+  again: recentPosts(count: 2) {
+    _id,
+      title (language: $language),
+    author {
+    ...getAuthor
+    },
+    comments {
+      _id,
+        content,
+        replies {
+        _id,
+          content
+      }
+    }
+  }
+}
+
+fragment getAuthor on Author {
+  ... on Author {
+		_id
+  	name
+  	twitterHandle
+  }
+}`;
+
 export const nestedResponse = {
   "recentPosts": [
     {
@@ -157,48 +206,8 @@ export const nestedResponse = {
   ]
 };
 
-export const nestedQueryString = `
-query getPosts($language: String) {
-  recentPosts(count: 2) {
-    _id,
-    title,
-    author {
-      ...getAuthor
-    },
-    comments {
-      _id,
-      replies {
-        _id,
-        content
-      }
-    }
-  },
-  again: recentPosts(count: 2) {
-    _id,
-      title (language: $language),
-    author {
-    ...getAuthor
-    },
-    comments {
-      _id,
-        content,
-        replies {
-        _id,
-          content
-      }
-    }
-  }
-}
 
-fragment getAuthor on Author {
-  ... on Author {
-		_id
-  	name
-  	twitterHandle
-  }
-}`;
-
-export const nestedStore = {
+export const nestedNormalized = {
   "entities": {
     "Post": {
       "03390abb5570ce03ae524397d215713b": {
@@ -276,25 +285,6 @@ export const nestedStore = {
         "Post:2f6b59fd0b182dc6e2f0051696c70d70"
       ]
     }
-  },
-  //denormalizedResults: {
-  //  "recentPosts": {
-  //    JSON
-  //  }
-  //},
-  //dependencies: {
-  //  //recent posts depends on all posts and specific comments
-  //  //you depend on normalized end data
-  //  "recentPosts":{"comments":[o1,o7,o19], "posts":[postsObject, o1,o2,o3,o4,o5]}
-  //}
-};
-
-
-export const nestedPaginationWords = {
-  first: 'count'
-};
-
-export const nestedVariableValues = {
-  language: 'english'
+  }
 };
 

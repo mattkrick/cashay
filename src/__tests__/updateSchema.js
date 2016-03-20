@@ -1,7 +1,7 @@
-require('babel-register');
+require('babel-core/register');
 
 const path = require('path');
-const rootSchema = require('./schema');
+const rootSchema = require('./src/schema');
 const fs = require('fs');
 const graphql = require('graphql').graphql;
 const introspectionQuery = `
@@ -76,7 +76,7 @@ graphql(rootSchema, introspectionQuery).then(result => {
     console.log(result.errors)
   } else {
     try {
-      fs.writeFileSync(path.join(__dirname, 'src/clientSchema.json'), JSON.stringify(result.data.__schema, null, 2));
+      fs.writeFileSync(path.join(__dirname, './clientSchema.json'), JSON.stringify(result.data.__schema, null, 2));
     }catch(e) {
       console.log(e)
     }

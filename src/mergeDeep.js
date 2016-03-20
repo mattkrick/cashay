@@ -1,6 +1,5 @@
 export const isObject = val => val && typeof val === 'object';
 
-//TODO this should take a front or back to know whether to append or prepend
 const mergeArrays = (target, src) => {
   //check for overlap in docs, intelligently append keys
   const minTraversalIdx = Math.max(0, target.length - src.length);
@@ -21,9 +20,17 @@ const mergeArrays = (target, src) => {
 export const mergeDeepWithArrs = (target, src) => {
   Object.keys(src).forEach(key => {
     if (isObject(target[key]) && isObject(src[key])) {
-      if (Array.isArray(src)) {
-        if (Array.isArray(target)) {
-          target[key] = (key === 'back') ? mergeArrays(src[key], target[key]) : mergeArrays(target[key], src[key]);
+      if (Array.isArray(src[key])) {
+        if (Array.isArray(target[key])) {
+          const mergedArray = (key === 'back') ? mergeArrays(src[key], target[key]) : mergeArrays(target[key], src[key]);
+          // if we've received fewer docs than requested, meaning we've got em all, use the full array
+          if (src[key].EOF || target[key].EOF) {
+            target.full = mergedArray;
+            delete target.front;
+            delete target.back;
+          } else {
+            target[key] = mergedArray;
+          }
         } else {
           target[key] = src[key];
         }

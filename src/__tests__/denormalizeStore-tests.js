@@ -3,10 +3,10 @@ import 'babel-register';
 import 'babel-polyfill';
 import {parse} from 'graphql/language/parser';
 import {buildExecutionContext} from '../buildExecutionContext';
-import {unionQueryString, unionResponse, unionStore} from './unionExample';
+import {unionQueryString, unionResponse, unionNormalized} from './_union';
 import clientSchema from './clientSchema.json';
 import {denormalizeStore} from '../denormalizeStore';
-import {nestedQueryString, nestedResponse, nestedStore, nestedPaginationWords, nestedVariableValues} from './nestedExample';
+import {nestedQueryString, nestedResponse, nestedNormalized, nestedPaginationWords, nestedVariableValues} from './_nested';
 
 test('denormalize store from union request', t => {
   t.plan(1);
@@ -15,7 +15,7 @@ test('denormalize store from union request', t => {
     variableValues: nestedVariableValues,
     paginationWords: nestedPaginationWords,
     idFieldName: '_id',
-    store: unionStore
+    store: unionNormalized
   };
   const context = buildExecutionContext(clientSchema, queryAST, unionOptions);
   const denormalizedResponse = denormalizeStore(context);
@@ -28,7 +28,7 @@ test('denormalize store from nested request', t => {
     variableValues: nestedVariableValues,
     paginationWords: nestedPaginationWords,
     idFieldName: '_id',
-    store: nestedStore
+    store: nestedNormalized
   };
   const context = buildExecutionContext(clientSchema, queryAST, nestedOptions);
   const denormalizedResponse = denormalizeStore(context);

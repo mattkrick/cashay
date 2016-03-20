@@ -10,11 +10,6 @@ const mapResponseToResult = (nestedResult, response, regularArgs, paginationArgs
   if (paginationArgs) {
     const paginationObj = {};
     const {before, after, first, last} = paginationArgs;
-    //if (before) {
-    //  paginationObj.before = before;
-    //} else if (after) {
-    //  paginationObj.after = after;
-    //}
     const arrName = first ? 'front' : last ? 'back' : 'full';
     paginationObj[arrName] = response;
     response = paginationObj;
@@ -65,7 +60,21 @@ const visitEntity = (bag, subResponse, reqAST, subSchema, context, id) => {
 };
 
 const visitIterable = (bag, subResponse, reqAST, subSchema, context) => {
-  return subResponse.map(res => visit(bag, res, reqAST, subSchema, context));
+  if (reqAST.arguments && reqAST.arguments.length) {
+    const {first, last} = context.paginationWords;
+    const count = reqAST.arguments.find(arg => arg.name.value === first || arg.name.value === last);
+    if (count !== undefined) {
+      const countVal = +count.value.value;
+      if (subResponse.length < countVal) {
+        subResponse.EOF = true;
+      }
+    }
+  }
+  const normalizedSubResponse = subResponse.map(res => visit(bag, res, reqAST, subSchema, context));
+  if (subResponse.EOF) {
+    normalizedSubResponse.EOF = true;
+  }
+  return normalizedSubResponse
 };
 
 const visitUnion = (bag, subResponse, reqAST, subSchema, context) => {
@@ -98,27 +107,10 @@ export const normalizeResponse = (response, context) => {
   const operationType = `${context.operation.operation}Type`;
   const operationSchema = context.schema.types.find(type => type.name === context.schema[operationType].name);
   const result = visit(bag, response, context.operation, operationSchema, context);
+  debugger
   const data = {
     entities: bag,
     result
   };
   return data
 };
-
-//window.imTarget = im.fromJS(window.target);
-//debugger
-//window.merged = window.imTarget.mergeDeepWith((prev, next, key) => {
-//  const aa = key;
-//  if (Array.isArray(next) && List.isList(prev)) {
-//    const primaryKey = next[0].cursor ? 'cursor' : 'id';
-//    const maxTraversals = Math.max(0, prev.size - next.length);
-//    let arrayFront = prev;
-//    for (let i = prev.size -1; i >= maxTraversals; i--) {
-//      if (prev.getIn([i,primaryKey]) === src[0][primaryKey]) {
-//        arrayFront = prev.slice(0,i);
-//        break;
-//      }
-//    }
-//    return arrayFront.concat(src);
-//  }
-//}, window.source)
