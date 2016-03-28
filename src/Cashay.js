@@ -1,7 +1,5 @@
-import {FETCH_DATA_REQUEST, FETCH_DATA_SUCCESS, FETCH_DATA_ERROR} from './duck';
-import {normalize} from 'normalizr';
+import {INSERT_NORMALIZED} from './duck';
 import {parse} from 'graphql/language/parser';
-import {BEGIN, COMMIT, REVERT} from 'redux-optimistic-ui';
 
 
 export default class Cashay {

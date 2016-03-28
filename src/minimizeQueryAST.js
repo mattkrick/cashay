@@ -1,9 +1,9 @@
 export const minimizeQueryAST = (reqAST, idFieldName) => {
   //const {selectionSet} = reqAST;
-  debugger
-  if (reqAST.selectionSet) {
+  if (!reqAST.selectionSet) {
     return
   }
+  debugger
   const {selections} = reqAST.selectionSet;
   let idField;
   for (let i = 0; i < selections.length; i++) {
@@ -14,7 +14,10 @@ export const minimizeQueryAST = (reqAST, idFieldName) => {
     if (!field.sendToServer) {
       selections[i] = undefined;
     } else {
-      minimizeQueryAST(field, idFieldName)
+      minimizeQueryAST(field, idFieldName);
+      if (!field.selectionSet) {
+        selections[i] = undefined;
+      }
     }
   }
   const minimizedFields = selections.filter(Boolean);
@@ -84,73 +87,43 @@ export const minimizeQueryAST = (reqAST, idFieldName) => {
 //  //return normalizrSchema;
 //};
 
-const queryString = `getPosts {
-  id,
-      title,
-      comments {
-    id,
-        title
-  }
-}`
 
-const mutationRules = {
-  add: {
-    Post(optimisticVariables, docFromServer, currentResponse, invalidate) {
-      invalidate();
-    },
-    Comment(optimisticVariables, docFromServer, currentResponse, invalidate) {
-      // optimisticVariables and docFromServer are mutually exclusive
-      let newComment = docFromServer;
-      if (optimisticVariables) {
-        const {title, user} = optimisticVariables;
-        newComment = {
-          title,
-          user,
-          createdAt: Date.now()
-        }
-      }
 
-      const postIndex = currentResponse.getPosts.findIndex(post => post.id === newComment.postId);
-      if (postIndex !== -1) {
-        const parentPost = currentResponse.getPosts[postIndex];
-        const placeBefore = parentPost.comments.findIndex(comment => comment.reputation < newComment.reputation);
-        if (placeBefore !== -1) {
-          return parentPost.comments.splice(placeBefore, 0, newComment);
-        }
-      }
-    }
-  }
-};
 
-//cashay.query(queryString, mutationRules, {variables, transport});
+// const queryString = `getPosts {
+//   id,
+//       title,
+//       comments {
+//     id,
+//         title
+//   }
+// }`
 //
-//const fn1 = (currentResponse, invalidate) => {
-//  return newObject => {
+// const mutationRules = {
+//   add: {
+//     Post(optimisticVariables, docFromServer, currentResponse, invalidate) {
+//       invalidate();
+//     },
+//     Comment(optimisticVariables, docFromServer, currentResponse, invalidate) {
+//       // optimisticVariables and docFromServer are mutually exclusive
+//       let newComment = docFromServer;
+//       if (optimisticVariables) {
+//         const {title, user} = optimisticVariables;
+//         newComment = {
+//           title,
+//           user,
+//           createdAt: Date.now()
+//         }
+//       }
 //
-//  }
-//};
-//
-//this._invalidate = () => {
-//  this._willInvalidateListener = true;
-//};
-//
-//this.add = [
-//  {
-//    mutRules: mutationRules,
-//    currentResponse: this._denormalizedQueries[1]
-//  }
-//];
-//this.add.forEach((listener, newObject, newObjectTypes) => {
-//  for (let i = 0; i < newObjectTypes.length; i++) {
-//    const objType = newObjectTypes[i];
-//    const relevantListener = listener.mutRules[objType];
-//    if (!relevantListener) continue;
-//    const modifiedResponse = relevantListener(newObject, listener.currentResponse, this._invalidate);
-//    if (this._willInvalidateListener === true) {
-//    }
-//    if (!modifiedResponse) continue;
-//  }
-//})
-//
-//
-//
+//       const postIndex = currentResponse.getPosts.findIndex(post => post.id === newComment.postId);
+//       if (postIndex !== -1) {
+//         const parentPost = currentResponse.getPosts[postIndex];
+//         const placeBefore = parentPost.comments.findIndex(comment => comment.reputation < newComment.reputation);
+//         if (placeBefore !== -1) {
+//           return parentPost.comments.splice(placeBefore, 0, newComment);
+//         }
+//       }
+//     }
+//   }
+// };

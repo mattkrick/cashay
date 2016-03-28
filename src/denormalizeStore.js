@@ -7,7 +7,7 @@ import {FRAGMENT_SPREAD, INLINE_FRAGMENT} from 'graphql/language/kinds';
 import {ensureRootType, getRegularArgsKey, ensureTypeFromNonNull} from './utils';
 const {UNION, INTERFACE, LIST, OBJECT, NON_NULL, SCALAR} = TypeKind;
 import {print} from 'graphql/language/printer';
-import {minimizeQueryAST} from './getMinimizedQuery';
+import {minimizeQueryAST} from './minimizeQueryAST';
 
 const handleMissingData = (aliasOrFieldName, field, fieldSchema, context) => {
   const fieldType = ensureTypeFromNonNull(fieldSchema.type);
@@ -82,7 +82,7 @@ const convertFragmentToInline = fragment => {
 
 const visitObject = (subState, reqAST, subSchema, context, baseReduction = {}) => {
   const reducedSelected = reqAST.selectionSet.selections.reduce((reduction, field, idx, selectionArr) => {
-    if (!field) debugger;
+    // if (!field) debugger;
     if (field.kind === FRAGMENT_SPREAD) {
       const fragment = context.fragments[field.name.value];
       selectionArr[idx] = field = convertFragmentToInline(fragment);
@@ -280,7 +280,6 @@ export const denormalizeStore = context => {
     const subSchema = operationSchema.fields.find(field => field.name === queryName);
     const {regularArgs, paginationArgs} = separateArgs(subSchema, selection.arguments, context);
     const fieldState = getFieldState(context.store.result[queryName], regularArgs, paginationArgs);
-    debugger
     calculateSendToServer(selection, context.idFieldName);
     reduction[aliasOrName] = visit(fieldState, selection, subSchema, context);
     return reduction
@@ -291,8 +290,8 @@ export const denormalizeStore = context => {
     definitions: [context.operation]
     //definitions: [context.operation, ...Object.keys(context.fragments).map((k) => context.fragments[k])]
   };
-  console.log('FINAL', print(documentAST));
-  minimizeQueryAST(context.operation, context.idFieldName)
+  // console.log('FINAL', print(documentAST));
+  // minimizeQueryAST(context.operation, context.idFieldName)
   return queryReduction;
 };
 
