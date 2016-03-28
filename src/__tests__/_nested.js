@@ -40,11 +40,9 @@ query getPosts($language: String) {
 }
 
 fragment getAuthor on Author {
-  ... on Author {
 		_id
   	name
   	twitterHandle
-  }
 }`;
 
 export const nestedResponse = {

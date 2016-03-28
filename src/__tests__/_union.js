@@ -65,7 +65,7 @@ export const unionResponse = {
       ]
     }
   }
-}
+};
 
 
 export const unionNormalized ={
@@ -89,7 +89,7 @@ export const unionNormalized ={
       },
       indi: {
         "_id": "indi",
-        "name": "Kasun Indi"
+        //"name": "Kasun Indi"
       },
       pahan: {
         "_id": "pahan",
@@ -184,7 +184,6 @@ query {
   getGroup(_id: "allEmployees") {
     _id
     owner {
-      __typename
       ... on Author {
         _id
         name

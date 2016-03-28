@@ -1,4 +1,5 @@
 import {OPERATION_DEFINITION, FRAGMENT_DEFINITION} from 'graphql/language/kinds';
+import {print} from 'graphql/language/printer';
 
 export const defaultPaginationWords = {
   before: 'before',
