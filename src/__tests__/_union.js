@@ -89,7 +89,7 @@ export const unionNormalized ={
       },
       indi: {
         "_id": "indi",
-        //"name": "Kasun Indi"
+        // "name": "Kasun Indi"
       },
       pahan: {
         "_id": "pahan",

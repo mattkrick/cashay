@@ -1,13 +1,9 @@
 import {TypeKind} from 'graphql/type/introspection';
 import {DOCUMENT} from 'graphql/language/kinds';
-import {buildExecutionContext} from './buildExecutionContext';
-import {mergeDeepWithArrs, mergeArrays, isObject} from './mergeDeep';
 import {separateArgs} from './separateArgs';
 import {FRAGMENT_SPREAD, INLINE_FRAGMENT} from 'graphql/language/kinds';
 import {ensureRootType, getRegularArgsKey, ensureTypeFromNonNull} from './utils';
 const {UNION, INTERFACE, LIST, OBJECT, NON_NULL, SCALAR} = TypeKind;
-import {print} from 'graphql/language/printer';
-import {minimizeQueryAST} from './minimizeQueryAST';
 
 const handleMissingData = (aliasOrFieldName, field, fieldSchema, context) => {
   const fieldType = ensureTypeFromNonNull(fieldSchema.type);
@@ -82,7 +78,6 @@ const convertFragmentToInline = fragment => {
 
 const visitObject = (subState, reqAST, subSchema, context, baseReduction = {}) => {
   const reducedSelected = reqAST.selectionSet.selections.reduce((reduction, field, idx, selectionArr) => {
-    // if (!field) debugger;
     if (field.kind === FRAGMENT_SPREAD) {
       const fragment = context.fragments[field.name.value];
       selectionArr[idx] = field = convertFragmentToInline(fragment);
@@ -129,22 +124,9 @@ const visitObject = (subState, reqAST, subSchema, context, baseReduction = {}) =
           fieldState = getFieldState(fieldState, regularArgs, paginationArgs);
         }
         reduction[aliasOrFieldName] = visit(fieldState, field, fieldSchema, context);
-        // remove selectionArr[idx] if no child sendToServer exists
         if (field.selectionSet) {
-        //debugger
-          //debugger
-          //field.sendToServer = true;
-          //} else {
-          //debugger
           calculateSendToServer(field, context.idFieldName)
         }
-        if (!field.selectionSet) {
-          //selectionArr[idx] = undefined;
-        }
-        //if (fieldName !== context.idFieldName) {
-        //  selectionArr[idx] = 'xxx'
-        //selectionArr.splice(idx,1)
-        //}
       } else {
         reduction[aliasOrFieldName] = handleMissingData(aliasOrFieldName, field, fieldSchema, context);
         field.sendToServer = true;
@@ -152,50 +134,33 @@ const visitObject = (subState, reqAST, subSchema, context, baseReduction = {}) =
     }
     return reduction
   }, baseReduction);
-  //console.log(reqAST.selectionSet.selections);
   reqAST.selectionSet.selections = reqAST.selectionSet.selections.filter(x => x !== 'xxx');
-  //console.log(reqAST.selectionSet.selections);
   return reducedSelected;
 };
 
 const calculateSendToServer = (field, idFieldName) => {
   const {selections} = field.selectionSet;
-  let idField;
   for (let i = 0; i < selections.length; i++) {
     const selection = selections[i];
-    if (!selection) {
-      continue;
-    }
     if (selection.kind === INLINE_FRAGMENT) {
       calculateSendToServer(selection, idFieldName);
-      //debugger
-      //clean up
-      if (!selection.selectionSet || !selection.selectionSet.selections.length) {
-        //selections[i] = undefined;
-      }
-
     }
-    else if (selection.sendToServer) {
+    if (selection.sendToServer) {
       field.sendToServer = true;
-    } else {
-      if (selection.name.value === idFieldName) {
-        idField = selection;
-      }
-      //selections[i] = undefined;
     }
   }
-  const minimizedSelections = selections.filter(Boolean);
-  if (minimizedSelections.length) {
-    if (idField) {
-      minimizedSelections.push(idField);
-    }
-    field.selectionSet.selections = minimizedSelections;
-    field.sendToServer = true;
-  } else {
-    //field.selectionSet = undefined;
-  }
+  // const minimizedSelections = selections.filter(Boolean);
+  // if (minimizedSelections.length) {
+  //   if (idField) {
+  //     minimizedSelections.push(idField);
+  //   }
+  //   field.selectionSet.selections = minimizedSelections;
+  //   field.sendToServer = true;
+  // } else {
+  //   //field.selectionSet = undefined;
+  // }
+};
 
-}
 const visitNormalizedString = (subState, reqAST, subSchema, context) => {
   const [typeName, docId] = subState.split(':');
   const doc = context.store.entities[typeName][docId];
@@ -227,29 +192,7 @@ const visitNormalizedString = (subState, reqAST, subSchema, context) => {
 const visitIterable = (subState, reqAST, subSchema, context) => {
   const fieldType = ensureRootType(subSchema.type);
   const fieldSchema = context.schema.types.find(type => type.name === fieldType.name);
-  const denormalizedIterable = subState.map(res => visit(res, reqAST, fieldSchema, context));
-  //TODO unions?
-  //debugger
-  //// get all the props that we could ever possibly want
-  ////const propNames = reqAST.selectionSet.selections.map(selection => selection.name.value);
-  //const propNames = getPropNames(reqAST.selectionSet.selections);
-  //for (let i = 0; i < propNames.length; i++) {
-  //  const propName = propNames[i];
-  //  if (propName === context.idFieldName) continue;
-  //  let hasNull;
-  //  for (let j = 0; j < denormalizedIterable.length; j++) {
-  //    const entity = denormalizedIterable[j];
-  //    if (entity[propName] === null) {
-  //      hasNull = true;
-  //      break;
-  //    }
-  //  }
-  //  propNames[i] = hasNull ? propNames[i] : undefined;
-  //}
-  //const selectionSet = new Set(propNames);
-  //reqAST.selectionSet.selections = reqAST.selectionSet.selections.filter(selection => selectionSet.has(selection.name.value));
-
-  return denormalizedIterable;
+  return subState.map(res => visit(res, reqAST, fieldSchema, context));
 };
 
 const visit = (subState, reqAST, subSchema, context) => {
@@ -271,7 +214,6 @@ const visit = (subState, reqAST, subSchema, context) => {
 };
 
 export const denormalizeStore = context => {
-  //ser
   const operationType = `${context.operation.operation}Type`;
   const operationSchema = context.schema.types.find(type => type.name === context.schema[operationType].name);
   const queryReduction = context.operation.selectionSet.selections.reduce((reduction, selection) => {
@@ -280,16 +222,16 @@ export const denormalizeStore = context => {
     const subSchema = operationSchema.fields.find(field => field.name === queryName);
     const {regularArgs, paginationArgs} = separateArgs(subSchema, selection.arguments, context);
     const fieldState = getFieldState(context.store.result[queryName], regularArgs, paginationArgs);
-    calculateSendToServer(selection, context.idFieldName);
     reduction[aliasOrName] = visit(fieldState, selection, subSchema, context);
+    calculateSendToServer(selection, context.idFieldName);
     return reduction
   }, {});
   calculateSendToServer(context.operation, context.idFieldName);
-  const documentAST = {
-    kind: DOCUMENT,
-    definitions: [context.operation]
+  // const documentAST = {
+  //   kind: DOCUMENT,
+  //   definitions: [context.operation]
     //definitions: [context.operation, ...Object.keys(context.fragments).map((k) => context.fragments[k])]
-  };
+  // };
   // console.log('FINAL', print(documentAST));
   // minimizeQueryAST(context.operation, context.idFieldName)
   return queryReduction;

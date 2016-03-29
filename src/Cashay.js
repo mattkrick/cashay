@@ -271,3 +271,43 @@ export default class Cashay {
 const getTypesMutated = (mutationString, schema) => {
 
 };
+
+
+
+// const queryString = `getPosts {
+//   id,
+//       title,
+//       comments {
+//     id,
+//         title
+//   }
+// }`
+//
+// const mutationRules = {
+//   add: {
+//     Post(optimisticVariables, docFromServer, currentResponse, invalidate) {
+//       invalidate();
+//     },
+//     Comment(optimisticVariables, docFromServer, currentResponse, invalidate) {
+//       // optimisticVariables and docFromServer are mutually exclusive
+//       let newComment = docFromServer;
+//       if (optimisticVariables) {
+//         const {title, user} = optimisticVariables;
+//         newComment = {
+//           title,
+//           user,
+//           createdAt: Date.now()
+//         }
+//       }
+//
+//       const postIndex = currentResponse.getPosts.findIndex(post => post.id === newComment.postId);
+//       if (postIndex !== -1) {
+//         const parentPost = currentResponse.getPosts[postIndex];
+//         const placeBefore = parentPost.comments.findIndex(comment => comment.reputation < newComment.reputation);
+//         if (placeBefore !== -1) {
+//           return parentPost.comments.splice(placeBefore, 0, newComment);
+//         }
+//       }
+//     }
+//   }
+// };
