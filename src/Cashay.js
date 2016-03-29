@@ -1,5 +1,7 @@
 import {INSERT_NORMALIZED} from './duck';
 import {parse} from 'graphql/language/parser';
+import {denormalizeStore} from './denormalizeStore';
+import {printMinimalQuery} from './minimizeQueryAST';
 
 
 export default class Cashay {
@@ -77,8 +79,10 @@ export default class Cashay {
       idFieldName,
       store: this._store
     });
-    //denormalizedPartialResult.isComplete = !minimizedAST; // done in denormFromStore
-    const {denormalizedPartialResult, minimizedAST} = denormFromStore(queryAST, context);
+    const denormalizedPartialResult = denormalizeStore(context);
+    
+    // const minimizedQueryString
+    // const {denormalizedPartialResult, minimizedAST} = denormFromStore(queryAST, context);
 
     // store the possibly full result in cashay
     denormalizedQueryMap.set(variables, denormalizedPartialResult);
@@ -87,7 +91,7 @@ export default class Cashay {
     }
 
     // if all the data is obtained locally, we're done!
-    if (!minimizedAST) {
+    if (denormalizedPartialResult._isComplete) {
       return denormalizedQueryMap.get(variables)
     }
 

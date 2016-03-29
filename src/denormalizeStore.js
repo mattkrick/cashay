@@ -1,5 +1,4 @@
 import {TypeKind} from 'graphql/type/introspection';
-import {DOCUMENT} from 'graphql/language/kinds';
 import {separateArgs} from './separateArgs';
 import {FRAGMENT_SPREAD, INLINE_FRAGMENT} from 'graphql/language/kinds';
 import {ensureRootType, getRegularArgsKey, ensureTypeFromNonNull} from './utils';
@@ -227,19 +226,6 @@ export const denormalizeStore = context => {
     return reduction
   }, {});
   calculateSendToServer(context.operation, context.idFieldName);
-  // const documentAST = {
-  //   kind: DOCUMENT,
-  //   definitions: [context.operation]
-    //definitions: [context.operation, ...Object.keys(context.fragments).map((k) => context.fragments[k])]
-  // };
-  // console.log('FINAL', print(documentAST));
-  // minimizeQueryAST(context.operation, context.idFieldName)
+  queryReduction._isComplete = !context.operation.sendToServer;
   return queryReduction;
 };
-
-//[1,2,3].reduce((reduction, entry, idx, arr) => {
-//  console.log(entry);
-//  if (idx === 1) {
-//    arr.splice(idx,1);
-//  }
-//}, 0)

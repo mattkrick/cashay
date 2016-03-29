@@ -1,12 +1,9 @@
 import {print} from 'graphql/language/printer';
 import {INLINE_FRAGMENT} from 'graphql/language/kinds';
+import {DOCUMENT} from 'graphql/language/kinds';
 
 export const printMinimalQuery = (reqAST, idFieldName) => {
-  window.gp = print;
-  window.reqAST = reqAST;
-  debugger
   minimizeQueryAST(reqAST.definitions[0], idFieldName);
-  console.log(print(reqAST));
   return print(reqAST);
 };
 
