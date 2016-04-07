@@ -1,13 +1,19 @@
 import {INSERT_NORMALIZED} from './duck';
 import {parse} from 'graphql/language/parser';
 import {denormalizeStore} from './denormalizeStore';
+import {normalizeResponse} from './normalizeResponse';
 import {printMinimalQuery} from './minimizeQueryAST';
+import {buildExecutionContext} from './buildExecutionContext';
 
+const defaultGetToState = store => store.getState().cashay;
 
 export default class Cashay {
-  constructor({store, transport, schema}) {
+  constructor({store, transport, schema, getToState}) {
     // the redux store
     this._store = store;
+
+    //how to get from the store to cahsay
+    this._getToState = getToState || defaultGetToState;
 
     // the default function to send the queryString to the server (usually HTTP or WS)
     this._transport = transport;
@@ -34,8 +40,26 @@ export default class Cashay {
       delete: new Map()
     };
 
+    // a set to store the listener object so we only have to set listeners once
+    this._ensuredListeners = new Set();
+
     // lookup table for connecting the mutation result to the entities it affects
     this._mutationStringToType = {};
+
+    // denormalized deps is an object with entities for keys. 
+    // The value of each entity is an object with uids for keys.
+    // the value of each UID is a set of dependencyKeys pointing to a denormalized query that needs to be invalidated
+    // const example = {
+    //   Pets: {
+    //     1: Set(dependencyKey1, dependencyKey2)
+    //   }
+    // }
+    this._denormalizedDeps = {};
+
+    // normalizedDeps is a Map where each key is a dependencyKey
+    // the value is a Set of locations in the _denormalizedDeps (eg ['Pets','1']
+    this._normalizedDeps = new Map();
+
   }
 
   _invalidate() {
@@ -59,6 +83,7 @@ export default class Cashay {
 
       // if the storedDenormResult exists & is complete & we aren't going to do a forceFetch, return it FAST
       if (storedDenormResult && storedDenormResult._isComplete && !forceFetch) {
+        // TODO garbage collect here
         return storedDenormResult;
       }
     } else {
@@ -66,92 +91,154 @@ export default class Cashay {
       denormalizedQueryMap = this._denormalizedResponses[queryString] = new Map();
     }
 
-    // the request query + vars combo are not stored
-    const queryAST = parse(queryString, {noLocation: true, noSource: true});
-
-    // denormalize queryAST from store data and create dependencies, return minimziedAST
     const {paginationWords, idFieldName} = options;
-    //const schema = options.schema || this._schema;
 
-    const context = buildExecutionContext(this._schema, queryAST, {
+    // parse the queryString into an AST and break it into tasty little chunks
+    const context = buildExecutionContext(this._schema, queryString, {
       variables,
       paginationWords,
       idFieldName,
       store: this._store
     });
+
+    // create a denormalized document from local data that also flags missing objects
     const denormalizedPartialResult = denormalizeStore(context);
-    
-    // const minimizedQueryString
-    // const {denormalizedPartialResult, minimizedAST} = denormFromStore(queryAST, context);
+
+    // operation.sendToServer means something down the tree needs to be fetched from the server
+    const dataIsLocal = !context.operation.sendToServer;
+
+    // if we're force fetching, always mark the result as incomplete since we'll get new data from the server
+    denormalizedPartialResult._isComplete = !forceFetch && dataIsLocal;
+
+    // if we need more data, get it from the server
+    if (!denormalizedPartialResult._isComplete) {
+      const transport = this._getTransport(options);
+
+      // given an operation enhanced with sendToServer flags, print minimal query
+      const minimizedQueryString = forceFetch ?
+        context.dependencyKey.queryString : printMinimalQuery(context.operation, idFieldName);
+
+      //  async query the server (no need to track the promise it returns, as it will change the redux state)
+      this._queryServer(transport, context, minimizedQueryString);
+    }
+
+    // add denormalizedDeps so we can invalidate when other queries come in
+    // add normalizedDeps to find those deps when a denormalizedReponse is mutated
+    if (!this._normalizedDeps.has(context.dependencyKey)) {
+      this._addDeps(denormalizedPartialResult, context.dependencyKey);
+    }
 
     // store the possibly full result in cashay
     denormalizedQueryMap.set(variables, denormalizedPartialResult);
+
+
     if (!denormalizedQueryMap.has('options')) {
-      denormalizedQueryMap.set('options', {paginationWords, idFieldName})
+
     }
 
-    // if all the data is obtained locally, we're done!
-    if (denormalizedPartialResult._isComplete) {
-      return denormalizedQueryMap.get(variables)
+    // go through a Map of function pointers to make sure we haven't listeners for this query before
+    if (!this._ensuredListeners.has(mutationListeners)) {
+      // keep options that are shared across variable combos (for listeners)
+      denormalizedQueryMap.set('options', {paginationWords, idFieldName});
+
+      // add the mutation listeners to the Cashay singleton
+      this._ensureListeners(queryString, mutationListeners);
     }
 
-    // create an object unique to the queryString + vars
-    const dependencyKey = {queryString, variables};
+    // if the only benefit we get from this dispatch is a few nulls & empty arrays, let's hold off until we get
+    // the good stuff back from the server
+    // if (!dataIsLocal) {
+    //   const reduc
+    //   // merge the new data 
+    //   this._store.dispatch({
+    //     type: '@@cashay/INSERT_NORMALIZED',
+    //     payload: {
+    //       response: denormalizedPartialResult
+    //     }
+    //   });
+    // }
+  }
 
-    // otherwise, normalize the partial data so we can cache pending queries
-    const normalizedPartialResult = normalizeAndAddDeps(denormalizedPartialResult, context, dependencyKey);
+  /*
+   *
+   * QUERY HELPER TO GET DATA FROM SERVER (ASYNC)
+   *
+   *  */
+  async _queryServer(transport, context, minimizedQueryString) {
+    const {variableValues: variables} = context;
 
-    // TODO: either put the normalizedPartialResult in the store or keep in in an array & run through each after minimizing
-    // the minimizaing logic must work on a queryAST + schema (to walk the queryAST) + normalized data
+    // send minimizedQueryString to server and await minimizedQueryResponse
+    const minimizedQueryResponse = await transport(minimizedQueryString, variables);
 
-    // fetch the missing data
-    (async () => {
-      // print (minimizedAST)
-      const minimizedQueryString = print(minimizedAST);
+    // normalize response to get ready to dispatch it into the state tree
+    const normalizedMinimizedQueryResponse = normalizeResponse(minimizedQueryResponse, context);
 
-      // get transport from options or default
-      const transport = options.transport || this._transport;
-      if (typeof transport !== 'function') {
-        console.error('No transport function provided');
+    // add denormalizedDeps so we can invalidate when other queries come in
+    // add normalizedDeps to find those deps when a denormalizedReponse is mutated
+    this._addDeps(normalizedMinimizedQueryResponse, context.dependencyKey);
+
+    // get current state data
+    const cashayDataStore = this._getToState(this._store).get('data');
+
+    // now, remove the objects that look identical to the ones already in the state
+    // if the incoming entity (eg Person.123) looks exactly like the one already in the store, then
+    // we don't have to invalidate and rerender 
+    const normalizedResponseForStore = reduceNormalizedResponse(normalizedMinimizedQueryResponse, cashayDataStore);
+
+    // walk the normalized response & grab the deps for each entity. put em all in a Set & flush it down the toilet
+    const flushSet = this._makeFlushSet(normalizedResponseForStore);
+
+    // TODO: if no mutations ever occur, such as pagination of read-only docs, when should we run GC?
+    for (let entry of flushSet) {
+      const {queryString, variables} = entry;
+      this._denormalizedResponses[queryString].delete(variables);
+      this._listeners.add.delete(queryString);
+      //this._listeners.update.delete(queryString);
+      //this._listeners.delete.delete(queryString);
+    }
+
+    // combine partial query with the new minimal response (a little hacky to get a result before the dispatch)
+    // fullResult should come with an _isComplete flag set to true
+    const fullResult = combinePartialAndMinimal(denormalizedPartialResult, normalizedMinimizedQueryResponse);
+    denormalizedQueryMap.set(variables, fullResult);
+
+    // stick normalize data in store and recreate any invalidated denormalized structures
+    this._store.dispatch({
+      type: '@@cashay/INSERT_NORMALIZED',
+      payload: {
+        response: normalizedMinimizedQueryResponse
       }
+    });
+  }
 
-      // send minimizedQueryString to server and await minimizedQueryResponse
-      const minimizedQueryResponse = await transport(minimizedQueryString, variables);
+  _addDeps(normalizedResponse, dependencyKey) {
+    const normalizedDeps = makeNormalizedDeps(normalizedResponse.entities);
+    const previousNormalizedDeps = this._normalizedDeps.get(dependencyKey);
 
-      // normalize response and add the storedDenormResults  to every object as a dep
-      const normalizedMinimizedQueryResponse = normalizeAndAddDeps(minimizedQueryResponse, context, dependencyKey);
-
-      // get current state data
-      const cashayDataStore = this._store.getState().getIn(['cashay', 'data']);
-
-      // walk the minimized response & at each location, find it in the current state. if it exists, add its deps
-      const flushSet = makeFlushSet(normalizedMinimizedQueryResponse, cashayDataStore);
-
-      // invalidate all denormalized results that depended on this data
-      // by aggresively invalidating, this serves as a garbage collector since it won't be recreated unless necessary
-      // TODO: if no mutations ever occur, such as pagination of read-only docs, when should we run GC?
-      for (let entry of flushSet) {
-        const {queryString, variables} = entry;
-        this._denormalizedResponses[queryString].delete(variables);
-        this._listeners.add.delete(queryString);
-        //this._listeners.update.delete(queryString);
-        //this._listeners.delete.delete(queryString);
-      }
-
-      // combine partial query with the new minimal response (a little hacky to get a result before the dispatch)
-      // fullResult should come with an _isComplete flag set to true
-      const fullResult = combinePartialAndMinimal(denormalizedPartialResult, normalizedMinimizedQueryResponse);
-      denormalizedQueryMap.set(variables, fullResult);
-
-      // stick normalize data in store and recreate any invalidated denormalized structures
-      this._store.dispatch({
-        type: '@@cashay/INSERT_NORMALIZED',
-        payload: {
-          response: normalizedMinimizedQueryResponse
+    // remove old denormalizedDeps
+    if (previousNormalizedDeps) {
+      // go through the remaining (obsolete) dependencies & if it isn't a new dep, remove it
+      for (let stackLoc of previousNormalizedDeps) {
+        if (!normalizedDeps.has(stackLoc)) {
+          const [entity, item] = stackLoc.split('.');
+          this._denormalizedDeps[entity][item].delete(dependencyKey);
         }
-      });
-    })();
+      }
+    }
 
+    //replace the old with the new
+    this._normalizedDeps.set(dependencyKey, normalizedDeps);
+
+    // go through and replace the denormalizedDeps with the new normalizedDeps
+    for (let stackLoc of normalizedDeps) {
+      const [entity, item] = stackLoc.split('.');
+      this._denormalizedDeps[entity] = this._denormalizedDeps[entity] || {};
+      this._denormalizedDeps[entity][item] = this._denormalizedDeps[entity][item] || new Set();
+      this._denormalizedDeps[entity][item].add(dependencyKey);
+    }
+  }
+
+  _ensureListeners(queryString, mutationListeners) {
     // add mutation listeners for add, update, delete
     Object.keys(mutationListeners).forEach(listener => {
       const listenerMap = this._listeners[listener];
@@ -161,7 +248,7 @@ export default class Cashay {
         console.error(`Invalid mutation rule: ${listener}.\nSee queryString: ${queryString}`);
       }
 
-      // make sure there is only 1 listener per queeryString
+      // make sure there is only 1 listener per queryString
       if (listenerMap.has(queryString)) {
         console.warn(`Each queryString can only have 1 set of rules per ${listener} mutation.
         Remove extra rules for secondary instances of: ${queryString}`);
@@ -170,6 +257,21 @@ export default class Cashay {
       // push the new listener
       listenerMap.set(queryString, mutationListeners[listener]);
     });
+  }
+
+  _getTransport(options) {
+    const transport = options.transport || this._transport;
+    if (typeof transport !== 'function') {
+      console.error('No transport function provided');
+    }
+    return transport;
+  }
+
+  _makeFlushSet(normalizedResponse) {
+    const flushSet = new Set();
+    // walk the minimized normalized response & at each location, find it in this._normalizedDeps.
+    // grab that Set & add it the the flushSet
+    // return the flushSet
   }
 
   /*
@@ -182,7 +284,7 @@ export default class Cashay {
     //const schema = options.schema || this._schema;
     const typesMutated = getTypesMutated(mutationString, this._schema);
 
-    (async () => {
+    (async() => {
       const transport = options.transport || this._transport;
       const docFromServer = await transport(mutationString, variables);
       // update state with new doc from server
@@ -272,11 +374,26 @@ export default class Cashay {
   }
 }
 
+const defaultSetLocationState = state => state.cashay
+
 const getTypesMutated = (mutationString, schema) => {
 
 };
 
-
+const makeNormalizedDeps = entities => {
+  const entityKeys = Object.keys(entities);
+  const normalizedDeps = new Set();
+  for (let i = 0; i < entityKeys.length; i++) {
+    const entityName = entityKeys[i];
+    const itemKeys = Object.keys(entities[entityName]);
+    for (let j = 0; j < itemKeys.length; j++) {
+      const itemName = itemKeys[j];
+      const dep = `${entityName}.${itemName}`;
+      normalizedDeps.add(dep);
+    }
+  }
+  return normalizedDeps;
+};
 
 // const queryString = `getPosts {
 //   id,

@@ -1,5 +1,6 @@
 import {OPERATION_DEFINITION, FRAGMENT_DEFINITION} from 'graphql/language/kinds';
 import {print} from 'graphql/language/printer';
+import {parse} from 'graphql/language/parser';
 
 export const defaultPaginationWords = {
   before: 'before',
@@ -8,7 +9,10 @@ export const defaultPaginationWords = {
   last: 'last'
 };
 
-export const buildExecutionContext = (schema, documentAST, options) => {
+export const buildExecutionContext = (schema, queryString, options) => {
+  // the request query + vars combo are not stored
+  const documentAST = parse(queryString, {noLocation: true, noSource: true});
+  
   let operation;
   const fragments = documentAST.definitions.reduce((reduction, definition) => {
     if (definition.kind === OPERATION_DEFINITION) {
@@ -32,7 +36,9 @@ export const buildExecutionContext = (schema, documentAST, options) => {
     paginationWords: Object.assign(defaultPaginationWords, options.paginationWords),
     variableValues: options.variableValues,
     idFieldName: options.idFieldName || 'id',
-    store: options.store
+    store: options.store,
+    // create an object unique to the queryString + vars
+    dependencyKey: {variables: options.variableValues, queryString}
   };
 };
 

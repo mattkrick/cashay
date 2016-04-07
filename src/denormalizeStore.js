@@ -226,6 +226,5 @@ export const denormalizeStore = context => {
     return reduction
   }, {});
   calculateSendToServer(context.operation, context.idFieldName);
-  queryReduction._isComplete = !context.operation.sendToServer;
   return queryReduction;
 };
