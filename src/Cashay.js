@@ -61,6 +61,7 @@ export default class Cashay {
     // the value is a Set of locations in the _denormalizedDeps (eg ['Pets','1']
     this._normalizedDeps = new Map();
 
+    // TODO store queryASTs in a WeakMap?
   }
 
   _invalidate() {
@@ -195,8 +196,8 @@ export default class Cashay {
 
     // combine partial query with the new minimal response (a little hacky to get a result before the dispatch)
     // fullResult should come with an _isComplete flag set to true
-    const fullResult = combinePartialAndMinimal(denormalizedPartialResult, normalizedMinimizedQueryResponse);
-    denormalizedQueryMap.set(variables, fullResult);
+    // const fullResult = mergeDeepWithArrs(denormalizedPartialResult, normalizedMinimizedQueryResponse);
+    // this._denormalizedResponses[context.dependencyKey.queryString].set(variables, fullResult);
 
     // stick normalize data in store and recreate any invalidated denormalized structures
     this._store.dispatch({
@@ -263,11 +264,28 @@ export default class Cashay {
     return transport;
   }
 
+  /*
+   * Crawl the dependency tree snagging up everything that will be invalidated
+   * No safety checks required.
+   * The tree is guaranteed to have everything we look for because of _addDeps
+   */
   _makeFlushSet(normalizedResponse) {
-    const flushSet = new Set();
-    // walk the minimized normalized response & at each location, find it in this._normalizedDeps.
-    // grab that Set & add it the the flushSet
-    // return the flushSet
+    let flushSet = new Set();
+    const {entities} = normalizedResponse;
+    const entityKeys = Object.keys(entities);
+    for (let i = 0; i < entityKeys.length; i++) {
+      const entityName = entityKeys[i];
+      const entityDepObject = this._denormalizedDeps[entityName];
+      const newEntity = entities[entityName];
+      const itemKeys = Object.keys(newEntity);
+      for (let j = 0; j < itemKeys.length; j++) {
+        const itemName = itemKeys[j];
+        const itemDepSet = entityDepObject[itemName];
+        // there's gotta be a more efficient way to merge sets. gross.
+        flushSet = new Set([...flushSet, ...itemDepSet]);
+      }
+    }
+    return flushSet;
   }
 
   /*
