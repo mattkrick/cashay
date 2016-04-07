@@ -4,6 +4,7 @@ import {denormalizeStore} from './denormalizeStore';
 import {normalizeResponse} from './normalizeResponse';
 import {printMinimalQuery} from './minimizeQueryAST';
 import {buildExecutionContext} from './buildExecutionContext';
+import {makeNormalizedDeps, shortenNormalizedResponse} from './queryHelpers';
 
 const defaultGetToState = store => store.getState().cashay;
 
@@ -83,7 +84,7 @@ export default class Cashay {
 
       // if the storedDenormResult exists & is complete & we aren't going to do a forceFetch, return it FAST
       if (storedDenormResult && storedDenormResult._isComplete && !forceFetch) {
-        // TODO garbage collect here
+        // TODO garbage collect here via a timeout
         return storedDenormResult;
       }
     } else {
@@ -130,11 +131,6 @@ export default class Cashay {
 
     // store the possibly full result in cashay
     denormalizedQueryMap.set(variables, denormalizedPartialResult);
-
-
-    if (!denormalizedQueryMap.has('options')) {
-
-    }
 
     // go through a Map of function pointers to make sure we haven't listeners for this query before
     if (!this._ensuredListeners.has(mutationListeners)) {
@@ -183,7 +179,7 @@ export default class Cashay {
     // now, remove the objects that look identical to the ones already in the state
     // if the incoming entity (eg Person.123) looks exactly like the one already in the store, then
     // we don't have to invalidate and rerender 
-    const normalizedResponseForStore = reduceNormalizedResponse(normalizedMinimizedQueryResponse, cashayDataStore);
+    const normalizedResponseForStore = shortenNormalizedResponse(normalizedMinimizedQueryResponse, cashayDataStore);
 
     // walk the normalized response & grab the deps for each entity. put em all in a Set & flush it down the toilet
     const flushSet = this._makeFlushSet(normalizedResponseForStore);
@@ -374,25 +370,8 @@ export default class Cashay {
   }
 }
 
-const defaultSetLocationState = state => state.cashay
-
 const getTypesMutated = (mutationString, schema) => {
 
-};
-
-const makeNormalizedDeps = entities => {
-  const entityKeys = Object.keys(entities);
-  const normalizedDeps = new Set();
-  for (let i = 0; i < entityKeys.length; i++) {
-    const entityName = entityKeys[i];
-    const itemKeys = Object.keys(entities[entityName]);
-    for (let j = 0; j < itemKeys.length; j++) {
-      const itemName = itemKeys[j];
-      const dep = `${entityName}.${itemName}`;
-      normalizedDeps.add(dep);
-    }
-  }
-  return normalizedDeps;
 };
 
 // const queryString = `getPosts {
@@ -432,3 +411,30 @@ const makeNormalizedDeps = entities => {
 //     }
 //   }
 // };
+
+// const equals = function (x, y) {
+//     if (x == y) return true;
+//
+//     let p;
+//     for (p in y) {
+//       if (typeof (x[p]) == 'undefined') { return false; }
+//     }
+//
+//     for (p in y) {
+//       if (y[p]) {
+//         if (typeof y[p] === 'object') {
+//           if (!equals(x[p], y[p])) { return false; } break;
+//         } else {
+//           if (y[p] != x[p]) { return false; }
+//         }
+//       } else {
+//         if (x[p])
+//           return false;
+//       }
+//     }
+//
+//     for (p in x) {
+//       if (typeof (y[p]) == 'undefined') { return false; }
+//     }
+//     return true;
+// }
