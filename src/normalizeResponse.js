@@ -1,7 +1,8 @@
-import {mergeDeepWithArrs, mergeArrays, isObject} from './mergeDeep';
+
+import {mergeDeepWithArrs, mergeArrays} from './mergeDeep';
 import {separateArgs} from './separateArgs';
 import {getSubReqAST} from './getSubReqAST';
-import {ensureRootType, getRegularArgsKey} from './utils';
+import {ensureRootType, getRegularArgsKey, isObject} from './utils';
 import {TypeKind} from 'graphql/type/introspection';
 const {UNION, INTERFACE, LIST, OBJECT, NON_NULL, SCALAR} = TypeKind;
 

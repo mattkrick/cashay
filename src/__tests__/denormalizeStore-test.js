@@ -6,7 +6,7 @@ import {buildExecutionContext} from '../buildExecutionContext';
 import {unionQueryString, unionResponse, unionNormalized,
   unionQueryStringExtraTwitter, unionResponsePartialTwitter,
   unionNormalizedMissingOwner, unionResponseMissingOwner,
-  unionQueryStringExtraOwner} from './_union';
+  unionQueryStringExtraOwner, initialState, initialStateResponse} from './_union';
 import clientSchema from './clientSchema.json';
 import {denormalizeStore} from '../denormalizeStore';
 import {nestedQueryString, nestedResponse, nestedNormalized,
@@ -37,83 +37,89 @@ export const same = (t, actual, expected, message) => {
   `);
 };
 
-//test('denormalize store from union request', t => {
-//  const queryAST = parse(unionQueryString, {noLocation: true, noSource: true});
-//  const unionOptions = {
-//    variableValues: nestedVariableValues,
-//    paginationWords: nestedPaginationWords,
-//    idFieldName: '_id',
-//    store: unionNormalized
-//  };
-//  const context = buildExecutionContext(clientSchema, queryAST, unionOptions);
-//  const denormalizedResponse = denormalizeStore(context);
-//  t.same(denormalizedResponse, unionResponse.data);
-//});
+test('denormalize store from union request', t => {
+ const unionOptions = {
+   variableValues: nestedVariableValues,
+   paginationWords: nestedPaginationWords,
+   idFieldName: '_id',
+   store: unionNormalized
+ };
+ const context = buildExecutionContext(clientSchema, unionQueryString, unionOptions);
+ const denormalizedResponse = denormalizeStore(context);
+ same(t,denormalizedResponse, unionResponse.data);
+});
 
 test('denormalize store with missing scalar data', t => {
-  const queryAST = parse(unionQueryStringExtraTwitter, {noLocation: true, noSource: true});
   const unionOptions = {
     variableValues: nestedVariableValues,
     paginationWords: nestedPaginationWords,
     idFieldName: '_id',
     store: unionNormalized
   };
-  const context = buildExecutionContext(clientSchema, queryAST, unionOptions);
+  const context = buildExecutionContext(clientSchema, unionQueryStringExtraTwitter, unionOptions);
   const denormalizedResponse = denormalizeStore(context);
   same(t,denormalizedResponse, unionResponsePartialTwitter.data);
 });
 
-//test('denormalize store with missing entity', t => {
-//  const queryAST = parse(nestedQueryString, {noLocation: true, noSource: true});
-//  const unionOptions = {
-//    variableValues: nestedVariableValues,
-//    paginationWords: nestedPaginationWords,
-//    idFieldName: '_id',
-//    store: nestedNormalizedNoFirstAuthor
-//  };
-//  const context = buildExecutionContext(clientSchema, queryAST, unionOptions);
-//  const denormalizedResponse = denormalizeStore(context);
-//  same(t,denormalizedResponse, nestedResponseNoFirstAuthor);
-//});
-//
-//test('denormalize store with missing array', t => {
-//  const queryAST = parse(nestedQueryString, {noLocation: true, noSource: true});
-//  const unionOptions = {
-//    variableValues: nestedVariableValues,
-//    paginationWords: nestedPaginationWords,
-//    idFieldName: '_id',
-//    store: nestedNormalizedNoFirstComments
-//  };
-//  const context = buildExecutionContext(clientSchema, queryAST, unionOptions);
-//  const denormalizedResponse = denormalizeStore(context);
-//  same(t,denormalizedResponse, nestedResponseNoFirstComments);
-//});
-//
-//test('denormalize store with missing union', t => {
-//  const queryAST = parse(unionQueryStringExtraOwner, {noLocation: true, noSource: true});
-//  const unionOptions = {
-//    variableValues: nestedVariableValues,
-//    paginationWords: nestedPaginationWords,
-//    idFieldName: '_id',
-//    store: unionNormalizedMissingOwner
-//  };
-//  const context = buildExecutionContext(clientSchema, queryAST, unionOptions);
-//  const denormalizedResponse = denormalizeStore(context);
-//  same(t,denormalizedResponse, unionResponseMissingOwner.data);
-//});
-//
-//test('denormalize store from nested request', t => {
-//  const queryAST = parse(nestedQueryString, {noLocation: true, noSource: true});
-//  const nestedOptions = {
-//    variableValues: nestedVariableValues,
-//    paginationWords: nestedPaginationWords,
-//    idFieldName: '_id',
-//    store: nestedNormalized
-//  };
-//  const context = buildExecutionContext(clientSchema, queryAST, nestedOptions);
-//  const denormalizedResponse = denormalizeStore(context);
-//  same(t,denormalizedResponse, nestedResponse);
-//});
+test('denormalize store with initial state', t => {
+  const unionOptions = {
+    variableValues: nestedVariableValues,
+    paginationWords: nestedPaginationWords,
+    idFieldName: '_id',
+    store: initialState
+  };
+  const context = buildExecutionContext(clientSchema, unionQueryStringExtraTwitter, unionOptions);
+  const denormalizedResponse = denormalizeStore(context);
+  same(t,denormalizedResponse, initialStateResponse.data);
+});
+
+test('denormalize store with missing entity', t => {
+ const unionOptions = {
+   variableValues: nestedVariableValues,
+   paginationWords: nestedPaginationWords,
+   idFieldName: '_id',
+   store: nestedNormalizedNoFirstAuthor
+ };
+ const context = buildExecutionContext(clientSchema, nestedQueryString, unionOptions);
+ const denormalizedResponse = denormalizeStore(context);
+ same(t,denormalizedResponse, nestedResponseNoFirstAuthor);
+});
+
+test('denormalize store with missing array', t => {
+ const unionOptions = {
+   variableValues: nestedVariableValues,
+   paginationWords: nestedPaginationWords,
+   idFieldName: '_id',
+   store: nestedNormalizedNoFirstComments
+ };
+ const context = buildExecutionContext(clientSchema, nestedQueryString, unionOptions);
+ const denormalizedResponse = denormalizeStore(context);
+ same(t,denormalizedResponse, nestedResponseNoFirstComments);
+});
+
+test('denormalize store with missing union', t => {
+ const unionOptions = {
+   variableValues: nestedVariableValues,
+   paginationWords: nestedPaginationWords,
+   idFieldName: '_id',
+   store: unionNormalizedMissingOwner
+ };
+ const context = buildExecutionContext(clientSchema, unionQueryStringExtraOwner, unionOptions);
+ const denormalizedResponse = denormalizeStore(context);
+ same(t,denormalizedResponse, unionResponseMissingOwner.data);
+});
+
+test('denormalize store from nested request', t => {
+ const nestedOptions = {
+   variableValues: nestedVariableValues,
+   paginationWords: nestedPaginationWords,
+   idFieldName: '_id',
+   store: nestedNormalized
+ };
+ const context = buildExecutionContext(clientSchema, nestedQueryString, nestedOptions);
+ const denormalizedResponse = denormalizeStore(context);
+ same(t,denormalizedResponse, nestedResponse);
+});
 
 // get subset of pagination docs saved
 

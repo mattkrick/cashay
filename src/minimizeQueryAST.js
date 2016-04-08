@@ -3,7 +3,7 @@ import {INLINE_FRAGMENT} from 'graphql/language/kinds';
 import {DOCUMENT} from 'graphql/language/kinds';
 
 export const printMinimalQuery = (reqAST, idFieldName) => {
-  minimizeQueryAST(reqAST.definitions[0], idFieldName);
+  minimizeQueryAST(reqAST, idFieldName);
   return print(reqAST);
 };
 

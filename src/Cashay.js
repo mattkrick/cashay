@@ -5,6 +5,7 @@ import {normalizeResponse} from './normalizeResponse';
 import {printMinimalQuery} from './minimizeQueryAST';
 import {buildExecutionContext} from './buildExecutionContext';
 import {makeNormalizedDeps, shortenNormalizedResponse} from './queryHelpers';
+import {isObject} from './utils';
 
 const defaultGetToState = store => store.getState().cashay;
 
@@ -73,7 +74,7 @@ export default class Cashay {
    * QUERY METHOD
    *
    */
-  query(queryString, options = {}, mutationListeners = {}) {
+  query(queryString, options = {}, mutationListeners) {
     //if you call forceFetch in a mapStateToProps, you're gonna have a bad time (it'll refresh on EVERY dispatch)
     const {variables, forceFetch} = options;
 
@@ -100,23 +101,25 @@ export default class Cashay {
       variables,
       paginationWords,
       idFieldName,
-      store: this._store
+      store: this._getToState(this._store).data
     });
 
     // create a denormalized document from local data that also flags missing objects
-    const denormalizedPartialResult = denormalizeStore(context);
+    const denormalizedPartialResult = {data: denormalizeStore(context)};
 
     // operation.sendToServer means something down the tree needs to be fetched from the server
     const dataIsLocal = !context.operation.sendToServer;
 
-    // if we're force fetching, always mark the result as incomplete since we'll get new data from the server
-    denormalizedPartialResult._isComplete = !forceFetch && dataIsLocal;
+    // figure out if we're done here
+    const isComplete = !forceFetch && dataIsLocal;
 
     // if we need more data, get it from the server
-    if (!denormalizedPartialResult._isComplete) {
+    if (!isComplete) {
       const transport = this._getTransport(options);
 
       // given an operation enhanced with sendToServer flags, print minimal query
+      // TODO currently unless it's a forceFetch, the whole thing tries to get minimized
+      // let's look in context.store.result[queryName][variables] for each query to see if theyre all empty, too
       const minimizedQueryString = forceFetch ?
         context.dependencyKey.queryString : printMinimalQuery(context.operation, idFieldName);
 
@@ -126,15 +129,20 @@ export default class Cashay {
 
     // add denormalizedDeps so we can invalidate when other queries come in
     // add normalizedDeps to find those deps when a denormalizedReponse is mutated
+    // TODO if !context.store.result[queryName][variables] skip this
     if (!this._normalizedDeps.has(context.dependencyKey)) {
-      this._addDeps(denormalizedPartialResult, context.dependencyKey);
+      const normalizedPartialResponse = normalizeResponse(denormalizedPartialResult.data, context);
+      this._addDeps(normalizedPartialResponse, context.dependencyKey);
     }
+
+    // if we're force fetching, always mark the result as incomplete since we'll get new data from the server
+    denormalizedPartialResult._isComplete = !forceFetch && dataIsLocal;
 
     // store the possibly full result in cashay
     denormalizedQueryMap.set(variables, denormalizedPartialResult);
 
     // go through a Map of function pointers to make sure we haven't listeners for this query before
-    if (!this._ensuredListeners.has(mutationListeners)) {
+    if (isObject(mutationListeners) && !this._ensuredListeners.has(mutationListeners)) {
       // keep options that are shared across variable combos (for listeners)
       denormalizedQueryMap.set('options', {paginationWords, idFieldName});
 
@@ -142,18 +150,18 @@ export default class Cashay {
       this._ensureListeners(queryString, mutationListeners);
     }
 
-    // if the only benefit we get from this dispatch is a few nulls & empty arrays, let's hold off until we get
-    // the good stuff back from the server
+    // TODO By adding these extra nulls & empty arrays to the state, we prevent a second server call for the same data
     // if (!dataIsLocal) {
-    //   const reduc
-    //   // merge the new data 
+    //   // if dataIsLocal is false, then we know there's at least 1 null or empty array placeholder
     //   this._store.dispatch({
     //     type: '@@cashay/INSERT_NORMALIZED',
     //     payload: {
-    //       response: denormalizedPartialResult
+    //       response: normalizedPartialResult
     //     }
     //   });
     // }
+    return denormalizedPartialResult;
+    ;
   }
 
   /*
@@ -162,28 +170,33 @@ export default class Cashay {
    *
    *  */
   async _queryServer(transport, context, minimizedQueryString) {
-    const {variableValues: variables} = context;
-
+    const {variableValues: variables, dependencyKey} = context;
     // send minimizedQueryString to server and await minimizedQueryResponse
     const minimizedQueryResponse = await transport(minimizedQueryString, variables);
-
+    
+    if (!minimizedQueryResponse.data) {
+      console.log(`Error with query: \n ${minimizedQueryString}`);
+      return;
+    }
     // normalize response to get ready to dispatch it into the state tree
-    const normalizedMinimizedQueryResponse = normalizeResponse(minimizedQueryResponse, context);
+    const normalizedMinimizedQueryResponse = normalizeResponse(minimizedQueryResponse.data, context);
+
 
     // add denormalizedDeps so we can invalidate when other queries come in
     // add normalizedDeps to find those deps when a denormalizedReponse is mutated
-    this._addDeps(normalizedMinimizedQueryResponse, context.dependencyKey);
+    this._addDeps(normalizedMinimizedQueryResponse, dependencyKey);
 
     // get current state data
-    const cashayDataStore = this._getToState(this._store).get('data');
+    const cashayDataStore = this._getToState(this._store).data;
 
     // now, remove the objects that look identical to the ones already in the state
     // if the incoming entity (eg Person.123) looks exactly like the one already in the store, then
     // we don't have to invalidate and rerender 
+
     const normalizedResponseForStore = shortenNormalizedResponse(normalizedMinimizedQueryResponse, cashayDataStore);
 
     // walk the normalized response & grab the deps for each entity. put em all in a Set & flush it down the toilet
-    const flushSet = this._makeFlushSet(normalizedResponseForStore);
+    const flushSet = this._makeFlushSet(normalizedResponseForStore, dependencyKey);
 
     // TODO: if no mutations ever occur, such as pagination of read-only docs, when should we run GC?
     for (let entry of flushSet) {
@@ -201,7 +214,7 @@ export default class Cashay {
 
     // stick normalize data in store and recreate any invalidated denormalized structures
     this._store.dispatch({
-      type: '@@cashay/INSERT_NORMALIZED',
+      type: INSERT_NORMALIZED,
       payload: {
         response: normalizedMinimizedQueryResponse
       }
@@ -227,6 +240,7 @@ export default class Cashay {
     this._normalizedDeps.set(dependencyKey, normalizedDeps);
 
     // go through and replace the denormalizedDeps with the new normalizedDeps
+    // TODO babel turns this into a try/catch. maybe move it to its own function
     for (let stackLoc of normalizedDeps) {
       const [entity, item] = stackLoc.split('.');
       this._denormalizedDeps[entity] = this._denormalizedDeps[entity] || {};
@@ -269,7 +283,7 @@ export default class Cashay {
    * No safety checks required.
    * The tree is guaranteed to have everything we look for because of _addDeps
    */
-  _makeFlushSet(normalizedResponse) {
+  _makeFlushSet(normalizedResponse, selfDependencyKey) {
     let flushSet = new Set();
     const {entities} = normalizedResponse;
     const entityKeys = Object.keys(entities);
@@ -285,6 +299,7 @@ export default class Cashay {
         flushSet = new Set([...flushSet, ...itemDepSet]);
       }
     }
+    flushSet.delete(selfDependencyKey);
     return flushSet;
   }
 

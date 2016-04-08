@@ -1,4 +1,5 @@
-export const isObject = val => val && typeof val === 'object';
+import {isObject} from './utils';
+
 
 const mergeArrays = (target, src) => {
   //check for overlap in docs, intelligently append keys
@@ -36,7 +37,7 @@ export const mergeDeepWithArrs = (target, src) => {
         }
       } else {
         //pass in key vars
-        target[key] = mergeDeepWithArrs(target[key], src[key]);
+        target[key] = Object.assign({},mergeDeepWithArrs(target[key], src[key]));
       }
     } else {
       target[key] = src[key];

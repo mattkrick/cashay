@@ -16,6 +16,7 @@ export const makeNormalizedDeps = entities => {
 /*
  * reduce the fields to merge into the state
  * doing this here means a smaller flushSet and fewer invalidations
+ * currently we mutate normalizedResponse. it may be worthwhile to make this pure
  * */
 export const shortenNormalizedResponse = (normalizedResponse, cashayDataStore) => {
   // TODO what if a forceFetched result is the same as what's already in the store? Need to handle results, too.
@@ -42,6 +43,7 @@ export const shortenNormalizedResponse = (normalizedResponse, cashayDataStore) =
       deepEqualAndReduce(storeItem, newItem);
     }
   }
+  return normalizedResponse;
 };
 
 /*

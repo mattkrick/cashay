@@ -9,6 +9,7 @@ const handleMissingData = (aliasOrFieldName, field, fieldSchema, context) => {
   if (fieldType.kind === SCALAR) {
     return null;
   } else if (fieldType.kind === LIST) {
+    // TODO don't return a list? if there's a list, then we don't know the difference between missing data & no data
     return [];
   } else {
     const newFieldSchema = context.schema.types.find(type => type.name === fieldType.name);
@@ -92,28 +93,6 @@ const visitObject = (subState, reqAST, subSchema, context, baseReduction = {}) =
       const fieldName = field.name.value;
       const aliasOrFieldName = field.alias && field.alias.value || fieldName;
       const fieldSchema = subSchema.fields.find(field => field.name === fieldName);
-      // TODO: move this logic to the vistor
-      //let unionHasTypeNameChild = false;
-      //if (fieldSchema.type.kind === UNION) {
-      //
-      //  debugger
-      //  const fieldHasTypeName = field.selectionSet.selections.find(selection => selection.name.value === '__typename');
-      //  if (!fieldHasTypeName) {
-      //    field.selectionSet.selection.shift({
-      //      "kind": "Field",
-      //      "alias": null,
-      //      "name": {
-      //        "kind": "Name",
-      //        "value": "__typename",
-      //        "loc": null
-      //      },
-      //      "arguments": [],
-      //      "directives": [],
-      //      "selectionSet": null,
-      //      "loc": null
-      //    })
-      //  }
-      //}
       const hasData = subState.hasOwnProperty(fieldName);
 
       if (hasData) {
@@ -213,18 +192,68 @@ const visit = (subState, reqAST, subSchema, context) => {
 };
 
 export const denormalizeStore = context => {
+  // Default introspection query adds Type after the operation
   const operationType = `${context.operation.operation}Type`;
+
+  // Lookup the root schema for the query/mutation/subscription (should always be a query?)
   const operationSchema = context.schema.types.find(type => type.name === context.schema[operationType].name);
+
+  // a query operation can have multiple queries, gotta catch 'em all
   const queryReduction = context.operation.selectionSet.selections.reduce((reduction, selection) => {
     const queryName = selection.name.value;
+
+    // look into the current redux state to see if we can borrow any data from it
+    const possibleResults = context.store.result[queryName];
+
+    // aliases are common for executing the same query twice (eg getPerson(id:1) getPerson(id:2))
     const aliasOrName = selection.alias && selection.alias.value || queryName;
-    const subSchema = operationSchema.fields.find(field => field.name === queryName);
-    const {regularArgs, paginationArgs} = separateArgs(subSchema, selection.arguments, context);
-    const fieldState = getFieldState(context.store.result[queryName], regularArgs, paginationArgs);
+
+    // get the query schema so we know what to expect the result to look like
+    let subSchema = operationSchema.fields.find(field => field.name === queryName);
+
+    // if there's no results stored, save some time & don't bother with the args
+    let fieldState;
+    if (possibleResults) {
+      const {regularArgs, paginationArgs} = separateArgs(subSchema, selection.arguments, context);
+      fieldState = getFieldState(possibleResults, regularArgs, paginationArgs);
+    } else {
+      const defaultStateKind =  subSchema.type.kind;
+      fieldState = defaultStateKind === OBJECT ? {} : defaultStateKind === LIST ? [] : null;
+
+      // I think we can clean this up & either eliminate this one or all the ones in the recursive visits
+      subSchema = context.schema.types.find(type => type.name === subSchema.type.name);
+    }
+
+    // recursively visit each branch
     reduction[aliasOrName] = visit(fieldState, selection, subSchema, context);
+
+    //shallowly climb the tree checking for the sendToServer flag. if it's present on a child, add it to the parent.
     calculateSendToServer(selection, context.idFieldName);
     return reduction
   }, {});
   calculateSendToServer(context.operation, context.idFieldName);
   return queryReduction;
 };
+
+// TODO: move this logic to the vistor
+//let unionHasTypeNameChild = false;
+//if (fieldSchema.type.kind === UNION) {
+//
+//  debugger
+//  const fieldHasTypeName = field.selectionSet.selections.find(selection => selection.name.value === '__typename');
+//  if (!fieldHasTypeName) {
+//    field.selectionSet.selection.shift({
+//      "kind": "Field",
+//      "alias": null,
+//      "name": {
+//        "kind": "Name",
+//        "value": "__typename",
+//        "loc": null
+//      },
+//      "arguments": [],
+//      "directives": [],
+//      "selectionSet": null,
+//      "loc": null
+//    })
+//  }
+//}

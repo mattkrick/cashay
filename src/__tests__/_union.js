@@ -89,7 +89,7 @@ export const unionNormalized ={
       },
       indi: {
         "_id": "indi",
-        // "name": "Kasun Indi"
+        "name": "Kasun Indi"
       },
       pahan: {
         "_id": "pahan",
@@ -100,6 +100,26 @@ export const unionNormalized ={
   result: {
     getGroup: {
       '{"_id":"allEmployees"}': 'Group:allEmployees'
+    }
+  }
+};
+
+export const initialState ={
+  entities: {},
+  result: {}
+};
+
+export const initialStateResponse = {
+  "data": {
+    "getGroup": {
+      "_id": null,
+      "owner": {
+        "__typename": null,
+        "_id": null,
+        "name": null,
+        "twitterHandle": null
+      },
+      "members": []
     }
   }
 };

@@ -12,3 +12,5 @@ export const ensureRootType = type => {
 export const getRegularArgsKey = regularArgs => {
   return regularArgs && (Object.keys(regularArgs).length ? JSON.stringify(regularArgs) : '');
 };
+
+export const isObject = val => val && typeof val === 'object';
