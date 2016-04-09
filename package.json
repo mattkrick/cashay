@@ -1,6 +1,6 @@
 {
   "name": "cashay",
-  "version": "0.2.0-alpha2",
+  "version": "0.2.1",
   "description": "relay for the rest of us",
   "main": "lib/index.js",
   "scripts": {
@@ -42,3 +42,4 @@
     "immutable": "^3.7.6"
   }
 }
+

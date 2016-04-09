@@ -24,10 +24,7 @@ export default class Cashay {
     this._schema = schema;
 
     // the object to hold the denormalized query responses
-    this._denormalizedResponses = {};
-
-    // an incrementing id for redux-optimistic-ui
-    this._optimisticId = 0;
+    this._denormalizedResults = {};
 
     // a flag thrown by the invalidate function and reset when that query is added to the queue
     this._willInvalidateListener = false;
@@ -69,35 +66,64 @@ export default class Cashay {
     this._willInvalidateListener = true;
   }
 
-  /*
+  /**
+   * A method that accepts a GraphQL query and returns a result using only local data.
+   * If it cannot complete the request on local data alone, it also asks the server for the data that it does not have.
    *
-   * QUERY METHOD
+   * @param {String} queryString The GraphQL query string, exactly as you'd send it to a GraphQL server
+   * @param {Object} options The optional objects to include with the query
+   *
+   * @property {String} options.componentId A string to uniquely match the queryString to the component.
+   * Only necessary if the queryString will be used on multiple components.
+   * @property {Boolean} options.forceFetch is true if the query is to ignore all local data and fetch new data
+   * @property {String} options.idFieldName is the name of the field that contains the unique ID (default is 'id')
+   * @property {Object} options.paginationWords is an object that contains custom names for 'before, after, first, last'
+   * @property {Function} options.transport The function used to send the data request to GraphQL, if different from default
+   * @property {Object} options.variables are the variables sent along with the query
+   *
+   * @param {Object} mutationListeners the functions used to change the local data when a mutation occurs
+   *
+   * @returns {Object} The denormalized object like GraphQL would return, with an additional `_isComplete` flag
    *
    */
   query(queryString, options = {}, mutationListeners) {
-    // debugger
     //if you call forceFetch in a mapStateToProps, you're gonna have a bad time (it'll refresh on EVERY dispatch)
     const {variables, forceFetch} = options;
 
+    // Each component can have only 1 uinque queryString/variable combo. This keeps memory use minimal.
+    const componentId = options.componentId || queryString;
+
     // return a map where the unique variable object is the key & the denormalized result is the value
-    let denormalizedQueryMap = this._denormalizedResponses[queryString];
+    const cachedResult = this._denormalizedResults[componentId];
 
-    if (denormalizedQueryMap) {
-      const storedDenormResult = denormalizedQueryMap.get(variables);
-
-      // if the storedDenormResult exists & is complete & we aren't going to do a forceFetch, return it FAST
-      if (storedDenormResult && storedDenormResult._isComplete && !forceFetch) {
-        // TODO garbage collect here via a timeout
-        return storedDenormResult;
-      }
-    } else {
-      // if we've never used the queryString before, save it
-      denormalizedQueryMap = this._denormalizedResponses[queryString] = new Map();
+    // if we can about local data & the vars are the same & the response is complete, return FAST
+    if (!forceFetch && cachedResult && cachedResult.variables === variables && cachedResult.response._isComplete) {
+      return cachedResult.response;
     }
 
-    const {paginationWords, idFieldName} = options;
+    // Do a friendly shallow comparison to catch if variables don't use the pointer
+    if (process.env.NODE_ENV === 'development') {
+      if (isObject(cachedResult.variables) && isObject(variables)) {
+        const varKeys = Object.keys(variables);
+        if (Object.keys.(cachedResult.variables).length === varKeys.length) {
+          let isSame = true;
+          for (let i = 0; i < varKeys.length; i++) {
+            if (cachedResult.variables[varKeys[i]] !== variables[varKeys[i]]) {
+              isSame = false;
+              break;
+            }
+          }
+          if (isSame) {
+            console.warn(`@@cashay: The variables object was recreated & couldn't be memoized! 
+            This makes for slow renders. Try to create the variables in a higher scope: ${variables}`)
+          }
+        }
+      }
+    }
+
 
     // parse the queryString into an AST and break it into tasty little chunks
+    const {paginationWords, idFieldName} = options;
     const context = buildExecutionContext(this._schema, queryString, {
       variables,
       paginationWords,
@@ -106,63 +132,53 @@ export default class Cashay {
     });
 
     // create a denormalized document from local data that also flags missing objects
-    const denormalizedPartialResult = {data: denormalizeStore(context)};
+    const denormalizedPartialResponse = denormalizeStore(context);
 
-    // operation.sendToServer means something down the tree needs to be fetched from the server
-    const dataIsLocal = !context.operation.sendToServer;
-
-    // figure out if we're done here
-    const isComplete = !forceFetch && dataIsLocal;
+    // if we're force fetching, always mark the result as incomplete since we'll get new data from the server
+    denormalizedPartialResponse._isComplete = !forceFetch && denormalizedPartialResponse._isComplete;
 
     // if we need more data, get it from the server
-    if (!isComplete) {
+    if (!denormalizedPartialResponse._isComplete) {
       const transport = this._getTransport(options);
 
       // given an operation enhanced with sendToServer flags, print minimal query
-      // TODO currently unless it's a forceFetch, the whole thing tries to get minimized
-      // let's look in context.store.result[queryName][variables] for each query to see if theyre all empty, too
-      const minimizedQueryString = forceFetch ?
-        context.dependencyKey.queryString : printMinimalQuery(context.operation, idFieldName);
+      const serverQueryString = (forceFetch || denormalizedPartialResponse._firstRun) ?
+        queryString : printMinimalQuery(context.operation, idFieldName);
 
       //  async query the server (no need to track the promise it returns, as it will change the redux state)
-      this._queryServer(transport, context, minimizedQueryString);
+      this._queryServer(transport, context, serverQueryString);
     }
 
-    // add denormalizedDeps so we can invalidate when other queries come in
-    // add normalizedDeps to find those deps when a denormalizedReponse is mutated
-    // TODO if !context.store.result[queryName][variables] skip this
-    if (!this._normalizedDeps.has(context.dependencyKey)) {
-      const normalizedPartialResponse = normalizeResponse(denormalizedPartialResult.data, context);
+    // normalize the localResponse so we prevent duplicate requests by merging with the store
+    const normalizedPartialResponse = normalizeResponse(denormalizedPartialResponse.data, context);
+
+    // if this is a different query string but the same query
+    // eg in this one we request 1 more field
+    if (!denormalizedPartialResponse._firstRun) {
       this._addDeps(normalizedPartialResponse, context.dependencyKey);
     }
 
-    // if we're force fetching, always mark the result as incomplete since we'll get new data from the server
-    denormalizedPartialResult._isComplete = !forceFetch && dataIsLocal;
-
     // store the possibly full result in cashay
-    denormalizedQueryMap.set(variables, denormalizedPartialResult);
-
-    // go through a Map of function pointers to make sure we haven't listeners for this query before
-    if (isObject(mutationListeners) && !this._ensuredListeners.has(mutationListeners)) {
+    this._denormalizedResults[componentId] = {
+      response: denormalizedPartialResponse,
       // keep options that are shared across variable combos (for listeners)
-      denormalizedQueryMap.set('options', {paginationWords, idFieldName});
+      options: {paginationWords, idFieldName},
+      variables
+    };
 
+    // go through a Map of function pointers to make sure we dont have listeners for this componentId
+    if (isObject(mutationListeners) && !this._ensuredListeners.has(mutationListeners)) {
       // add the mutation listeners to the Cashay singleton
-      this._ensureListeners(queryString, mutationListeners);
+      this._ensureListeners(componentId, mutationListeners);
     }
 
-    // TODO By adding these extra nulls & empty arrays to the state, we prevent a second server call for the same data
-    // if (!dataIsLocal) {
-    //   // if dataIsLocal is false, then we know there's at least 1 null or empty array placeholder
-    //   this._store.dispatch({
-    //     type: '@@cashay/INSERT_NORMALIZED',
-    //     payload: {
-    //       response: normalizedPartialResult
-    //     }
-    //   });
-    // }
-    return denormalizedPartialResult;
-    ;
+    this._store.dispatch({
+      type: '@@cashay/INSERT_NORMALIZED',
+      payload: {
+        response: normalizedPartialResponse
+      }
+    });
+    return denormalizedPartialResponse;
   }
 
   /*
@@ -202,7 +218,7 @@ export default class Cashay {
     // TODO: if no mutations ever occur, such as pagination of read-only docs, when should we run GC?
     for (let entry of flushSet) {
       const {queryString, variables} = entry;
-      this._denormalizedResponses[queryString].delete(variables);
+      this._denormalizedResults[queryString].delete(variables);
       this._listeners.add.delete(queryString);
       //this._listeners.update.delete(queryString);
       //this._listeners.delete.delete(queryString);
@@ -210,8 +226,8 @@ export default class Cashay {
 
     // combine partial query with the new minimal response (a little hacky to get a result before the dispatch)
     // fullResult should come with an _isComplete flag set to true
-    // const fullResult = mergeDeepWithArrs(denormalizedPartialResult, normalizedMinimizedQueryResponse);
-    // this._denormalizedResponses[context.dependencyKey.queryString].set(variables, fullResult);
+    // const fullResult = mergeDeepWithArrs(denormalizedPartialResponse, normalizedMinimizedQueryResponse);
+    // this._denormalizedResults[context.dependencyKey.queryString].set(variables, fullResult);
 
     // stick normalize data in store and recreate any invalidated denormalized structures
     this._store.dispatch({
@@ -250,24 +266,24 @@ export default class Cashay {
     }
   }
 
-  _ensureListeners(queryString, mutationListeners) {
+  _ensureListeners(componentId, mutationListeners) {
     // add mutation listeners for add, update, delete
     Object.keys(mutationListeners).forEach(listener => {
       const listenerMap = this._listeners[listener];
 
       // make sure the listener is for add, update, or delete
       if (!listenerMap) {
-        console.error(`Invalid mutation rule: ${listener}.\nSee queryString: ${queryString}`);
+        console.error(`Invalid mutation rule: ${listener}.\nSee componentId: ${componentId}`);
       }
 
-      // make sure there is only 1 listener per queryString
-      if (listenerMap.has(queryString)) {
-        console.warn(`Each queryString can only have 1 set of rules per ${listener} mutation.
-        Remove extra rules for secondary instances of: ${queryString}`);
+      // make sure there is only 1 listener per componentId
+      if (listenerMap.has(componentId)) {
+        console.warn(`Each componentId can only have 1 set of rules per ${listener} mutation.
+        Remove extra rules for secondary instances of: ${componentId}`);
       }
 
       // push the new listener
-      listenerMap.set(queryString, mutationListeners[listener]);
+      listenerMap.set(componentId, mutationListeners[listener]);
     });
   }
 
@@ -335,7 +351,7 @@ export default class Cashay {
         if (!relevantListener) {
           continue;
         }
-        const queryMap = this._denormalizedResponses[queryString];
+        const queryMap = this._denormalizedResults[queryString];
         let executionContext;
         // iterate through the same query with different variable objects
         for (let [variables, query] of queryMap.entities()) {
@@ -445,30 +461,3 @@ const getTypesMutated = (mutationString, schema) => {
 //     }
 //   }
 // };
-
-// const equals = function (x, y) {
-//     if (x == y) return true;
-//
-//     let p;
-//     for (p in y) {
-//       if (typeof (x[p]) == 'undefined') { return false; }
-//     }
-//
-//     for (p in y) {
-//       if (y[p]) {
-//         if (typeof y[p] === 'object') {
-//           if (!equals(x[p], y[p])) { return false; } break;
-//         } else {
-//           if (y[p] != x[p]) { return false; }
-//         }
-//       } else {
-//         if (x[p])
-//           return false;
-//       }
-//     }
-//
-//     for (p in x) {
-//       if (typeof (y[p]) == 'undefined') { return false; }
-//     }
-//     return true;
-// }

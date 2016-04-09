@@ -213,6 +213,9 @@ export const denormalizeStore = context => {
   // Lookup the root schema for the query/mutation/subscription (should always be a query?)
   const operationSchema = context.schema.types.find(type => type.name === context.schema[operationType].name);
 
+  // if we have nothing in the local state for this query, send it right to the server
+  let firstRun = true;
+
   // a query operation can have multiple queries, gotta catch 'em all
   const queryReduction = context.operation.selectionSet.selections.reduce((reduction, selection) => {
     const queryName = selection.name.value;
@@ -228,20 +231,16 @@ export const denormalizeStore = context => {
 
     // if there's no results stored, save some time & don't bother with the args
     let fieldState;
-    let doVisit = true;
     if (possibleResults) {
+      firstRun = false;
       const {regularArgs, paginationArgs} = separateArgs(subSchema, selection.arguments, context);
       fieldState = getFieldState(possibleResults, regularArgs, paginationArgs);
-    } else {
-      const defaultStateKind = subSchema.type.kind;
+    } else if (subSchema.type.kind === OBJECT) {
       // I think we can clean this up & either eliminate this one or all the ones in the recursive visits
-      if (defaultStateKind === OBJECT) {
-        subSchema = context.schema.types.find(type => type.name === subSchema.type.name);
-        fieldState = {};
-      } else {
-        doVisit = false;
-        // fieldState = defaultStateKind === LIST ? [] : null;
-      }
+      // This only applies for queries that return a single object
+      // maybe give it 'null.0' and treat the null collection specially?
+      subSchema = context.schema.types.find(type => type.name === subSchema.type.name);
+      fieldState = {};
     }
 
     // recursively visit each branch
@@ -252,7 +251,11 @@ export const denormalizeStore = context => {
     return reduction
   }, {});
   calculateSendToServer(context.operation, context.idFieldName);
-  return queryReduction;
+  return {
+    data: queryReduction,
+    _firstRun: firstRun,
+    _isComplete: !context.operation.sendToServer
+  };
 };
 
 // TODO: move this logic to the vistor
