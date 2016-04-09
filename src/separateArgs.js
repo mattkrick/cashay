@@ -2,14 +2,14 @@ import {TypeKind} from 'graphql/type/introspection';
 const {LIST} = TypeKind;
 import {ensureTypeFromNonNull} from './utils';
 
-const getSuppliedArgs = (args, variableValues = {}, paginationWords) => {
+const getSuppliedArgs = (args, variables = {}, paginationWords) => {
   const regularArgs = {};
   const paginationArgs = {};
   args
     .sort((a, b) => a.name.value < b.name.value)
     .forEach(arg => {
       const argName = arg.name.value;
-      let argValue = arg.value.value || variableValues[argName];
+      let argValue = arg.value.value || variables[argName];
       if (!argValue) return;
       let paginationMeaning = Object.keys(paginationWords).find(pageWord => paginationWords[pageWord] === argName);
       if (paginationMeaning) {
@@ -50,10 +50,10 @@ const getPossibleArgs = (schema, paginationWords) => {
   return {acceptsRegularArgs, acceptsPaginationArgs};
 };
 
-export const separateArgs = (fieldSchema, reqASTArgs, {paginationWords, variableValues}) => {
+export const separateArgs = (fieldSchema, reqASTArgs, {paginationWords, variables}) => {
   const responseType = ensureTypeFromNonNull(fieldSchema.type);
   const {acceptsRegularArgs, acceptsPaginationArgs} = getPossibleArgs(fieldSchema, paginationWords);
-  let {regularArgs, paginationArgs} = getSuppliedArgs(reqASTArgs, variableValues, paginationWords);
+  let {regularArgs, paginationArgs} = getSuppliedArgs(reqASTArgs, variables, paginationWords);
   regularArgs = acceptsRegularArgs && regularArgs;
   paginationArgs = acceptsPaginationArgs && paginationArgs;
   if (paginationArgs && responseType.kind !== LIST) {

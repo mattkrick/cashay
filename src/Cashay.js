@@ -75,6 +75,7 @@ export default class Cashay {
    *
    */
   query(queryString, options = {}, mutationListeners) {
+    // debugger
     //if you call forceFetch in a mapStateToProps, you're gonna have a bad time (it'll refresh on EVERY dispatch)
     const {variables, forceFetch} = options;
 
@@ -170,10 +171,10 @@ export default class Cashay {
    *
    *  */
   async _queryServer(transport, context, minimizedQueryString) {
-    const {variableValues: variables, dependencyKey} = context;
+    const {variables, dependencyKey} = context;
     // send minimizedQueryString to server and await minimizedQueryResponse
     const minimizedQueryResponse = await transport(minimizedQueryString, variables);
-    
+
     if (!minimizedQueryResponse.data) {
       console.log(`Error with query: \n ${minimizedQueryString}`);
       return;

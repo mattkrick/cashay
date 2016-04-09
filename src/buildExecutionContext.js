@@ -34,11 +34,11 @@ export const buildExecutionContext = (schema, queryString, options) => {
     fragments,
     operation,
     paginationWords: Object.assign(defaultPaginationWords, options.paginationWords),
-    variableValues: options.variableValues,
+    variables: options.variables,
     idFieldName: options.idFieldName || 'id',
     store: options.store,
     // create an object unique to the queryString + vars
-    dependencyKey: {variables: options.variableValues, queryString}
+    dependencyKey: {variables: options.variables, queryString}
   };
 };
 

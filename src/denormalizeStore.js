@@ -167,10 +167,25 @@ const visitNormalizedString = (subState, reqAST, subSchema, context) => {
 //  })
 //}
 
+const sendChildrenToServer = reqAST => {
+  reqAST.sendToServer = true;
+  if (!reqAST.selectionSet) {
+    return;
+  }
+  reqAST.selectionSet.selections.forEach(child => {
+    sendChildrenToServer(child);
+  })
+};
+
 const visitIterable = (subState, reqAST, subSchema, context) => {
   const fieldType = ensureRootType(subSchema.type);
   const fieldSchema = context.schema.types.find(type => type.name === fieldType.name);
-  return subState.map(res => visit(res, reqAST, fieldSchema, context));
+  if (Array.isArray(subState)) {
+    return subState.map(res => visit(res, reqAST, fieldSchema, context));
+  } else {
+    sendChildrenToServer(reqAST);
+    return [];
+  }
 };
 
 const visit = (subState, reqAST, subSchema, context) => {
@@ -213,20 +228,25 @@ export const denormalizeStore = context => {
 
     // if there's no results stored, save some time & don't bother with the args
     let fieldState;
+    let doVisit = true;
     if (possibleResults) {
       const {regularArgs, paginationArgs} = separateArgs(subSchema, selection.arguments, context);
       fieldState = getFieldState(possibleResults, regularArgs, paginationArgs);
     } else {
-      const defaultStateKind =  subSchema.type.kind;
-      fieldState = defaultStateKind === OBJECT ? {} : defaultStateKind === LIST ? [] : null;
-
+      const defaultStateKind = subSchema.type.kind;
       // I think we can clean this up & either eliminate this one or all the ones in the recursive visits
-      subSchema = context.schema.types.find(type => type.name === subSchema.type.name);
+      if (defaultStateKind === OBJECT) {
+        subSchema = context.schema.types.find(type => type.name === subSchema.type.name);
+        fieldState = {};
+      } else {
+        doVisit = false;
+        // fieldState = defaultStateKind === LIST ? [] : null;
+      }
     }
 
     // recursively visit each branch
     reduction[aliasOrName] = visit(fieldState, selection, subSchema, context);
-
+    // reduction[aliasOrName] = doVisit ? visit(fieldState, selection, subSchema, context) : fieldState;
     //shallowly climb the tree checking for the sendToServer flag. if it's present on a child, add it to the parent.
     calculateSendToServer(selection, context.idFieldName);
     return reduction
@@ -239,7 +259,6 @@ export const denormalizeStore = context => {
 //let unionHasTypeNameChild = false;
 //if (fieldSchema.type.kind === UNION) {
 //
-//  debugger
 //  const fieldHasTypeName = field.selectionSet.selections.find(selection => selection.name.value === '__typename');
 //  if (!fieldHasTypeName) {
 //    field.selectionSet.selection.shift({

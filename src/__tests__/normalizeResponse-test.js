@@ -27,7 +27,7 @@ test('normalizes unions', t => {
 test('normalizes nests with pagination words and variables', t => {
   t.plan(1);
   const nestedOptions = {
-    variableValues: nestedVariableValues,
+    variables: nestedVariableValues,
     paginationWords: nestedPaginationWords,
     idFieldName: '_id'
   };

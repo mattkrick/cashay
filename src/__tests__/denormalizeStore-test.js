@@ -39,7 +39,7 @@ export const same = (t, actual, expected, message) => {
 
 test('denormalize store from union request', t => {
  const unionOptions = {
-   variableValues: nestedVariableValues,
+   variables: nestedVariableValues,
    paginationWords: nestedPaginationWords,
    idFieldName: '_id',
    store: unionNormalized
@@ -51,7 +51,7 @@ test('denormalize store from union request', t => {
 
 test('denormalize store with missing scalar data', t => {
   const unionOptions = {
-    variableValues: nestedVariableValues,
+    variables: nestedVariableValues,
     paginationWords: nestedPaginationWords,
     idFieldName: '_id',
     store: unionNormalized
@@ -63,7 +63,7 @@ test('denormalize store with missing scalar data', t => {
 
 test('denormalize store with initial state', t => {
   const unionOptions = {
-    variableValues: nestedVariableValues,
+    variables: nestedVariableValues,
     paginationWords: nestedPaginationWords,
     idFieldName: '_id',
     store: initialState
@@ -75,7 +75,7 @@ test('denormalize store with initial state', t => {
 
 test('denormalize store with missing entity', t => {
  const unionOptions = {
-   variableValues: nestedVariableValues,
+   variables: nestedVariableValues,
    paginationWords: nestedPaginationWords,
    idFieldName: '_id',
    store: nestedNormalizedNoFirstAuthor
@@ -87,7 +87,7 @@ test('denormalize store with missing entity', t => {
 
 test('denormalize store with missing array', t => {
  const unionOptions = {
-   variableValues: nestedVariableValues,
+   variables: nestedVariableValues,
    paginationWords: nestedPaginationWords,
    idFieldName: '_id',
    store: nestedNormalizedNoFirstComments
@@ -99,7 +99,7 @@ test('denormalize store with missing array', t => {
 
 test('denormalize store with missing union', t => {
  const unionOptions = {
-   variableValues: nestedVariableValues,
+   variables: nestedVariableValues,
    paginationWords: nestedPaginationWords,
    idFieldName: '_id',
    store: unionNormalizedMissingOwner
@@ -111,7 +111,7 @@ test('denormalize store with missing union', t => {
 
 test('denormalize store from nested request', t => {
  const nestedOptions = {
-   variableValues: nestedVariableValues,
+   variables: nestedVariableValues,
    paginationWords: nestedPaginationWords,
    idFieldName: '_id',
    store: nestedNormalized
