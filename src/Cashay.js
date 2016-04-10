@@ -1,4 +1,4 @@
-import {INSERT_NORMALIZED} from './duck';
+import {INSERT_NORMALIZED, INSERT_NORMALIZED_OPTIMISTIC} from './duck';
 import {parse} from 'graphql/language/parser';
 import {denormalizeStore} from './denormalizeStore';
 import {normalizeResponse} from './normalizeResponse';
@@ -14,7 +14,7 @@ export default class Cashay {
     // the redux store
     this._store = store;
 
-    //how to get from the store to cahsay
+    //how to get from the store to cashay
     this._getToState = getToState || defaultGetToState;
 
     // the default function to send the queryString to the server (usually HTTP or WS)
@@ -95,33 +95,20 @@ export default class Cashay {
 
     // return a map where the unique variable object is the key & the denormalized result is the value
     const cachedResult = this._denormalizedResults[componentId];
-
-    // if we can about local data & the vars are the same & the response is complete, return FAST
-    if (!forceFetch && cachedResult && cachedResult.variables === variables && cachedResult.response._isComplete) {
-      return cachedResult.response;
-    }
-
-    // Do a friendly shallow comparison to catch if variables don't use the pointer
-    if (process.env.NODE_ENV === 'development') {
-      if (isObject(cachedResult.variables) && isObject(variables)) {
-        const varKeys = Object.keys(variables);
-        if (Object.keys.(cachedResult.variables).length === varKeys.length) {
-          let isSame = true;
-          for (let i = 0; i < varKeys.length; i++) {
-            if (cachedResult.variables[varKeys[i]] !== variables[varKeys[i]]) {
-              isSame = false;
-              break;
-            }
-          }
-          if (isSame) {
-            console.warn(`@@cashay: The variables object was recreated & couldn't be memoized! 
-            This makes for slow renders. Try to create the variables in a higher scope: ${variables}`)
-          }
-        }
+    
+    // if we care about local data & the vars are the same & the response is complete, return FAST
+    // fetchCameBack is false when a req is sent to the server & true when it comes back
+    // it's necessary because calling dispatch from within a mapStateToProps will cause that mapStateToProps to rerender
+    // if a dispatch occurs before the server replies, we can quickly give it all we got
+    //TODO instead of submitting an empty array for data that isn't there, we should submit the count of null objs
+    // That way, when a 2nd query comes in looking for the same stuff, it won't trigger a 2nd request
+    if (!forceFetch && cachedResult && (!cachedResult.fetchCameBack || cachedResult.response._isComplete)) {
+      if (cachedResult.variables === variables || JSON.stringify(cachedResult.variables) === JSON.stringify(variables)) {
+        console.log('cache hit');
+        return cachedResult.response;
       }
     }
-
-
+    console.log('cache miss')
     // parse the queryString into an AST and break it into tasty little chunks
     const {paginationWords, idFieldName} = options;
     const context = buildExecutionContext(this._schema, queryString, {
@@ -146,7 +133,7 @@ export default class Cashay {
         queryString : printMinimalQuery(context.operation, idFieldName);
 
       //  async query the server (no need to track the promise it returns, as it will change the redux state)
-      this._queryServer(transport, context, serverQueryString);
+      this._queryServer(transport, context, serverQueryString, componentId);
     }
 
     // normalize the localResponse so we prevent duplicate requests by merging with the store
@@ -163,7 +150,8 @@ export default class Cashay {
       response: denormalizedPartialResponse,
       // keep options that are shared across variable combos (for listeners)
       options: {paginationWords, idFieldName},
-      variables
+      variables,
+      fetchCameBack: denormalizedPartialResponse._isComplete
     };
 
     // go through a Map of function pointers to make sure we dont have listeners for this componentId
@@ -172,12 +160,15 @@ export default class Cashay {
       this._ensureListeners(componentId, mutationListeners);
     }
 
-    this._store.dispatch({
-      type: '@@cashay/INSERT_NORMALIZED',
-      payload: {
-        response: normalizedPartialResponse
-      }
-    });
+    // if we've already got all the data, we don't need to adjust the state
+    if (!denormalizedPartialResponse._isComplete) {
+      this._store.dispatch({
+        type: '@@cashay/INSERT_NORMALIZED_OPTIMISTIC',
+        payload: {
+          response: normalizedPartialResponse
+        }
+      });
+    }
     return denormalizedPartialResponse;
   }
 
@@ -186,7 +177,7 @@ export default class Cashay {
    * QUERY HELPER TO GET DATA FROM SERVER (ASYNC)
    *
    *  */
-  async _queryServer(transport, context, minimizedQueryString) {
+  async _queryServer(transport, context, minimizedQueryString, componentId) {
     const {variables, dependencyKey} = context;
     // send minimizedQueryString to server and await minimizedQueryResponse
     const minimizedQueryResponse = await transport(minimizedQueryString, variables);
@@ -208,7 +199,7 @@ export default class Cashay {
 
     // now, remove the objects that look identical to the ones already in the state
     // if the incoming entity (eg Person.123) looks exactly like the one already in the store, then
-    // we don't have to invalidate and rerender 
+    // we don't have to invalidate and rerender
 
     const normalizedResponseForStore = shortenNormalizedResponse(normalizedMinimizedQueryResponse, cashayDataStore);
 
@@ -229,6 +220,8 @@ export default class Cashay {
     // const fullResult = mergeDeepWithArrs(denormalizedPartialResponse, normalizedMinimizedQueryResponse);
     // this._denormalizedResults[context.dependencyKey.queryString].set(variables, fullResult);
 
+    // yay, the full result is coming! time to start listening to dispatches again
+    this._denormalizedResults[componentId].fetchCameBack = true;
     // stick normalize data in store and recreate any invalidated denormalized structures
     this._store.dispatch({
       type: INSERT_NORMALIZED,

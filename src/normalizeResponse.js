@@ -1,4 +1,3 @@
-
 import {mergeDeepWithArrs, mergeArrays} from './mergeDeep';
 import {separateArgs} from './separateArgs';
 import {getSubReqAST} from './getSubReqAST';
@@ -67,6 +66,7 @@ const visitIterable = (bag, subResponse, reqAST, subSchema, context) => {
     if (count !== undefined) {
       const countVal = +count.value.value;
       if (subResponse.length < countVal) {
+        console.log('reqAST', JSON.stringify(bag));
         subResponse.EOF = true;
       }
     }
@@ -114,3 +114,15 @@ export const normalizeResponse = (response, context) => {
   };
   return data
 };
+
+// a = [{
+//   "kind": "Argument",
+//   "name": {"kind": "Name", "value": "count", "loc": null},
+//   "value": {"kind": "IntValue", "value": "5", "loc": null},
+//   "loc": null
+// }, {
+//   "kind": "Argument",
+//   "name": {"kind": "Name", "value": "after", "loc": null},
+//   "value": {"kind": "StringValue", "value": "2015-07-01T00:00:00.000Z", "loc": null},
+//   "loc": null
+// }]
