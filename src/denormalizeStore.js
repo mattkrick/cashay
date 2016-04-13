@@ -1,8 +1,14 @@
 import {TypeKind} from 'graphql/type/introspection';
-import {separateArgs} from './separateArgs';
 import {FRAGMENT_SPREAD, INLINE_FRAGMENT} from 'graphql/language/kinds';
-import {ensureRootType, getRegularArgsKey, ensureTypeFromNonNull} from './utils';
-const {UNION, INTERFACE, LIST, OBJECT, NON_NULL, SCALAR} = TypeKind;
+import {isObject, ensureRootType, ensureTypeFromNonNull} from './utils';
+import {
+  getFieldState,
+  convertFragmentToInline,
+  calculateSendToServer,
+  sendChildrenToServer
+} from './denormalizeHelpers';
+
+const {UNION, LIST, OBJECT, SCALAR} = TypeKind;
 
 const handleMissingData = (aliasOrFieldName, field, fieldSchema, context) => {
   const fieldType = ensureTypeFromNonNull(fieldSchema.type);
@@ -15,68 +21,19 @@ const handleMissingData = (aliasOrFieldName, field, fieldSchema, context) => {
     const newFieldSchema = context.schema.types.find(type => type.name === fieldType.name);
     if (fieldType.kind === UNION) {
       // since we don't know what the shape will look like, make it look like everything
-      const omniPartial = newFieldSchema.possibleTypes.reduce((reduction, objType) => {
+      return newFieldSchema.possibleTypes.reduce((reduction, objType) => {
         const newFieldSchema = context.schema.types.find(type => type.name === objType.name);
-        return {...reduction, ...visit(reduction, field, newFieldSchema, context)};
+        // take the old, add the new, keep typename null
+        return Object.assign(reduction, visit(reduction, field, newFieldSchema, context), {__typename: null});
+        // sure to work, but less efficient
+        // return {...reduction, ...visit(reduction, field, newFieldSchema, context)};
       }, {});
-      omniPartial.__typename = null;
-      return omniPartial;
     }
     return visit({}, field, newFieldSchema, context);
   }
 };
 
-const getFieldState = (fieldState, regularArgs, paginationArgs) => {
-  if (regularArgs) {
-    const regularArgsString = getRegularArgsKey(regularArgs);
-    fieldState = fieldState[regularArgsString];
-  }
-  if (paginationArgs) {
-    const {before, after, first, last} = paginationArgs;
-    let usefulArray = fieldState.full;
-    let isReverse = false;
-    if (usefulArray) { // if we have all the docs
-      isReverse = !!last; //if we're getting stuff in reverse
-    } else { // if we only have some of the docs
-      usefulArray = last ? fieldState.back : fieldState.front;
-    }
-    if (!usefulArray) {
-      console.log('no local data')
-    }
-    const cursor = before || after;
-    let cursorIdx = -1;
-    if (cursor) {
-      cursorIdx = usefulArray.find(doc => {
-        const [typeName, docId] = doc.split(':');
-        const storedDoc = store.entities[typeName][docId];
-        return storedDoc.cursor === cursor
-      });
-      if (!cursorIdx) {
-        console.error('invalid cursor');
-      }
-    }
-    if (isReverse) {
-      const minIdx = Math.max(0, cursorIdx + 1 - last);
-      fieldState = usefulArray.slice(minIdx, minIdx + last);
-    } else {
-      const limit = first || last; //separateArgs ensures at least 1 exists
-      const maxIdx = cursorIdx + 1 + limit;
-      if (usefulArray.length < maxIdx) {
-        console.log('not enough data, need to fetch more');
-      }
-      fieldState = usefulArray.slice(cursorIdx + 1, cursorIdx + 1 + limit);
-    }
-  }
-  return fieldState;
-};
-
-const convertFragmentToInline = fragment => {
-  delete fragment.name;
-  fragment.kind = INLINE_FRAGMENT;
-  return fragment;
-};
-
-const visitObject = (subState, reqAST, subSchema, context, baseReduction = {}) => {
+const visitObject = (subState = {}, reqAST, subSchema, context, baseReduction = {}) => {
   const reducedSelected = reqAST.selectionSet.selections.reduce((reduction, field, idx, selectionArr) => {
     if (field.kind === FRAGMENT_SPREAD) {
       const fragment = context.fragments[field.name.value];
@@ -98,9 +55,9 @@ const visitObject = (subState, reqAST, subSchema, context, baseReduction = {}) =
       if (hasData) {
         let fieldState = subState[fieldName];
         if (fieldSchema.args && fieldSchema.args.length) {
-          const {regularArgs, paginationArgs} = separateArgs(fieldSchema, field.arguments, context);
-          fieldState = getFieldState(fieldState, regularArgs, paginationArgs);
+          fieldState = getFieldState(fieldState, fieldSchema, field.arguments, context);
         }
+        // const typeSchema = context.schema.types.find(type => type.name === fieldSchema.type.name);
         reduction[aliasOrFieldName] = visit(fieldState, field, fieldSchema, context);
         if (field.selectionSet) {
           calculateSendToServer(field, context.idFieldName)
@@ -116,29 +73,6 @@ const visitObject = (subState, reqAST, subSchema, context, baseReduction = {}) =
   return reducedSelected;
 };
 
-const calculateSendToServer = (field, idFieldName) => {
-  const {selections} = field.selectionSet;
-  for (let i = 0; i < selections.length; i++) {
-    const selection = selections[i];
-    if (selection.kind === INLINE_FRAGMENT) {
-      calculateSendToServer(selection, idFieldName);
-    }
-    if (selection.sendToServer) {
-      field.sendToServer = true;
-    }
-  }
-  // const minimizedSelections = selections.filter(Boolean);
-  // if (minimizedSelections.length) {
-  //   if (idField) {
-  //     minimizedSelections.push(idField);
-  //   }
-  //   field.selectionSet.selections = minimizedSelections;
-  //   field.sendToServer = true;
-  // } else {
-  //   //field.selectionSet = undefined;
-  // }
-};
-
 const visitNormalizedString = (subState, reqAST, subSchema, context) => {
   const [typeName, docId] = subState.split(':');
   const doc = context.store.entities[typeName][docId];
@@ -146,49 +80,28 @@ const visitNormalizedString = (subState, reqAST, subSchema, context) => {
   return visit(doc, reqAST, fieldSchema, context);
 };
 
-//const getPropNames = (selections, bag = []) => {
-//  selections.forEach(selection => {
-//    if (selection.kind === INLINE_FRAGMENT) {
-//      getPropNames(selection.selectionSet.selections, bag)
-//    } else {
-//      bag.push(selection.name.value);
-//    }
-//  });
-//  return bag;
-//};
-//
-//const filterPropNames = (selections, selectionSet) => {
-//  selections.forEach(selection => {
-//    if (selection.kind === INLINE_FRAGMENT) {
-//      filterPropNames(selection.selectionSet.selections, selectionSet);
-//    } else if (!selectionSet.has(selection.name.value)) {
-//      //selections[selection] =
-//    }
-//  })
-//}
-
-const sendChildrenToServer = reqAST => {
-  reqAST.sendToServer = true;
-  if (!reqAST.selectionSet) {
-    return;
-  }
-  reqAST.selectionSet.selections.forEach(child => {
-    sendChildrenToServer(child);
-  })
-};
-
 const visitIterable = (subState, reqAST, subSchema, context) => {
+
+  // recurse into the root type, since it could be nonnull(list(nonnull(rootType))). Doesn't work with list of lists
   const fieldType = ensureRootType(subSchema.type);
-  const fieldSchema = context.schema.types.find(type => type.name === fieldType.name);
+
   if (Array.isArray(subState)) {
+    // get the schema for the root type, could be a union
+    const fieldSchema = context.schema.types.find(type => type.name === fieldType.name);
+
+    // for each value in the array, get the denormalized item
     return subState.map(res => visit(res, reqAST, fieldSchema, context));
-  } else {
-    sendChildrenToServer(reqAST);
-    return [];
   }
+  // recursively climb down the tree, flagging each branch with sendToServer
+  sendChildrenToServer(reqAST);
+
+  // return an empty array as a placeholder for the data that will come from the server
+  return [];
 };
 
 const visit = (subState, reqAST, subSchema, context) => {
+  // debugger
+  // By implementing a ternary here, we can get rid of a pointless O(n) find in visitObject
   const objectType = subSchema.kind ? subSchema.kind : subSchema.type.kind;
 
   switch (objectType) {
@@ -207,75 +120,64 @@ const visit = (subState, reqAST, subSchema, context) => {
 };
 
 export const denormalizeStore = context => {
-  // Default introspection query adds Type after the operation
-  const operationType = `${context.operation.operation}Type`;
-
-  // Lookup the root schema for the query/mutation/subscription (should always be a query?)
-  const operationSchema = context.schema.types.find(type => type.name === context.schema[operationType].name);
-
   // if we have nothing in the local state for this query, send it right to the server
   let firstRun = true;
+
+  // Lookup the root schema for the queryType (hardcoded name in the return of the introspection query)
+  const operationSchema = context.schema.types.find(type => type.name === context.schema.queryType.name);
 
   // a query operation can have multiple queries, gotta catch 'em all
   const queryReduction = context.operation.selectionSet.selections.reduce((reduction, selection) => {
     const queryName = selection.name.value;
 
-    // look into the current redux state to see if we can borrow any data from it
-    const possibleResults = context.store.result[queryName];
-
     // aliases are common for executing the same query twice (eg getPerson(id:1) getPerson(id:2))
     const aliasOrName = selection.alias && selection.alias.value || queryName;
 
-    // get the query schema so we know what to expect the result to look like
-    let subSchema = operationSchema.fields.find(field => field.name === queryName);
+    // get the query schema to know the expected type and args
+    let querySchema = operationSchema.fields.find(field => field.name === queryName);
 
-    // if there's no results stored, save some time & don't bother with the args
+    // look into the current redux state to see if we can borrow any data from it
+    let queryInState = context.store.result[queryName];
+
+    // if there's no results stored or being fetched, save some time & don't bother with the args
     let fieldState;
-    if (possibleResults) {
-      firstRun = false;
-      const {regularArgs, paginationArgs} = separateArgs(subSchema, selection.arguments, context);
-      fieldState = getFieldState(possibleResults, regularArgs, paginationArgs);
-    } else if (subSchema.type.kind === OBJECT) {
-      // I think we can clean this up & either eliminate this one or all the ones in the recursive visits
-      // This only applies for queries that return a single object
-      // maybe give it 'null.0' and treat the null collection specially?
-      subSchema = context.schema.types.find(type => type.name === subSchema.type.name);
-      fieldState = {};
+    if (queryInState) {
+      if (isObject(queryInState)) {
+        fieldState = getFieldState(queryInState, querySchema, selection.arguments, context);
+      } else {
+        fieldState = queryInState;
+      }
     }
 
-    // recursively visit each branch
+    // if a result exists in the state, this isn't the first time the query was called.
+    // a firstRun flag means there's no need to try to minimize the query pre-server fetch & no need to add deps
+    if (fieldState) {
+      firstRun = false;
+    }
+    debugger
+    // const query
+    // get the expected return value, devs can be silly, so if the had the return value in a nonnull, remove it.
+    const subSchema = querySchema.type.kind === LIST ?
+      querySchema : ensureTypeFromNonNull(context.schema.types.find(type => type.name === querySchema.type.name));
+
+    // recursively visit each branch, flag missing branches with a sendToServer flag
     reduction[aliasOrName] = visit(fieldState, selection, subSchema, context);
-    // reduction[aliasOrName] = doVisit ? visit(fieldState, selection, subSchema, context) : fieldState;
+
     //shallowly climb the tree checking for the sendToServer flag. if it's present on a child, add it to the parent.
     calculateSendToServer(selection, context.idFieldName);
     return reduction
   }, {});
+
+  // add a sendToServerFlag to the operation if any of the queries need data from the server
   calculateSendToServer(context.operation, context.idFieldName);
+
+  // return what the user expects GraphQL to return
+
   return {
     data: queryReduction,
+    // this is handy if the user wants to do something when a query is run for the first time
     _firstRun: firstRun,
+    // this is handy if the user wants to know if the data is complete as requested (eg top-level spinners)
     _isComplete: !context.operation.sendToServer
   };
 };
-
-// TODO: move this logic to the vistor
-//let unionHasTypeNameChild = false;
-//if (fieldSchema.type.kind === UNION) {
-//
-//  const fieldHasTypeName = field.selectionSet.selections.find(selection => selection.name.value === '__typename');
-//  if (!fieldHasTypeName) {
-//    field.selectionSet.selection.shift({
-//      "kind": "Field",
-//      "alias": null,
-//      "name": {
-//        "kind": "Name",
-//        "value": "__typename",
-//        "loc": null
-//      },
-//      "arguments": [],
-//      "directives": [],
-//      "selectionSet": null,
-//      "loc": null
-//    })
-//  }
-//}

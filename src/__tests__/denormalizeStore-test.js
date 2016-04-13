@@ -46,7 +46,7 @@ test('denormalize store from union request', t => {
  };
  const context = buildExecutionContext(clientSchema, unionQueryString, unionOptions);
  const denormalizedResponse = denormalizeStore(context);
- same(t,denormalizedResponse, unionResponse.data);
+ same(t,denormalizedResponse.data, unionResponse.data);
 });
 
 test('denormalize store with missing scalar data', t => {
@@ -58,7 +58,7 @@ test('denormalize store with missing scalar data', t => {
   };
   const context = buildExecutionContext(clientSchema, unionQueryStringExtraTwitter, unionOptions);
   const denormalizedResponse = denormalizeStore(context);
-  same(t,denormalizedResponse, unionResponsePartialTwitter.data);
+  same(t,denormalizedResponse.data, unionResponsePartialTwitter.data);
 });
 
 test('denormalize store with initial state', t => {
@@ -70,7 +70,7 @@ test('denormalize store with initial state', t => {
   };
   const context = buildExecutionContext(clientSchema, unionQueryStringExtraTwitter, unionOptions);
   const denormalizedResponse = denormalizeStore(context);
-  same(t,denormalizedResponse, initialStateResponse.data);
+  same(t,denormalizedResponse.data, initialStateResponse.data);
 });
 
 test('denormalize store with missing entity', t => {
@@ -82,7 +82,7 @@ test('denormalize store with missing entity', t => {
  };
  const context = buildExecutionContext(clientSchema, nestedQueryString, unionOptions);
  const denormalizedResponse = denormalizeStore(context);
- same(t,denormalizedResponse, nestedResponseNoFirstAuthor);
+ same(t,denormalizedResponse.data, nestedResponseNoFirstAuthor);
 });
 
 test('denormalize store with missing array', t => {
@@ -94,7 +94,7 @@ test('denormalize store with missing array', t => {
  };
  const context = buildExecutionContext(clientSchema, nestedQueryString, unionOptions);
  const denormalizedResponse = denormalizeStore(context);
- same(t,denormalizedResponse, nestedResponseNoFirstComments);
+ same(t,denormalizedResponse.data, nestedResponseNoFirstComments);
 });
 
 test('denormalize store with missing union', t => {
@@ -106,7 +106,7 @@ test('denormalize store with missing union', t => {
  };
  const context = buildExecutionContext(clientSchema, unionQueryStringExtraOwner, unionOptions);
  const denormalizedResponse = denormalizeStore(context);
- same(t,denormalizedResponse, unionResponseMissingOwner.data);
+ same(t,denormalizedResponse.data, unionResponseMissingOwner.data);
 });
 
 test('denormalize store from nested request', t => {
@@ -118,7 +118,7 @@ test('denormalize store from nested request', t => {
  };
  const context = buildExecutionContext(clientSchema, nestedQueryString, nestedOptions);
  const denormalizedResponse = denormalizeStore(context);
- same(t,denormalizedResponse, nestedResponse);
+ same(t,denormalizedResponse.data, nestedResponse);
 });
 
 // get subset of pagination docs saved

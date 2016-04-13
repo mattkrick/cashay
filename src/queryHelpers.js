@@ -1,4 +1,4 @@
-export const makeNormalizedDeps = entities => {
+export const makeNormalizedDeps = (entities, stack = []) => {
   const entityKeys = Object.keys(entities);
   const normalizedDeps = new Set();
   for (let i = 0; i < entityKeys.length; i++) {

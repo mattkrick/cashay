@@ -1,6 +1,8 @@
 // import {Map as iMap, fromJS} from 'immutable';
 export const INSERT_NORMALIZED = '@@cashay/INSERT_NORMALIZED';
-export const INSERT_NORMALIZED_OPTIMISTIC = '@@cashay/INSERT_NORMALIZED_OPTIMISTIC';
+// export const INSERT_NORMALIZED_OPTIMISTIC = '@@cashay/INSERT_NORMALIZED_OPTIMISTIC';
+export const SET_VARIABLES = '@@cashay/SET_VARIABLES';
+
 import {deepAssign} from './deepAssign';
 
 const initialState = {
@@ -8,19 +10,35 @@ const initialState = {
   isFetching: false,
   data: {
     entities: {},
-    result: {}
+    result: {},
+    variables: {}
   }
 };
 
 export const reducer = (state = initialState, action) => {
   switch (action.type) {
     case INSERT_NORMALIZED:
-    case INSERT_NORMALIZED_OPTIMISTIC:
-      debugger
-      const newState = Object.assign({}, state, {
-        data: deepAssign(state.data, action.payload.response)
+      // debugger
+      return Object.assign({}, state, {
+        data: Object.assign(deepAssign(state.data, action.payload.response), {
+          variables: Object.assign({}, state.data.variables, {
+            [action.payload.componentId]: Object.assign({},
+              state.data.variables[action.payload.componentId],
+              action.payload.variables)
+          })
+        })
       });
-      return  newState;
+    case SET_VARIABLES:
+      return Object.assign({}, state, {
+        data: Object.assign({}, state.data, {
+          variables: Object.assign({}, state.data.variables, {
+            [action.payload.componentId]: Object.assign({},
+              state.data.variables[action.payload.componentId],
+              action.payload.variables)
+          })
+        })
+      })
+
     default:
       return state;
   }
