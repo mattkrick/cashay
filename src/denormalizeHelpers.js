@@ -1,21 +1,20 @@
 import {TypeKind} from 'graphql/type/introspection';
-import {INLINE_FRAGMENT} from 'graphql/language/kinds';
+import {INLINE_FRAGMENT, STRING, NAME, ARGUMENT, INT, VARIABLE} from 'graphql/language/kinds';
 import {getRegularArgsKey, ensureTypeFromNonNull} from './utils';
 import {separateArgs} from './separateArgs';
-
-const {UNION, LIST, SCALAR} = TypeKind;
 
 /**
  * given a parent field state & some args, drill down to the data using the args as a map
  *
  * @param {object} fieldState the parent field in the redux state.
  * @param {object} fieldSchema the portion of the clientSchema relating to the fieldState
- * @param {object} fieldArgs the original arguments provided by the reqAST
+ * @param {object} selection the original query that holds the arguments
  * @param {object} context
  *
  * @returns {*} the an object, or array, or scalar from the normalized store
  * */
-export const getFieldState = (fieldState, fieldSchema, fieldArgs, context) => {
+export const getFieldState = (fieldState, fieldSchema, selection, context) => {
+  const {arguments: fieldArgs} = selection;
   const {regularArgs, paginationArgs} = separateArgs(fieldSchema, fieldArgs, context);
   if (regularArgs) {
     const regularArgsString = getRegularArgsKey(regularArgs);
@@ -47,32 +46,70 @@ export const getFieldState = (fieldState, fieldSchema, fieldArgs, context) => {
     // if last is provided, then first is not and we need to go from last to first
     let missingDocCount;
     if (last) {
-      const minIdx = cursorIdx - last;
-      missingDocCount = -minIdx;
-      const realStartIdx = Math.max(0, minIdx);
-      fieldState = usefulArray.slice(realStartIdx, cursorIdx);
-      if (missingDocCount > 0) {
-        const desiredDocCount = fieldArgs[context.paginationWords.last];
-        if (missingDocCount < desiredDocCount) {
-          fieldArgs[context.paginationWords.last] = missingDocCount;
-          fieldArgs[context.paginationWords.before] = usefulArray[0].cursor;
-        }
-      }
+      // TODO copy working example from else statement
+      // const minIdx = cursorIdx - last;
+      // missingDocCount = -minIdx;
+      // const realStartIdx = Math.max(0, minIdx);
+      // fieldState = usefulArray.slice(realStartIdx, cursorIdx);
+      // if (missingDocCount > 0) {
+      //   const desiredDocCount = fieldArgs.find(arg => arg.name.value === context.paginationWords.last);
+      //   if (missingDocCount < last) {
+      //     fieldArgs[context.paginationWords.last] = missingDocCount;
+      //     fieldArgs[context.paginationWords.before] = usefulArray[0].cursor;
+      //   }
+      // }
     } else {
       const maxIdx = cursorIdx + first;
       missingDocCount = maxIdx + 1 - usefulArray.length;
       fieldState = usefulArray.slice(cursorIdx + 1, cursorIdx + 1 + first);
       if (missingDocCount > 0) {
         console.log(`not enough data, need to fetch ${missingDocCount} more`);
-        const desiredDocCount = fieldArgs[context.paginationWords.first];
-        // if we have a partial response, only ask for the missing pieces
-        if (missingDocCount < desiredDocCount) {
-          fieldArgs[context.paginationWords.first] = missingDocCount;
-          fieldArgs[context.paginationWords.after] = usefulArray[usefulArray.length - 1].cursor;
+        debugger
+
+        // if we have a partial response & the backend accepts a cursor, only ask for the missing pieces
+        if (missingDocCount < first && fieldSchema.args.find(arg => arg.name === context.paginationWords.after)) {
+          sendChildrenToServer(selection);
+          const countArg = fieldArgs.find(arg => arg.name.value === context.paginationWords.first);
+          countArg.value = {
+            kind: INT,
+            value: missingDocCount
+          };
+          const cursorNormalizedString = usefulArray[usefulArray.length - 1];
+          const [typeName, docId] = cursorNormalizedString.split(':');
+          const storedDoc = context.store.entities[typeName][docId];
+          if (!storedDoc.cursor) {
+            console.error(`No cursor was included for ${cursorNormalizedString}. Please include the cursor field for the ${fieldSchema.name} query`)
+          }
+          const newCursorArg = {
+            kind: ARGUMENT,
+            name: {
+              kind: NAME,
+              value: context.paginationWords.after,
+              name: undefined
+            },
+            value: {
+              kind: STRING,
+              value: storedDoc.cursor
+            }
+          };
+          const cursorArgIdx = fieldArgs.findIndex(arg => arg.name.value === context.paginationWords.after);
+          if (cursorArgIdx > -1) {
+            fieldArgs[cursorArgIdx] = newCursorArg;
+          } else {
+            fieldArgs.push(newCursorArg);
+          }
         }
       }
     }
   }
+  fieldArgs.forEach(arg => {
+    if (arg.value.kind === VARIABLE) {
+      const argInOperation = context.operation.variableDefinitions.find(varDef => {
+        return varDef.variable.name.value === arg.value.name.value
+      });
+      argInOperation._inUse = true;
+    }
+  });
   return fieldState;
 };
 

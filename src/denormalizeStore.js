@@ -55,7 +55,7 @@ const visitObject = (subState = {}, reqAST, subSchema, context, baseReduction = 
       if (hasData) {
         let fieldState = subState[fieldName];
         if (fieldSchema.args && fieldSchema.args.length) {
-          fieldState = getFieldState(fieldState, fieldSchema, field.arguments, context);
+          fieldState = getFieldState(fieldState, fieldSchema, field, context);
         }
         // const typeSchema = context.schema.types.find(type => type.name === fieldSchema.type.name);
         reduction[aliasOrFieldName] = visit(fieldState, field, fieldSchema, context);
@@ -143,7 +143,7 @@ export const denormalizeStore = context => {
     let fieldState;
     if (queryInState) {
       if (isObject(queryInState)) {
-        fieldState = getFieldState(queryInState, querySchema, selection.arguments, context);
+        fieldState = getFieldState(queryInState, querySchema, selection, context);
       } else {
         fieldState = queryInState;
       }
@@ -154,7 +154,6 @@ export const denormalizeStore = context => {
     if (fieldState) {
       firstRun = false;
     }
-    debugger
     // const query
     // get the expected return value, devs can be silly, so if the had the return value in a nonnull, remove it.
     const subSchema = querySchema.type.kind === LIST ?

@@ -88,30 +88,34 @@ export default class Cashay {
    */
   query(queryString, options = {}, mutationListeners) {
     //if you call forceFetch in a mapStateToProps, you're gonna have a bad time (it'll refresh on EVERY dispatch)
-    const {variables, forceFetch} = options;
+    const {forceFetch} = options;
 
-    // Each component can have only 1 uinque queryString/variable combo. This keeps memory use minimal.
+    // Each component can have only 1 unique queryString/variable combo. This keeps memory use minimal.
+    // if 2 components have the same queryString/variable but a different componentId, it'll fetch twice
     const componentId = options.componentId || queryString;
+    const variables = this._getToState(this._store).data.variables[componentId] || options.variables;
 
-    // return a map where the unique variable object is the key & the denormalized result is the value
+    // get the result, containing a response, queryString, options to re-call the query, and a fetchCameBack boolean
     const cachedResult = this._denormalizedResults[componentId];
+
     // if we care about local data & the vars are the same & the response is complete, return FAST
     // fetchCameBack is false when a req is sent to the server & true when it comes back
     // it's necessary because calling dispatch from within a mapStateToProps will cause that mapStateToProps to rerender
-    // if a dispatch occurs before the server replies, we can quickly give it all we got
-    //TODO instead of submitting an empty array for data that isn't there, we should submit the count of null objs
-    // That way, when a 2nd query comes in looking for the same stuff, it won't trigger a 2nd request
+    // if a dispatch occurs before the server replies, we can use the cached incomplete data
     if (!forceFetch && cachedResult && (!cachedResult.fetchCameBack || cachedResult.response._isComplete)) {
       if (cachedResult.variables === variables || JSON.stringify(cachedResult.variables) === JSON.stringify(variables)) {
         console.log('cache hit');
         return cachedResult.response;
       }
     }
+
+    // troubleshooting
     if (!cachedResult) {
       console.log(`cache miss (no cached resulted)`)
     } else if (cachedResult.fetchCameBack) {
       console.log('cache miss (new data from server)')
     }
+
     // parse the queryString into an AST and break it into tasty little chunks
     const {paginationWords, idFieldName} = options;
     const context = buildExecutionContext(this._schema, queryString, {
@@ -137,6 +141,9 @@ export default class Cashay {
     // if we need more data, get it from the server
     if (!denormalizedPartialResponse._isComplete) {
 
+      // remove variableDefinitions that are no longer in use
+      context.operation.variableDefinitions = context.operation.variableDefinitions.filter(varDef => varDef._inUse === true);
+      
       // given an operation enhanced with sendToServer flags, print minimal query
       // should forceFetch minimize based on pending queries?
       const serverQueryString = (forceFetch || denormalizedPartialResponse._firstRun) ?
@@ -175,6 +182,7 @@ export default class Cashay {
       // add the mutation listeners to the Cashay singleton
       this._ensureListeners(componentId, mutationListeners);
     }
+    return denormalizedPartialResponse;
 
     // by putting nulls and empty arrays in the state, we're lying to the next query that wants data
     // that means we don't know what data is real & what is fake
@@ -189,13 +197,12 @@ export default class Cashay {
     //     }
     //   });
     // }
-    return denormalizedPartialResponse;
   }
 
   _setVariablesFactory = (componentId, currentVariables) => {
     return cb => {
-      const newVariables = Object.assign({}, currentVariables, cb(currentVariables));
-
+      const variables = Object.assign({}, currentVariables, cb(currentVariables));
+      
       // invalidate the cache
       this._denormalizedResults[componentId] = undefined;
 
@@ -204,9 +211,9 @@ export default class Cashay {
         type: SET_VARIABLES,
         payload: {
           componentId,
-          newVariables
+          variables
         }
-      })
+      });
     }
   };
 
@@ -221,7 +228,8 @@ export default class Cashay {
     const minimizedQueryResponse = await transport(minimizedQueryString, variables);
 
     if (!minimizedQueryResponse.data) {
-      console.log(`Error with query: \n ${minimizedQueryString}`);
+      console.log(JSON.stringify(minimizedQueryResponse.errors));
+      // console.log(`Error with query: \n ${minimizedQueryString}`);
       return;
     }
     // normalize response to get ready to dispatch it into the state tree
@@ -243,11 +251,11 @@ export default class Cashay {
 
     // walk the normalized response & grab the deps for each entity. put em all in a Set & flush it down the toilet
     const flushSet = this._makeFlushSet(normalizedResponseForStore, dependencyKey);
-
+    debugger
     // TODO: if no mutations ever occur, such as pagination of read-only docs, when should we run GC?
     for (let entry of flushSet) {
       const {queryString, variables} = entry;
-      this._denormalizedResults[queryString].delete(variables);
+      this._denormalizedResults[componentId] = undefined;
       this._listeners.add.delete(queryString);
       //this._listeners.update.delete(queryString);
       //this._listeners.delete.delete(queryString);
@@ -272,12 +280,15 @@ export default class Cashay {
   }
 
   _addDeps(normalizedResponse, dependencyKey) {
+    // create a set of normalized locations in entities (eg 'Post.123')
     const normalizedDeps = makeNormalizedDeps(normalizedResponse.entities);
+
+    // get the previous set
     const previousNormalizedDeps = this._normalizedDeps.get(dependencyKey);
 
     // remove old denormalizedDeps
     if (previousNormalizedDeps) {
-      // go through the remaining (obsolete) dependencies & if it isn't a new dep, remove it
+      // go through the remaining (obsolete) dependencies & if it isn't a new dep, remove it from the cached structure
       for (let stackLoc of previousNormalizedDeps) {
         if (!normalizedDeps.has(stackLoc)) {
           const [entity, item] = stackLoc.split('.');
