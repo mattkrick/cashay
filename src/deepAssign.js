@@ -1,30 +1,17 @@
 import {isObject} from './utils';
 
-const target = {
-  // foo: [{id: 1}, {id: 2, a: {a1: 2}}, {id: 3}],
-  bar: {
-    d: 4,
-    e: 5
-  }
-};
-
-const source = {
-  // foo: [{id: 2, a: {a1: 2}}, {id: 3}, {id: 4}],
-  bar: {
-    g: 7
-  },
-  baz: 1
-};
-
-//check for overlap in docs, intelligently append keys
-// all the logic in here is to mitigate the problems with cursor-based pagination
+/**
+ * check for overlap in docs, intelligently append keys
+ * all the logic in here is to mitigate the problems with cursor-based pagination (duplicates, etc)
+ *
+ */
 const mergeArrays = (state, src, isAppend) => {
   // pagination should never have the same document twice
   // the question is, do we maintain the old order, or the new?
   // maintaining the old order ensures less jumping around & that the user won't have to scroll past the same thing twice
   // so if the new stuff has references to old stuff, delete em
   // then, stick em on the end
-  const srcSet = new Set([src]);
+  const srcSet = new Set([...src]);
   for (let i = 0; i < state.length; i++) {
     srcSet.delete(state[i]);
   }
@@ -40,9 +27,10 @@ const handleArrays = (target, key, srcProp, stateProp) => {
     target[key] = srcProp;
   } else {
     // if this is an array of items moving forwards, append. Else, prepend.
-    const mergedArray = mergeForward ? mergeArrays(stateProp, srcProp) : mergeArrays(srcProp, stateProp);
+    const mergedArray = mergeArrays(stateProp, srcProp, mergeForward);
     // if an EOF flag exists on the array object, we know we requested more than we got
-    // TODO will we need to check stateProp.EOF? 
+    // TODO will we need to check stateProp.EOF?
+    // debugger
     if (srcProp.EOF) {
       delete target.front;
       delete target.back;

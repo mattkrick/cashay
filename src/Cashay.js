@@ -6,6 +6,7 @@ import {printMinimalQuery} from './minimizeQueryAST';
 import {buildExecutionContext} from './buildExecutionContext';
 import {makeNormalizedDeps, shortenNormalizedResponse} from './queryHelpers';
 import {isObject} from './utils';
+import {deepAssign} from './deepAssign';
 
 const defaultGetToState = store => store.getState().cashay;
 
@@ -39,7 +40,7 @@ export default class Cashay {
       delete: new Map()
     };
 
-    // a set to store the listener object so we only have to set listeners once
+    // a set of componentIds to quickly make sure we've got some listeners
     this._ensuredListeners = new Set();
 
     // lookup table for connecting the mutation result to the entities it affects
@@ -47,17 +48,18 @@ export default class Cashay {
 
     // denormalized deps is an object with entities for keys. 
     // The value of each entity is an object with uids for keys.
-    // the value of each UID is a set of dependencyKeys pointing to a denormalized query that needs to be invalidated
+    // the value of each UID is a set of componentIds
     // const example = {
     //   Pets: {
-    //     1: Set(dependencyKey1, dependencyKey2)
+    //     1: Set("componentId1", "componentId2")
     //   }
     // }
     this._denormalizedDeps = {};
 
-    // normalizedDeps is a Map where each key is a dependencyKey
-    // the value is a Set of locations in the _denormalizedDeps (eg ['Pets','1']
-    this._normalizedDeps = new Map();
+    // normalizedDeps is an Object where each key is a componentId
+    // it's not stored in _denormalizedResults in able to compare old vs new deps
+    // the value is a Set of locations in the _denormalizedDeps (eg ['Pets','1'])
+    this._normalizedDeps = {};
 
     // TODO store queryASTs in a WeakMap?
   }
@@ -97,7 +99,7 @@ export default class Cashay {
 
     // get the result, containing a response, queryString, options to re-call the query, and a fetchCameBack boolean
     const cachedResult = this._denormalizedResults[componentId];
-
+    // debugger
     // if we care about local data & the vars are the same & the response is complete, return FAST
     // fetchCameBack is false when a req is sent to the server & true when it comes back
     // it's necessary because calling dispatch from within a mapStateToProps will cause that mapStateToProps to rerender
@@ -138,28 +140,29 @@ export default class Cashay {
 
     const transport = this._getTransport(options);
 
+    // normalize the localResponse so we prevent duplicate requests by merging with the store
+    const normalizedPartialResponse = normalizeResponse(denormalizedPartialResponse.data, context);
+
     // if we need more data, get it from the server
     if (!denormalizedPartialResponse._isComplete) {
 
       // remove variableDefinitions that are no longer in use
       context.operation.variableDefinitions = context.operation.variableDefinitions.filter(varDef => varDef._inUse === true);
-      
+
       // given an operation enhanced with sendToServer flags, print minimal query
       // should forceFetch minimize based on pending queries?
       const serverQueryString = (forceFetch || denormalizedPartialResponse._firstRun) ?
         queryString : printMinimalQuery(context.operation, idFieldName);
 
       //  async query the server (no need to track the promise it returns, as it will change the redux state)
-      this._queryServer(transport, context, serverQueryString, componentId);
+      this._queryServer(transport, context, serverQueryString, componentId, normalizedPartialResponse);
     }
 
-    // normalize the localResponse so we prevent duplicate requests by merging with the store
-    const normalizedPartialResponse = normalizeResponse(denormalizedPartialResponse.data, context);
 
     // if this is a different query string but the same query
     // eg in this one we request 1 more field
     if (!denormalizedPartialResponse._firstRun) {
-      this._addDeps(normalizedPartialResponse, context.dependencyKey);
+      this._addDeps(normalizedPartialResponse, componentId);
     }
 
     // store the possibly full result in cashay
@@ -176,33 +179,25 @@ export default class Cashay {
       fetchCameBack: denormalizedPartialResponse._isComplete
     };
 
-    // go through a Map of function pointers to make sure we dont have listeners for this componentId
-    // TODO someone could use the same listeners for different components
-    if (isObject(mutationListeners) && !this._ensuredListeners.has(mutationListeners)) {
+    // go through a Set of function pointers to make sure we dont have listeners for this componentId
+    if (isObject(mutationListeners) && !this._ensuredListeners.has(componentId)) {
       // add the mutation listeners to the Cashay singleton
       this._ensureListeners(componentId, mutationListeners);
     }
     return denormalizedPartialResponse;
 
-    // by putting nulls and empty arrays in the state, we're lying to the next query that wants data
-    // that means we don't know what data is real & what is fake
-    // this causes a problem with things that just return in the result, since there are no deps on the result
-
-    // if we've already got all the data, we don't need to adjust the state
-    // if (!denormalizedPartialResponse._isComplete) {
-    //   this._store.dispatch({
-    //     type: '@@cashay/INSERT_NORMALIZED_OPTIMISTIC',
-    //     payload: {
-    //       response: normalizedPartialResponse
-    //     }
-    //   });
-    // }
+    // currently, there is no check for pending queries
+    // this is difficult to perform because we need to create a normalized state that encompasses how the state will look
+    // that includes the number of docs that come back, and their placement in the current array
+    // additionally, for unions, we'll have to create a special object saying if x, then y, etc.
+    // all that logic & bloat will only benefit us if the same query + same vars are sent off within ~300ms
+    // that sounds highly unlikely & cashay can have a smaller footprint by keeping this out of scope
   }
 
   _setVariablesFactory = (componentId, currentVariables) => {
     return cb => {
       const variables = Object.assign({}, currentVariables, cb(currentVariables));
-      
+
       // invalidate the cache
       this._denormalizedResults[componentId] = undefined;
 
@@ -217,46 +212,86 @@ export default class Cashay {
     }
   };
 
-  /*
+  /**
+   * A function used to get missing data from the server.
+   * Once the data comes back, it is normalized, old dependencies are removed, new ones are created,
+   * and the data that comes back from the server is compared to local data to minimize invalidations
    *
-   * QUERY HELPER TO GET DATA FROM SERVER (ASYNC)
+   * @param {function} transport the transport function to send the query + vars to a GraphQL endpoint
+   * @param {object} context the context to normalize data, including the requestAST and schema
+   * @param {string} minimizedQueryString the query string to send to the GraphQL endpoint
+   * @param {string} componentId an ID specific to the queryString/variable combo (defaults to the queryString)
+   * @param {object} normalizedPartialResponse the local data that we already have to fulfill the request
    *
-   **/
-  async _queryServer(transport, context, minimizedQueryString, componentId) {
-    const {variables, dependencyKey} = context;
+   * @return {undefined}
+   */
+  async _queryServer(transport, context, minimizedQueryString, componentId, normalizedPartialResponse) {
+    const {variables} = context;
+
     // send minimizedQueryString to server and await minimizedQueryResponse
     const minimizedQueryResponse = await transport(minimizedQueryString, variables);
 
+    // handle errors coming back from the server
     if (!minimizedQueryResponse.data) {
       console.log(JSON.stringify(minimizedQueryResponse.errors));
+      this._denormalizedResults[componentId].fetchCameBack = true;
+      this._denormalizedResults[componentId].error = JSON.stringify(minimizedQueryResponse.errors);
       // console.log(`Error with query: \n ${minimizedQueryString}`);
       return;
     }
+
     // normalize response to get ready to dispatch it into the state tree
+    // debugger
     const normalizedMinimizedQueryResponse = normalizeResponse(minimizedQueryResponse.data, context);
 
+    const fullNormalizedResponse = deepAssign(normalizedPartialResponse, normalizedMinimizedQueryResponse);
+
+    // TODO denormalize result from the fullNormalizedResponse as the store. Saves a query
+    // the problem is we already mutated the context.operation args
+    // const fullDenormalizedResponse = denormalizeStore(Object.assign(context, {store: fullNormalizedResponse}));
+    // // TODO remove fetchCameBack
+    // this._denormalizedResults[componentId] = {
+    //   response: fullDenormalizedResponse,
+    //   // keep options that are shared across variable combos (for listeners)
+    //   options: {
+    //     paginationWords: context.paginationWords,
+    //     idFieldName: context.idFieldName,
+    //     variables,
+    //     transport
+    //   },
+    //   queryString: context.queryString,
+    //   fetchCameBack: true
+    // };
+
+    // yay, the full result is coming! time to start listening to dispatches again
+    
+    // when a fetch returns nothing (EOF) isComplete is not true, but if we turn it true here, then it won't invalidate cache
+    // denormalized needs to check for EOF, but also, we should move towards doing it all here
+    this._denormalizedResults[componentId].fetchCameBack = true;
 
     // add denormalizedDeps so we can invalidate when other queries come in
     // add normalizedDeps to find those deps when a denormalizedReponse is mutated
-    this._addDeps(normalizedMinimizedQueryResponse, dependencyKey);
+    // the data fetched from server is only part of the story, so we shouldn't remove old deps with only partial data
+    this._addDeps(fullNormalizedResponse, componentId);
 
     // get current state data
-    const cashayDataStore = this._getToState(this._store).data;
+    const cashayDataState = this._getToState(this._store).data;
 
     // now, remove the objects that look identical to the ones already in the state
     // if the incoming entity (eg Person.123) looks exactly like the one already in the store, then
     // we don't have to invalidate and rerender
 
-    const normalizedResponseForStore = shortenNormalizedResponse(normalizedMinimizedQueryResponse, cashayDataStore);
+    const normalizedResponseForStore = shortenNormalizedResponse(normalizedMinimizedQueryResponse, cashayDataState);
 
     // walk the normalized response & grab the deps for each entity. put em all in a Set & flush it down the toilet
-    const flushSet = this._makeFlushSet(normalizedResponseForStore, dependencyKey);
-    debugger
+    const flushSet = this._makeFlushSet(normalizedResponseForStore, componentId);
+
     // TODO: if no mutations ever occur, such as pagination of read-only docs, when should we run GC?
-    for (let entry of flushSet) {
-      const {queryString, variables} = entry;
-      this._denormalizedResults[componentId] = undefined;
-      this._listeners.add.delete(queryString);
+    for (let flushedComponentId of flushSet) {
+      this._denormalizedResults[flushedComponentId] = undefined;
+      this._listeners.add.delete(flushedComponentId);
+      // TODO delete from _ensuredListeners? Otherwise it's a memory leak
+      // Ideally check normalizedDeps for the componentId & if there are none, then remove listeners
       //this._listeners.update.delete(queryString);
       //this._listeners.delete.delete(queryString);
     }
@@ -266,8 +301,9 @@ export default class Cashay {
     // const fullResult = mergeDeepWithArrs(denormalizedPartialResponse, normalizedMinimizedQueryResponse);
     // this._denormalizedResults[context.dependencyKey.queryString].set(variables, fullResult);
 
-    // yay, the full result is coming! time to start listening to dispatches again
-    this._denormalizedResults[componentId].fetchCameBack = true;
+
+    // that'd also eliminate the need for fetchCameBack, maybe?
+
     // stick normalize data in store and recreate any invalidated denormalized structures
     this._store.dispatch({
       type: INSERT_NORMALIZED,
@@ -279,34 +315,41 @@ export default class Cashay {
     });
   }
 
-  _addDeps(normalizedResponse, dependencyKey) {
-    // create a set of normalized locations in entities (eg 'Post.123')
-    const normalizedDeps = makeNormalizedDeps(normalizedResponse.entities);
-
+  _addDeps(normalizedResponse, componentId) {
     // get the previous set
-    const previousNormalizedDeps = this._normalizedDeps.get(dependencyKey);
+    const oldNormalizedDeps = this._normalizedDeps[componentId];
 
-    // remove old denormalizedDeps
-    if (previousNormalizedDeps) {
-      // go through the remaining (obsolete) dependencies & if it isn't a new dep, remove it from the cached structure
-      for (let stackLoc of previousNormalizedDeps) {
-        if (!normalizedDeps.has(stackLoc)) {
-          const [entity, item] = stackLoc.split('.');
-          this._denormalizedDeps[entity][item].delete(dependencyKey);
+    // create a set of normalized locations in entities (eg 'Post.123')
+    const newNormalizedDeps = this._normalizedDeps[componentId] = makeNormalizedDeps(normalizedResponse.entities);
+
+    let newUniques;
+    if (!oldNormalizedDeps) {
+      newUniques = newNormalizedDeps;
+    } else {
+      // debugger
+      // create 2 Sets that are the left/right diff of old and new
+      newUniques = new Set();
+      for (let dep of newNormalizedDeps) {
+        if (oldNormalizedDeps.has(dep)) {
+          oldNormalizedDeps.delete(dep);
+        } else {
+          newUniques.add(dep);
         }
+      }
+
+      // remove old deps
+      for (let dep of oldNormalizedDeps) {
+        const [entity, item] = dep.split('.');
+        this._denormalizedDeps[entity][item].delete(componentId);
       }
     }
 
-    //replace the old with the new
-    this._normalizedDeps.set(dependencyKey, normalizedDeps);
-
-    // go through and replace the denormalizedDeps with the new normalizedDeps
-    // TODO babel turns this into a try/catch. maybe move it to its own function
-    for (let stackLoc of normalizedDeps) {
-      const [entity, item] = stackLoc.split('.');
+    // add new deps
+    for (let dep of newUniques) {
+      const [entity, item] = dep.split('.');
       this._denormalizedDeps[entity] = this._denormalizedDeps[entity] || {};
       this._denormalizedDeps[entity][item] = this._denormalizedDeps[entity][item] || new Set();
-      this._denormalizedDeps[entity][item].add(dependencyKey);
+      this._denormalizedDeps[entity][item].add(componentId);
     }
   }
 
@@ -339,14 +382,15 @@ export default class Cashay {
     return transport;
   }
 
-  /*
+  /**
    * Crawl the dependency tree snagging up everything that will be invalidated
    * No safety checks required.
    * The tree is guaranteed to have everything we look for because of _addDeps
+   *
    */
-  _makeFlushSet(normalizedResponse, selfDependencyKey) {
-    let flushSet = new Set();
+  _makeFlushSet(normalizedResponse, componentId) {
     const {entities} = normalizedResponse;
+    let flushSet = new Set();
     const entityKeys = Object.keys(entities);
     for (let i = 0; i < entityKeys.length; i++) {
       const entityName = entityKeys[i];
@@ -360,7 +404,9 @@ export default class Cashay {
         flushSet = new Set([...flushSet, ...itemDepSet]);
       }
     }
-    flushSet.delete(selfDependencyKey);
+
+    // no need to flush the callee
+    flushSet.delete(componentId);
     return flushSet;
   }
 

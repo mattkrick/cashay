@@ -23,9 +23,10 @@ export const getFieldState = (fieldState, fieldSchema, selection, context) => {
   if (paginationArgs) {
     const {before, after, first, last} = paginationArgs;
     // try to use the full array. if it doesn't exist, see if we're going backwards & use the back array, else front
-    const usefulArray = fieldState.full || last ? fieldState.back : fieldState.front;
+    const usefulArray = fieldState.full || (last ? fieldState.back : fieldState.front);
 
     if (!usefulArray) {
+      debugger
       console.log('no local data')
       return;
     }
@@ -60,11 +61,13 @@ export const getFieldState = (fieldState, fieldSchema, selection, context) => {
       // }
     } else {
       const maxIdx = cursorIdx + first;
+      const isFull = usefulArray === fieldState.full;
       missingDocCount = maxIdx + 1 - usefulArray.length;
       fieldState = usefulArray.slice(cursorIdx + 1, cursorIdx + 1 + first);
-      if (missingDocCount > 0) {
+      debugger
+      // if there's a document missing & we don't have all the documents yet, get more!
+      if (missingDocCount > 0 && !isFull) {
         console.log(`not enough data, need to fetch ${missingDocCount} more`);
-        debugger
 
         // if we have a partial response & the backend accepts a cursor, only ask for the missing pieces
         if (missingDocCount < first && fieldSchema.args.find(arg => arg.name === context.paginationWords.after)) {
@@ -107,7 +110,10 @@ export const getFieldState = (fieldState, fieldSchema, selection, context) => {
       const argInOperation = context.operation.variableDefinitions.find(varDef => {
         return varDef.variable.name.value === arg.value.name.value
       });
-      argInOperation._inUse = true;
+      // if calling denormalize from the _queryServer, it's possible we already nuked the arg from the operation
+      if (argInOperation) {
+        argInOperation._inUse = true;
+      }
     }
   });
   return fieldState;

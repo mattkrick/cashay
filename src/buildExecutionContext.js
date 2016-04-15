@@ -36,9 +36,10 @@ export const buildExecutionContext = (schema, queryString, options) => {
     paginationWords: Object.assign(defaultPaginationWords, options.paginationWords),
     variables: options.variables,
     idFieldName: options.idFieldName || 'id',
-    store: options.store,
+    // TODO rename to cashayState
+    store: options.store
     // create an object unique to the queryString + vars
-    dependencyKey: {variables: options.variables, queryString}
+    // dependencyKey: {variables: options.variables, queryString}
   };
 };
 

@@ -108,11 +108,10 @@ export const normalizeResponse = (response, context) => {
   const operationType = `${context.operation.operation}Type`;
   const operationSchema = context.schema.types.find(type => type.name === context.schema[operationType].name);
   const result = visit(bag, response, context.operation, operationSchema, context);
-  const data = {
+  return {
     entities: bag,
     result
   };
-  return data
 };
 
 // a = [{

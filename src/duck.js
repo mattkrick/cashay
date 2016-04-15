@@ -6,6 +6,7 @@ export const SET_VARIABLES = '@@cashay/SET_VARIABLES';
 import {deepAssign} from './deepAssign';
 
 const initialState = {
+  // TODO simplify. isFetching is the same as !cachedResponse._isComplete
   error: {},
   isFetching: false,
   data: {
