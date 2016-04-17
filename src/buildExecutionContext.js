@@ -1,5 +1,4 @@
 import {OPERATION_DEFINITION, FRAGMENT_DEFINITION} from 'graphql/language/kinds';
-import {print} from 'graphql/language/printer';
 import {parse} from 'graphql/language/parser';
 
 export const defaultPaginationWords = {
@@ -36,10 +35,7 @@ export const buildExecutionContext = (schema, queryString, options) => {
     paginationWords: Object.assign(defaultPaginationWords, options.paginationWords),
     variables: options.variables,
     idFieldName: options.idFieldName || 'id',
-    // TODO rename to cashayState
-    store: options.store
-    // create an object unique to the queryString + vars
-    // dependencyKey: {variables: options.variables, queryString}
+    cashayDataState: options.cashayDataState
   };
 };
 

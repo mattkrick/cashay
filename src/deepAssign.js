@@ -27,10 +27,9 @@ const handleArrays = (target, key, srcProp, stateProp) => {
     target[key] = srcProp;
   } else {
     // if this is an array of items moving forwards, append. Else, prepend.
-    const mergedArray = mergeArrays(stateProp, srcProp, mergeForward);
+    const mergedArray = mergeArrays(stateProp.filter(Boolean), srcProp, mergeForward);
     // if an EOF flag exists on the array object, we know we requested more than we got
     // TODO will we need to check stateProp.EOF?
-    // debugger
     if (srcProp.EOF) {
       delete target.front;
       delete target.back;

@@ -19,6 +19,7 @@ const initialState = {
 export const reducer = (state = initialState, action) => {
   switch (action.type) {
     case INSERT_NORMALIZED:
+      console.log('calling insert normalized');
       // debugger
       return Object.assign({}, state, {
         data: Object.assign(deepAssign(state.data, action.payload.response), {
@@ -30,6 +31,7 @@ export const reducer = (state = initialState, action) => {
         })
       });
     case SET_VARIABLES:
+      console.log('calling set variables');
       return Object.assign({}, state, {
         data: Object.assign({}, state.data, {
           variables: Object.assign({}, state.data.variables, {

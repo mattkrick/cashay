@@ -1,6 +1,6 @@
 import {INSERT_NORMALIZED, SET_VARIABLES} from './duck';
-import {parse} from 'graphql/language/parser';
 import {denormalizeStore} from './denormalizeStore';
+import {rebuildOriginalArgs} from './denormalizeHelpers';
 import {normalizeResponse} from './normalizeResponse';
 import {printMinimalQuery} from './minimizeQueryAST';
 import {buildExecutionContext} from './buildExecutionContext';
@@ -95,36 +95,24 @@ export default class Cashay {
     // Each component can have only 1 unique queryString/variable combo. This keeps memory use minimal.
     // if 2 components have the same queryString/variable but a different componentId, it'll fetch twice
     const componentId = options.componentId || queryString;
-    const variables = this._getToState(this._store).data.variables[componentId] || options.variables;
 
     // get the result, containing a response, queryString, options to re-call the query, and a fetchCameBack boolean
     const cachedResult = this._denormalizedResults[componentId];
-    // debugger
-    // if we care about local data & the vars are the same & the response is complete, return FAST
-    // fetchCameBack is false when a req is sent to the server & true when it comes back
-    // it's necessary because calling dispatch from within a mapStateToProps will cause that mapStateToProps to rerender
-    // if a dispatch occurs before the server replies, we can use the cached incomplete data
-    if (!forceFetch && cachedResult && (!cachedResult.fetchCameBack || cachedResult.response._isComplete)) {
-      if (cachedResult.variables === variables || JSON.stringify(cachedResult.variables) === JSON.stringify(variables)) {
-        console.log('cache hit');
-        return cachedResult.response;
-      }
-    }
 
-    // troubleshooting
-    if (!cachedResult) {
-      console.log(`cache miss (no cached resulted)`)
-    } else if (cachedResult.fetchCameBack) {
-      console.log('cache miss (new data from server)')
+    // if we got local data, then send it on back
+    if (cachedResult && !forceFetch) {
+      console.log('cache hit');
+      return cachedResult.response;
     }
 
     // parse the queryString into an AST and break it into tasty little chunks
+    const variables = this._getToState(this._store).data.variables[componentId] || options.variables;
     const {paginationWords, idFieldName} = options;
     const context = buildExecutionContext(this._schema, queryString, {
       variables,
       paginationWords,
       idFieldName,
-      store: this._getToState(this._store).data
+      cashayDataState: this._getToState(this._store).data
     });
 
     // create a denormalized document from local data that also turns frags to inline & flags missing objects in context.operation
@@ -140,7 +128,7 @@ export default class Cashay {
 
     const transport = this._getTransport(options);
 
-    // normalize the localResponse so we prevent duplicate requests by merging with the store
+    // normalize the denormalizedPartialResponse so we prevent duplicate requests by merging with the store
     const normalizedPartialResponse = normalizeResponse(denormalizedPartialResponse.data, context);
 
     // if we need more data, get it from the server
@@ -172,11 +160,9 @@ export default class Cashay {
       options: {
         paginationWords: context.paginationWords,
         idFieldName: context.idFieldName,
-        variables,
         transport
       },
-      queryString,
-      fetchCameBack: denormalizedPartialResponse._isComplete
+      queryString
     };
 
     // go through a Set of function pointers to make sure we dont have listeners for this componentId
@@ -185,13 +171,6 @@ export default class Cashay {
       this._ensureListeners(componentId, mutationListeners);
     }
     return denormalizedPartialResponse;
-
-    // currently, there is no check for pending queries
-    // this is difficult to perform because we need to create a normalized state that encompasses how the state will look
-    // that includes the number of docs that come back, and their placement in the current array
-    // additionally, for unions, we'll have to create a special object saying if x, then y, etc.
-    // all that logic & bloat will only benefit us if the same query + same vars are sent off within ~300ms
-    // that sounds highly unlikely & cashay can have a smaller footprint by keeping this out of scope
   }
 
   _setVariablesFactory = (componentId, currentVariables) => {
@@ -234,44 +213,38 @@ export default class Cashay {
     // handle errors coming back from the server
     if (!minimizedQueryResponse.data) {
       console.log(JSON.stringify(minimizedQueryResponse.errors));
-      this._denormalizedResults[componentId].fetchCameBack = true;
       this._denormalizedResults[componentId].error = JSON.stringify(minimizedQueryResponse.errors);
-      // console.log(`Error with query: \n ${minimizedQueryString}`);
       return;
     }
 
     // normalize response to get ready to dispatch it into the state tree
-    // debugger
     const normalizedMinimizedQueryResponse = normalizeResponse(minimizedQueryResponse.data, context);
 
     const fullNormalizedResponse = deepAssign(normalizedPartialResponse, normalizedMinimizedQueryResponse);
-
-    // TODO denormalize result from the fullNormalizedResponse as the store. Saves a query
-    // the problem is we already mutated the context.operation args
-    // const fullDenormalizedResponse = denormalizeStore(Object.assign(context, {store: fullNormalizedResponse}));
-    // // TODO remove fetchCameBack
-    // this._denormalizedResults[componentId] = {
-    //   response: fullDenormalizedResponse,
-    //   // keep options that are shared across variable combos (for listeners)
-    //   options: {
-    //     paginationWords: context.paginationWords,
-    //     idFieldName: context.idFieldName,
-    //     variables,
-    //     transport
-    //   },
-    //   queryString: context.queryString,
-    //   fetchCameBack: true
-    // };
-
-    // yay, the full result is coming! time to start listening to dispatches again
+    // it's possible that we adjusted the arguments for the operation we sent to server
+    // for example, instead of asking for 20 docs, we asked for 5 at index 15.
+    // now, we want the 20 again
+    rebuildOriginalArgs(context.operation);
     
-    // when a fetch returns nothing (EOF) isComplete is not true, but if we turn it true here, then it won't invalidate cache
-    // denormalized needs to check for EOF, but also, we should move towards doing it all here
-    this._denormalizedResults[componentId].fetchCameBack = true;
+    // read from a pseudo store (eliminates a requery)
+    // even if the requery wasn't expensive, doing it here means we don't have to keep track of the fetching status
+    // eg if fetching is true, then we always return the cached result
+    const reducedContext = Object.assign(context, {cashayDataState: fullNormalizedResponse});
+    const fullDenormalizedResponse = denormalizeStore(reducedContext);
+    fullDenormalizedResponse.setVariables = this._setVariablesFactory(componentId, variables);
+    this._denormalizedResults[componentId] = {
+      response: fullDenormalizedResponse,
+      options: {
+        paginationWords: context.paginationWords,
+        idFieldName: context.idFieldName,
+        transport
+      },
+      queryString: context.queryString
+    };
 
     // add denormalizedDeps so we can invalidate when other queries come in
     // add normalizedDeps to find those deps when a denormalizedReponse is mutated
-    // the data fetched from server is only part of the story, so we shouldn't remove old deps with only partial data
+    // the data fetched from server is only part of the story, so we need the full normalized response
     this._addDeps(fullNormalizedResponse, componentId);
 
     // get current state data
@@ -280,7 +253,6 @@ export default class Cashay {
     // now, remove the objects that look identical to the ones already in the state
     // if the incoming entity (eg Person.123) looks exactly like the one already in the store, then
     // we don't have to invalidate and rerender
-
     const normalizedResponseForStore = shortenNormalizedResponse(normalizedMinimizedQueryResponse, cashayDataState);
 
     // walk the normalized response & grab the deps for each entity. put em all in a Set & flush it down the toilet
@@ -326,7 +298,6 @@ export default class Cashay {
     if (!oldNormalizedDeps) {
       newUniques = newNormalizedDeps;
     } else {
-      // debugger
       // create 2 Sets that are the left/right diff of old and new
       newUniques = new Set();
       for (let dep of newNormalizedDeps) {
@@ -433,17 +404,17 @@ export default class Cashay {
   }
 
   _addListenersHandler(typesMutated, docFromServer) {
-    // for every add listener
+    // for every add listener (key = componentId, value = listenerObj)
     for (let [componentId, listenerObj] of this._listeners.add.entities()) {
       // for every type of entity mutated in the returned mutation (usually 1)
       for (let typeMutated of typesMutated) {
         const relevantListener = listenerObj[typeMutated];
+        // if the component query does not care about adding a particular type, ignore it
         if (!relevantListener) {
           continue;
         }
         // find current cached result for this particular componentId
         const cachedResult = this._denormalizedResults[componentId];
-        let executionContext;
         const {variables, queryString, response} = cachedResult;
 
         // for the denormalized response, mutate it in place or return undefined if no mutation was made
@@ -453,16 +424,16 @@ export default class Cashay {
           // otherwise, treat it as an optimistic update
           relevantListener(variables, null, response, this._invalidate);
 
-        // see if we want to rerun the listening query again. it so, put it in a map & we'll run them after
-        // this means there's a possible 3 updates: optimistic, doc from server, full array from server (invalided)
+        // see if we want to rerun the listening query again. if so, put it in a map & we'll run them after
+        // this means there's a possible 3 updates: optimistic, doc from server, full array from server (invalidated)
+        const {paginationWords, idFieldName} = cachedResult.options;
         if (this._willInvalidateListener) {
-          const {paginationWords, idFieldName} = cachedResult.options;
           this._willInvalidateListener = false;
           if (!this._invalidationQueue.has(componentId)) {
             this._invalidationQueue.set(componentId, () => {
               console.log('querySTring mutated?', componentId, variables);
               this.query(queryString, {
-                variables,
+                // variables, // grab from state?
                 paginationWords,
                 idFieldName,
                 forceFetch: true
@@ -470,6 +441,8 @@ export default class Cashay {
             })
           }
         }
+
+        // this must come back after the invalidateListener check because they could invalidate without returning something
         if (!modifiedResponse) {
           continue;
         }
@@ -477,19 +450,17 @@ export default class Cashay {
         // TODO: normalizing requires context, requires the queryAST, but we don't wanna parse that over & over!
         // let's parse for alpha, then figure out whether to store it or do something intelligent
         // like only save it if it's used a lot
-        if (executionContext) {
-          executionContext.variables = variables;
-        } else {
-          // only parse the query once, regardless of how many variable-deviations there are
-          const queryAST = parse(queryString, {noLocation: true, noSource: true});
-          const {paginationWords, idFieldName} = queryMap.get('options');
-          executionContext = buildExecutionContext(this._schema, queryAST, {
-            variables,
-            paginationWords,
-            idFieldName,
-            store: this._store
-          });
-        }
+        // if (executionContext) {
+        //   executionContext.variables = variables;
+        // } else {
+        // only parse the query once, regardless of how many variable-deviations there are
+        const executionContext = buildExecutionContext(this._schema, queryString, {
+          variables,
+          paginationWords,
+          idFieldName,
+          store: this._store
+        });
+        // }
         const normalizedModifiedResponse = normalize(modifiedResponse, context);
         // merge the normalized optimistic result with the state
         // dont change other queries, they might not want it.

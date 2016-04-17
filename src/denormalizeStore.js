@@ -34,7 +34,7 @@ const handleMissingData = (aliasOrFieldName, field, fieldSchema, context) => {
 };
 
 const visitObject = (subState = {}, reqAST, subSchema, context, baseReduction = {}) => {
-  const reducedSelected = reqAST.selectionSet.selections.reduce((reduction, field, idx, selectionArr) => {
+  return reqAST.selectionSet.selections.reduce((reduction, field, idx, selectionArr) => {
     if (field.kind === FRAGMENT_SPREAD) {
       const fragment = context.fragments[field.name.value];
       selectionArr[idx] = field = convertFragmentToInline(fragment);
@@ -69,13 +69,11 @@ const visitObject = (subState = {}, reqAST, subSchema, context, baseReduction = 
     }
     return reduction
   }, baseReduction);
-  reqAST.selectionSet.selections = reqAST.selectionSet.selections.filter(x => x !== 'xxx');
-  return reducedSelected;
 };
 
 const visitNormalizedString = (subState, reqAST, subSchema, context) => {
   const [typeName, docId] = subState.split(':');
-  const doc = context.store.entities[typeName][docId];
+  const doc = context.cashayDataState.entities[typeName][docId];
   const fieldSchema = context.schema.types.find(type => type.name === typeName);
   return visit(doc, reqAST, fieldSchema, context);
 };
@@ -90,7 +88,10 @@ const visitIterable = (subState, reqAST, subSchema, context) => {
     const fieldSchema = context.schema.types.find(type => type.name === fieldType.name);
 
     // for each value in the array, get the denormalized item
-    return subState.map(res => visit(res, reqAST, fieldSchema, context));
+    const mappedState = subState.map(res => visit(res, reqAST, fieldSchema, context));
+    mappedState.BOF = subState.BOF;
+    mappedState.EOF = subState.EOF;
+    return mappedState;
   }
   // recursively climb down the tree, flagging each branch with sendToServer
   sendChildrenToServer(reqAST);
@@ -137,7 +138,7 @@ export const denormalizeStore = context => {
     let querySchema = operationSchema.fields.find(field => field.name === queryName);
 
     // look into the current redux state to see if we can borrow any data from it
-    let queryInState = context.store.result[queryName];
+    let queryInState = context.cashayDataState.result[queryName];
 
     // if there's no results stored or being fetched, save some time & don't bother with the args
     let fieldState;
@@ -177,6 +178,8 @@ export const denormalizeStore = context => {
     // this is handy if the user wants to do something when a query is run for the first time
     _firstRun: firstRun,
     // this is handy if the user wants to know if the data is complete as requested (eg top-level spinners)
-    _isComplete: !context.operation.sendToServer
+    _isComplete: !context.operation.sendToServer,
+    // we'll define this later
+    seVariables: undefined
   };
 };
