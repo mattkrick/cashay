@@ -7,6 +7,7 @@ import {buildExecutionContext} from './buildExecutionContext';
 import {makeNormalizedDeps, shortenNormalizedResponse} from './queryHelpers';
 import {isObject} from './utils';
 import {deepAssign} from './deepAssign';
+import {createMutationString} from './createMutationString';
 
 const defaultGetToState = store => store.getState().cashay;
 
@@ -34,17 +35,13 @@ export default class Cashay {
     this._invalidationQueue = [];
 
     // an array of queries listening for mutations
-    this._listeners = {
-      add: new Map(),
-      update: new Map(),
-      delete: new Map()
-    };
+    this._listeners = {};
 
     // a set of componentIds to quickly make sure we've got some listeners
     this._ensuredListeners = new Set();
 
     // lookup table for connecting the mutation result to the entities it affects
-    this._mutationStringToType = {};
+    // this._mutationStringToType = {};
 
     // denormalized deps is an object with entities for keys. 
     // The value of each entity is an object with uids for keys.
@@ -64,6 +61,10 @@ export default class Cashay {
     // TODO store queryASTs in a WeakMap?
   }
 
+  /**
+   * a method given to a mutation callback that turns on a global.
+   * if true, then we know to queue up a requery
+   */
   _invalidate() {
     this._willInvalidateListener = true;
   }
@@ -99,13 +100,13 @@ export default class Cashay {
     // get the result, containing a response, queryString, options to re-call the query, and a fetchCameBack boolean
     const cachedResult = this._denormalizedResults[componentId];
 
-    // if we got local data, then send it on back
+    // if we got local data cached already, send it back fast
     if (cachedResult && !forceFetch) {
-      console.log('cache hit');
       return cachedResult.response;
     }
 
     // parse the queryString into an AST and break it into tasty little chunks
+    // in the future, babel will parse the query at compile time to speed this up
     const variables = this._getToState(this._store).data.variables[componentId] || options.variables;
     const {paginationWords, idFieldName} = options;
     const context = buildExecutionContext(this._schema, queryString, {
@@ -134,7 +135,7 @@ export default class Cashay {
     // if we need more data, get it from the server
     if (!denormalizedPartialResponse._isComplete) {
 
-      // remove variableDefinitions that are no longer in use
+      // remove variableDefinitions that are no longer in use, flag is set during denorm
       context.operation.variableDefinitions = context.operation.variableDefinitions.filter(varDef => varDef._inUse === true);
 
       // given an operation enhanced with sendToServer flags, print minimal query
@@ -149,6 +150,9 @@ export default class Cashay {
 
     // if this is a different query string but the same query
     // eg in this one we request 1 more field
+    // we'll want to run this if the rsponse came back complete locally
+    // as well as any partial data, since we don't know when the server response will come back
+    // and stuff could get invalidated before then
     if (!denormalizedPartialResponse._firstRun) {
       this._addDeps(normalizedPartialResponse, componentId);
     }
@@ -167,12 +171,16 @@ export default class Cashay {
 
     // go through a Set of function pointers to make sure we dont have listeners for this componentId
     if (isObject(mutationListeners) && !this._ensuredListeners.has(componentId)) {
-      // add the mutation listeners to the Cashay singleton
+      // add the mutation listeners to the Cashay object
       this._ensureListeners(componentId, mutationListeners);
     }
     return denormalizedPartialResponse;
   }
 
+  /**
+   * Creates a function to allow for the user to change the variables without mutating the old
+   * variables or having to type the componentId. This allows for pretty painless state++ behavior
+   */
   _setVariablesFactory = (componentId, currentVariables) => {
     return cb => {
       const variables = Object.assign({}, currentVariables, cb(currentVariables));
@@ -192,7 +200,7 @@ export default class Cashay {
   };
 
   /**
-   * A function used to get missing data from the server.
+   * A method used to get missing data from the server.
    * Once the data comes back, it is normalized, old dependencies are removed, new ones are created,
    * and the data that comes back from the server is compared to local data to minimize invalidations
    *
@@ -214,24 +222,30 @@ export default class Cashay {
     if (!minimizedQueryResponse.data) {
       console.log(JSON.stringify(minimizedQueryResponse.errors));
       this._denormalizedResults[componentId].error = JSON.stringify(minimizedQueryResponse.errors);
+      // TODO put error in redux state
       return;
     }
 
     // normalize response to get ready to dispatch it into the state tree
     const normalizedMinimizedQueryResponse = normalizeResponse(minimizedQueryResponse.data, context);
 
+    // combine the partial response with the server response to fully respond to the query
     const fullNormalizedResponse = deepAssign(normalizedPartialResponse, normalizedMinimizedQueryResponse);
+
     // it's possible that we adjusted the arguments for the operation we sent to server
     // for example, instead of asking for 20 docs, we asked for 5 at index 15.
-    // now, we want the 20 again
+    // now, we want to ask for the 20 again
     rebuildOriginalArgs(context.operation);
-    
+
     // read from a pseudo store (eliminates a requery)
     // even if the requery wasn't expensive, doing it here means we don't have to keep track of the fetching status
     // eg if fetching is true, then we always return the cached result
     const reducedContext = Object.assign(context, {cashayDataState: fullNormalizedResponse});
     const fullDenormalizedResponse = denormalizeStore(reducedContext);
+
+    // attach a function to the response that supplies the currentVariables so the user can create a new vars object
     fullDenormalizedResponse.setVariables = this._setVariablesFactory(componentId, variables);
+
     this._denormalizedResults[componentId] = {
       response: fullDenormalizedResponse,
       options: {
@@ -267,14 +281,6 @@ export default class Cashay {
       //this._listeners.update.delete(queryString);
       //this._listeners.delete.delete(queryString);
     }
-
-    // combine partial query with the new minimal response (a little hacky to get a result before the dispatch)
-    // fullResult should come with an _isComplete flag set to true
-    // const fullResult = mergeDeepWithArrs(denormalizedPartialResponse, normalizedMinimizedQueryResponse);
-    // this._denormalizedResults[context.dependencyKey.queryString].set(variables, fullResult);
-
-
-    // that'd also eliminate the need for fetchCameBack, maybe?
 
     // stick normalize data in store and recreate any invalidated denormalized structures
     this._store.dispatch({
@@ -325,23 +331,16 @@ export default class Cashay {
   }
 
   _ensureListeners(componentId, mutationListeners) {
-    // add mutation listeners for add, update, delete
-    Object.keys(mutationListeners).forEach(listener => {
-      const listenerMap = this._listeners[listener];
-
-      // make sure the listener is for add, update, or delete
-      if (!listenerMap) {
-        console.error(`Invalid mutation rule: ${listener}.\nSee componentId: ${componentId}`);
+    // add mutation listeners
+    const operationName = this._schema.mutationType.name;
+    const rootMutation = this._schema.types.find(type => type.name === operationName);
+    Object.keys(mutationListeners).forEach(mutationName => {
+      const mutationSchema = rootMutation.fields.find(field => field.name === mutationName);
+      if (!mutationSchema) {
+        console.error(`Invalid mutation: ${mutationName}.\nDid you make a typo?`);
       }
-
-      // make sure there is only 1 listener per componentId
-      if (listenerMap.has(componentId)) {
-        console.warn(`Each componentId can only have 1 set of rules per ${listener} mutation.
-        Remove extra rules for secondary instances of: ${componentId}`);
-      }
-
-      // push the new listener
-      listenerMap.set(componentId, mutationListeners[listener]);
+      this._listeners[mutationName] = this._listeners[mutationName] || new Map();
+      this._listeners[mutationName].set(componentId, mutationListeners[mutationName]);
     });
   }
 
@@ -381,114 +380,102 @@ export default class Cashay {
     return flushSet;
   }
 
-  /*
+  /**
    *
-   * ADD MUTATION METHOD
+   * An external method to be used whenever someone wants to
    *
    */
-  add(mutationString, options = {}) {
+  mutate(mutationName, options = {}) {
     const {variables} = options;
     //const schema = options.schema || this._schema;
-    const typesMutated = getTypesMutated(mutationString, this._schema);
-
-    (async() => {
-      const transport = options.transport || this._transport;
-      const docFromServer = await transport(mutationString, variables);
-      // update state with new doc from server
-      this._addListenersHandler(typesMutated, docFromServer);
-      this._invalidationQueue.forEach(queryToRefetch => queryToRefetch());
-      this._invalidationQueue = [];
-    })();
+    // const mutationName = getTypesMutated(mutationName, this._schema);
+    const mutationString = createMutationString.call(this, mutationName, variables);
+    
+    //if nothing is listening for changes, don't bother changing 
+    if (!mutationString) return;
+    
     // optimistcally update
-    this._addListenersHandler(typesMutated)
+    this._addListenersHandler(mutationName, null, variables);
+
+    // async call the server
+    this._mutateServer(variables, mutationString);
   }
 
-  _addListenersHandler(typesMutated, docFromServer) {
-    // for every add listener (key = componentId, value = listenerObj)
-    for (let [componentId, listenerObj] of this._listeners.add.entities()) {
-      // for every type of entity mutated in the returned mutation (usually 1)
-      for (let typeMutated of typesMutated) {
-        const relevantListener = listenerObj[typeMutated];
-        // if the component query does not care about adding a particular type, ignore it
-        if (!relevantListener) {
-          continue;
-        }
-        // find current cached result for this particular componentId
-        const cachedResult = this._denormalizedResults[componentId];
-        const {variables, queryString, response} = cachedResult;
+  async _mutateServer(variables, mutationName, mutationString) {
+    const transport = this._getTransport(options);
+    const docFromServer = await transport(mutationString, variables);
+    // update state with new doc from server
+    this._addListenersHandler(mutationName, docFromServer);
 
-        // for the denormalized response, mutate it in place or return undefined if no mutation was made
-        const modifiedResponse = docFromServer ?
-          // if it's from the server, send the doc we got back
-          relevantListener(null, docFromServer, response, this._invalidate) :
-          // otherwise, treat it as an optimistic update
-          relevantListener(variables, null, response, this._invalidate);
-
-        // see if we want to rerun the listening query again. if so, put it in a map & we'll run them after
-        // this means there's a possible 3 updates: optimistic, doc from server, full array from server (invalidated)
-        const {paginationWords, idFieldName} = cachedResult.options;
-        if (this._willInvalidateListener) {
-          this._willInvalidateListener = false;
-          if (!this._invalidationQueue.has(componentId)) {
-            this._invalidationQueue.set(componentId, () => {
-              console.log('querySTring mutated?', componentId, variables);
-              this.query(queryString, {
-                // variables, // grab from state?
-                paginationWords,
-                idFieldName,
-                forceFetch: true
-              })
-            })
-          }
-        }
-
-        // this must come back after the invalidateListener check because they could invalidate without returning something
-        if (!modifiedResponse) {
-          continue;
-        }
-        // if a mutation was made, normalize it & send it off to the store
-        // TODO: normalizing requires context, requires the queryAST, but we don't wanna parse that over & over!
-        // let's parse for alpha, then figure out whether to store it or do something intelligent
-        // like only save it if it's used a lot
-        // if (executionContext) {
-        //   executionContext.variables = variables;
-        // } else {
-        // only parse the query once, regardless of how many variable-deviations there are
-        const executionContext = buildExecutionContext(this._schema, queryString, {
-          variables,
-          paginationWords,
-          idFieldName,
-          store: this._store
-        });
-        // }
-        const normalizedModifiedResponse = normalize(modifiedResponse, context);
-        // merge the normalized optimistic result with the state
-        // dont change other queries, they might not want it.
-        // if they want it, they'll ask for it in their own listener
-        this._store.dispatch({
-          type: '@@cashay/INSERT_NORMALIZED',
-          payload: {
-            response: normalizedModifiedResponse
-          }
-        });
-      }
+    // the queries to forcefully refetch
+    while (this._invalidationQueue.length) {
+      const queryToRefetch = this._invalidationQueue.shift();
+      queryToRefetch();
     }
   }
+
+  _addListenersHandler(mutationName, docFromServer, variables) {
+    let allNormalizedChanges = {};
+    // for every component that listens the the mutationName
+    for (let [componentId, mutationListener] of this._listeners[mutationName].entities()) {
+
+      // find current cached result for this particular componentId
+      const cachedResult = this._denormalizedResults[componentId];
+      const {queryString, response, options: {paginationWords, idFieldName, transport}} = cachedResult;
+
+      // for the denormalized response, mutate it in place or return undefined if no mutation was made
+      const modifiedResponse = docFromServer ?
+        // if it's from the server, send the doc we got back
+        mutationListener(null, docFromServer, response, this._invalidate) :
+        // otherwise, treat it as an optimistic update
+        mutationListener(variables, null, response, this._invalidate);
+
+      // see if we want to rerun the listening query again. if so, put it in a map & we'll run them after
+      // this means there's a possible 3 updates: optimistic, doc from server, full array from server (invalidated)
+      if (this._willInvalidateListener) {
+        this._willInvalidateListener = false;
+        this._invalidationQueue.set(componentId, () => {
+          console.log('querySTring mutated?', componentId);
+          this.query(queryString, {
+            componentId,
+            paginationWords,
+            idFieldName,
+            transport,
+            forceFetch: true
+          })
+        })
+      }
+
+      // this must come back after the invalidateListener check because they could invalidate without returning something
+      if (!modifiedResponse) {
+        continue;
+      }
+      // TODO: normalizing requires context, requires the queryAST, but we don't wanna parse that over & over!
+      // let's parse for alpha, then figure out whether to store it or do something intelligent
+      // like store the AST for hot queries
+      // if a mutation was made, normalize it & send it off to the store
+      const cashayDataState = this._getToState(this._store).data;
+      const context = buildExecutionContext(this._schema, queryString, {
+        variables: cashayDataState.variables[componentId],
+        paginationWords,
+        idFieldName,
+        cashayDataState
+      });
+
+      const normalizedModifiedResponse = normalizeResponse(modifiedResponse, context);
+      allNormalizedChanges = deepAssign(allNormalizedChanges, normalizedModifiedResponse);
+    }
+    // merge the normalized optimistic result with the state
+    // dont invalidate other queries, they might not want it.
+    // if they want it, they'll ask for it in their own listener
+    this._store.dispatch({
+      type: '@@cashay/INSERT_NORMALIZED',
+      payload: {
+        response: allNormalizedChanges
+      }
+    });
+  }
 }
-
-const getTypesMutated = (mutationString, schema) => {
-
-};
-
-// const setVariables = (cb, componentId, currentVariables) => {
-//   this._store.dispatch({
-//     type: 'SET_VARIABLES',
-//     payload: {
-//       componentId,
-//       newVariables: cb(currentVariables)
-//     }
-//   })
-// };
 
 // const queryString = `getPosts {
 //   id,
@@ -500,6 +487,28 @@ const getTypesMutated = (mutationString, schema) => {
 // }`
 //
 // const mutationRules = {
+//   addCommentToPost(optimisticVariables, docFromServer, currentResponse, invalidate) {
+//     let newComment = docFromServer;
+//     if (optimisticVariables) {
+//       const {title, postId} = optimisticVariables;
+//       newComment = {
+//         title,
+//         postId,
+//         createdAt: Date.now()
+//       }
+//     }
+//
+//     const postIndex = currentResponse.getPosts.findIndex(post => post.id === newComment.postId);
+//     if (postIndex !== -1) {
+//       const parentPost = currentResponse.getPosts[postIndex];
+//       const placeBefore = parentPost.comments.findIndex(comment => comment.reputation < newComment.reputation);
+//       if (placeBefore !== -1) {
+//         return parentPost.comments.splice(placeBefore, 0, newComment);
+//       }
+//     }
+//   }
+// }
+// }
 //   add: {
 //     Post(optimisticVariables, docFromServer, currentResponse, invalidate) {
 //       invalidate();
@@ -527,3 +536,14 @@ const getTypesMutated = (mutationString, schema) => {
 //     }
 //   }
 // };
+
+// var isObject = val => val && typeof val === 'object';
+
+// const {proxy, accessLog} = detectAccess({});
+//
+// function mockMutatationListener(proxy) {
+//   console.log(proxy.foo);
+//   console.log(proxy.foo.bar);
+//   console.log(proxy.bar);
+// }
+// mockMutatationListener(proxy);
