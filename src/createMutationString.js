@@ -12,7 +12,7 @@ import {
   LIST
 } from 'graphql/language/kinds';
 
-export const createMutationString = (mutationName, variables) => {
+export const createMutationString = function(mutationName, variables) {
   // find the mutation in the schema
   const operationName = this._schema.mutationType.name;
   const rootMutation = this._schema.types.find(type => type.name === operationName);
@@ -31,7 +31,9 @@ export const createMutationString = (mutationName, variables) => {
   const variableDefinitions = makeVariableDefinitions(mutationSchema, usefulArguments);
 
   // figure out what all the listeners need
-  const accessLogs = buildAccessLogs(isAList, this._listeners[mutationName]);
+  const mutationListeners = this._listeners[mutationName];
+  if (!mutationListeners) return;
+  const accessLogs = buildAccessLogs.call(this, isAList, mutationListeners, variables);
   const mergedAccessLog = mergeAccessLogs(accessLogs);
   if (!mergedAccessLog) return;
 
@@ -73,26 +75,28 @@ const buildMutationAST = (mutationName, usefulArguments, operationSelectionSet, 
   }
 };
 
-const buildAccessLogs = (isAList, mutationNameListener) => {
+const buildAccessLogs = function(isAList, mutationNameListener, variables) {
   const accessLogs = [];
-  for (let [componentId, mutationListener] of mutationNameListener.entities()) {
+  for (let [componentId, mutationListener] of mutationNameListener) {
 
     // get currently cached response
-    const {response} = this._denormalizedResults[componentId];
+    const {data: responseData} = this._denormalizedResults[componentId].response;
 
     // make proxy doc to figure out what fields will be mutated
     const {proxy, accessLog} = detectAccess({});
 
     // make a copy of the response that we can throw away
-    const responseClone = JSON.parse(JSON.stringify(response));
+    const responseClone = JSON.parse(JSON.stringify(responseData));
 
     // if the result coming back is an array, make the proxy an array to get into some possible conditionals
     const finalProxy = isAList ? [proxy] : proxy;
 
+    // run through a mock optimistic update
+    debugger
+    mutationListener(variables, null, responseClone, () => {});
     // call listener with proxy doc
     // this would break if we need to get inside a proxy-based conditional (eg if response.foo === 5 response.bar)
-    mutationListener(null, finalProxy, responseClone, () => {
-    });
+    mutationListener(null, finalProxy, responseClone, () => {});
     if (Object.keys(accessLog)) {
       accessLogs.push(accessLog);
     }
@@ -135,7 +139,8 @@ const makeVariableDefinitions = (mutationSchema, usefulVariables) => {
           name: variable.name
         }
       }
-    })
+    });
+    return reduction;
   }, [])
 };
 

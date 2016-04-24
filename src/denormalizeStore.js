@@ -180,6 +180,6 @@ export const denormalizeStore = context => {
     // this is handy if the user wants to know if the data is complete as requested (eg top-level spinners)
     _isComplete: !context.operation.sendToServer,
     // we'll define this later
-    seVariables: undefined
+    setVariables: undefined
   };
 };

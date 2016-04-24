@@ -242,6 +242,8 @@ export default class Cashay {
     // eg if fetching is true, then we always return the cached result
     const reducedContext = Object.assign(context, {cashayDataState: fullNormalizedResponse});
     const fullDenormalizedResponse = denormalizeStore(reducedContext);
+    // ignore the result from above, it was using the mutated content from the initial request
+    fullDenormalizedResponse._isComplete = true;
 
     // attach a function to the response that supplies the currentVariables so the user can create a new vars object
     fullDenormalizedResponse.setVariables = this._setVariablesFactory(componentId, variables);
@@ -389,6 +391,7 @@ export default class Cashay {
     const {variables} = options;
     //const schema = options.schema || this._schema;
     // const mutationName = getTypesMutated(mutationName, this._schema);
+    console.log('S1', this._schema);
     const mutationString = createMutationString.call(this, mutationName, variables);
     
     //if nothing is listening for changes, don't bother changing 
