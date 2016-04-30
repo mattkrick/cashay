@@ -34,12 +34,15 @@ export default class Cashay {
     // a queue of queries to refetch after a mutation invalidated their data
     this._invalidationQueue = [];
 
-    // an array of queries listening for mutations
-    this._listeners = {};
+    // an object of with mutationNames as keys and a map for a prop
+    // the map has the componentId for the key and an object with a mutation (strong) and resolve (fn) for a values
+    this._listenersByMutation = {};
 
     // a set of componentIds to quickly make sure we've got some listeners
     this._ensuredListeners = new Set();
 
+    // key = mutationName, prop = {setKey: Set(), fullMutation: string}
+    this._cachedMutations = {};
     // lookup table for connecting the mutation result to the entities it affects
     // this._mutationStringToType = {};
 
@@ -277,11 +280,9 @@ export default class Cashay {
     // TODO: if no mutations ever occur, such as pagination of read-only docs, when should we run GC?
     for (let flushedComponentId of flushSet) {
       this._denormalizedResults[flushedComponentId] = undefined;
-      this._listeners.add.delete(flushedComponentId);
-      // TODO delete from _ensuredListeners? Otherwise it's a memory leak
+      // this._listenersByMutation.add.delete(flushedComponentId);
+      // TODO when a component is dismounted, delete from _ensuredListeners and _listenersByMutation
       // Ideally check normalizedDeps for the componentId & if there are none, then remove listeners
-      //this._listeners.update.delete(queryString);
-      //this._listeners.delete.delete(queryString);
     }
 
     // stick normalize data in store and recreate any invalidated denormalized structures
@@ -341,15 +342,15 @@ export default class Cashay {
       if (!mutationSchema) {
         console.error(`Invalid mutation: ${mutationName}.\nDid you make a typo?`);
       }
-      this._listeners[mutationName] = this._listeners[mutationName] || new Map();
-      this._listeners[mutationName].set(componentId, mutationListeners[mutationName]);
+      this._listenersByMutation[mutationName] = this._listenersByMutation[mutationName] || new Map();
+      this._listenersByMutation[mutationName].set(componentId, mutationListeners[mutationName]);
     });
   }
 
   _getTransport(options) {
     const transport = options.transport || this._transport;
     if (typeof transport !== 'function') {
-      console.error('No transport function provided');
+      throw new Error('No transport function provided');
     }
     return transport;
   }
@@ -387,28 +388,28 @@ export default class Cashay {
    * An external method to be used whenever someone wants to
    *
    */
-  mutate(mutationName, options = {}) {
+  mutate(mutationName, possibleComponentIds, options = {}) {
+
     const {variables} = options;
-    //const schema = options.schema || this._schema;
-    // const mutationName = getTypesMutated(mutationName, this._schema);
-    console.log('S1', this._schema);
-    const mutationString = createMutationString.call(this, mutationName, variables);
-    
-    //if nothing is listening for changes, don't bother changing 
-    if (!mutationString) return;
+    const componentIdsToUpdate = makeComponentsToUpdate(mutationName, possibleComponentIds, this._denormalizedResults);
+    if (!componentIdsToUpdate) {
+      throw new Error(`Mutation has no queries to update: ${mutationName}`);
+    }
+    const mutationString = createMutationString.call(this, mutationName, componentIdsToUpdate);
     
     // optimistcally update
-    this._addListenersHandler(mutationName, null, variables);
+    this._addListenersHandler(mutationName, componentIdsToUpdate, null, variables);
 
     // async call the server
-    this._mutateServer(variables, mutationString);
+    this._mutateServer(mutationName, componentIdsToUpdate, mutationString, variables);
   }
 
-  async _mutateServer(variables, mutationName, mutationString) {
+  
+  async _mutateServer(mutationName, componentIdsToUpdate, mutationString, variables) {
     const transport = this._getTransport(options);
     const docFromServer = await transport(mutationString, variables);
     // update state with new doc from server
-    this._addListenersHandler(mutationName, docFromServer);
+    this._addListenersHandler(mutationName, componentIdsToUpdate, docFromServer);
 
     // the queries to forcefully refetch
     while (this._invalidationQueue.length) {
@@ -416,22 +417,24 @@ export default class Cashay {
       queryToRefetch();
     }
   }
-
-  _addListenersHandler(mutationName, docFromServer, variables) {
+  
+  _addListenersHandler(mutationName, componentIdsToUpdate, docFromServer, variables) {
+    const listenerMap = this._listenersByMutation[mutationName];
+    const cashayDataState = this._getToState(this._store).data;
     let allNormalizedChanges = {};
     // for every component that listens the the mutationName
-    for (let [componentId, mutationListener] of this._listeners[mutationName].entities()) {
-
-      // find current cached result for this particular componentId
+    for (let componentId of componentIdsToUpdate) {
+      const {resolve} = listenerMap.get(componentId);
+        // find current cached result for this particular componentId
       const cachedResult = this._denormalizedResults[componentId];
       const {queryString, response, options: {paginationWords, idFieldName, transport}} = cachedResult;
 
       // for the denormalized response, mutate it in place or return undefined if no mutation was made
       const modifiedResponse = docFromServer ?
         // if it's from the server, send the doc we got back
-        mutationListener(null, docFromServer, response, this._invalidate) :
+        resolve(null, docFromServer, response, this._invalidate) :
         // otherwise, treat it as an optimistic update
-        mutationListener(variables, null, response, this._invalidate);
+        resolve(variables, null, response, this._invalidate);
 
       // see if we want to rerun the listening query again. if so, put it in a map & we'll run them after
       // this means there's a possible 3 updates: optimistic, doc from server, full array from server (invalidated)
@@ -457,7 +460,6 @@ export default class Cashay {
       // let's parse for alpha, then figure out whether to store it or do something intelligent
       // like store the AST for hot queries
       // if a mutation was made, normalize it & send it off to the store
-      const cashayDataState = this._getToState(this._store).data;
       const context = buildExecutionContext(this._schema, queryString, {
         variables: cashayDataState.variables[componentId],
         paginationWords,
@@ -468,17 +470,46 @@ export default class Cashay {
       const normalizedModifiedResponse = normalizeResponse(modifiedResponse, context);
       allNormalizedChanges = deepAssign(allNormalizedChanges, normalizedModifiedResponse);
     }
+
+    const normalizedResponseForStore = shortenNormalizedResponse(allNormalizedChanges, cashayDataState);
     // merge the normalized optimistic result with the state
     // dont invalidate other queries, they might not want it.
     // if they want it, they'll ask for it in their own listener
     this._store.dispatch({
       type: '@@cashay/INSERT_NORMALIZED',
       payload: {
-        response: allNormalizedChanges
+        response: normalizedResponseForStore
       }
     });
   }
 }
+
+const makeComponentsToUpdate = (mutationName, possibleComponentIds, denormalizedResults) => {
+  const componentIds = [];
+  // if there are no provided queries to update, try updating them all
+  if (!possibleComponentIds) {
+    const listenerMap = this._listenersByMutation[mutationName];
+    for (let [componentId] of listenerMap) {
+      if (denormalizedResults[componentId]) {
+        componentIds.push(componentId);
+      }
+    }
+    // if only 1 component is provided, add it if the query is currently in use
+  } else if (!Array.isArray(possibleComponentIds)) {
+    if (denormalizedResults[possibleComponentIds]) {
+      componentIds.push(possibleComponentIds);
+    }
+    // if a list of components is provided, only select those that have queries in use
+  } else {
+    for (let componentId of possibleComponentIds) {
+      if (denormalizedResults[componentId]) {
+        componentIds.push(componentId);
+      }
+    }
+  }
+  return componentIds.length && componentIds;
+};
+
 
 // const queryString = `getPosts {
 //   id,

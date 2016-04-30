@@ -1,234 +1,162 @@
-import {ensureTypeFromNonNull, ensureRootType, isObject} from './utils';
+import {ensureRootType} from './utils';
 import {
-  OPERATION_DEFINITION,
-  DOCUMENT,
-  SELECTION_SET,
   NAME,
-  ARGUMENT,
   VARIABLE,
+  VARIABLE_DEFINITION,
   NAMED_TYPE,
-  FIELD,
-  OBJECT,
-  LIST
 } from 'graphql/language/kinds';
 
-export const createMutationString = function(mutationName, variables) {
-  // find the mutation in the schema
-  const operationName = this._schema.mutationType.name;
-  const rootMutation = this._schema.types.find(type => type.name === operationName);
-  const mutationSchema = rootMutation.fields.find(field => field.name === mutationName);
-  const nonNullMutationType = ensureTypeFromNonNull(mutationSchema.type);
-  const rootMutationType = ensureRootType(nonNullMutationType);
+export const createMutationString = function(mutationName, componentIdsToUpdate) {
+  const listenerMap = this._listenersByMutation[mutationName];
 
-  // determine if it's a list to increase chances of a successful accessLog
-  const isAList = nonNullMutationType.kind === LIST;
+  // return quickly without needing to save to cache for single components
+  if (componentIdsToUpdate.length === 1) {
+    return listenerMap.get(componentIdsToUpdate[0]).fullMutation;
+  }
 
-  // get the underlying type of document the mutation will return
-  const returnType = this._schema.types.find(type => type.name === rootMutationType.name);
+  // return quickly without needing to save to cache for multiple components that need the same thing
+  const mutationStringSet = makeMutationStringSet(listenerMap, componentIdsToUpdate);
+  if (mutationStringSet.size === 1) {
+    return listenerMap.get(componentIdsToUpdate[0]).fullMutation;
+  }
 
-  // use variables to create the mutation arguments
-  const usefulArguments = makeUsefulArguments(mutationSchema, variables);
-  const variableDefinitions = makeVariableDefinitions(mutationSchema, usefulArguments);
+  // if the components we want are the ones we cached, grab the mutation string from the cache
+  const cachedMutationObj = this._cachedMutations[mutationName];
+  const cachedMutationString = getCachedMutationString(cachedMutationObj, mutationStringSet);
+  if (cachedMutationString) {
+    return cachedMutationString;
+  }
 
-  // figure out what all the listeners need
-  const mutationListeners = this._listeners[mutationName];
-  if (!mutationListeners) return;
-  const accessLogs = buildAccessLogs.call(this, isAList, mutationListeners, variables);
-  const mergedAccessLog = mergeAccessLogs(accessLogs);
-  if (!mergedAccessLog) return;
-
-  // mix it all together in a tasty dish
-  const operationSelectionSet = walkAccessLog(mergedAccessLog, returnType, this._schema);
-  const mutationAST = buildMutationAST(mutationName, usefulArguments, operationSelectionSet, variableDefinitions);
-  return print(mutationAST);
+  // do the super expensive AST parse and merge
+  const fullMutation = mergeStringSet(mutationStringSet, this._schema);
+  this._cachedMutations[mutationName] = {
+    fullMutation,
+    setKey: mutationStringSet
+  };
+  return fullMutation;
 };
 
-const buildMutationAST = (mutationName, usefulArguments, operationSelectionSet, variableDefinitions) => {
-  const operationNameObj = {
-    kind: NAME,
-    value: mutationName
-  };
+const makeMutationStringSet = (listenerMap, componentIdsToUpdate) => {
+  const mutationStringSet = new Set();
+  for (let componentId of componentIdsToUpdate) {
+    mutationStringSet.add(listenerMap.get(componentId).mutation);
+  }
+  return mutationStringSet;
+};
 
-  const operationSelection = {
-    alias: operationNameObj,
-    arguments: usefulArguments,
-    directives: [], // TODO add directives support
-    kind: FIELD,
-    name: operationNameObj,
-    selectionSet: operationSelectionSet
-  };
-
-  const mutationDefinition = {
-    kind: OPERATION_DEFINITION,
-    operation: 'mutation',
-    variableDefinitions,
-    selectionSet: {
-      kind: SELECTION_SET,
-      selections: [operationSelection] // only 1 mutation at a time here
+const getCachedMutationString = (cachedMutationObj, mutationStringSet) => {
+  if (cachedMutationObj && cachedMutationObj.setKey.size === mutationStringSet.size) {
+    for (let mutationString of cachedMutationObj.setKey) {
+      if (!mutationStringSet.has(mutationString)) {
+        return
+      }
     }
-  };
-
-  // document wrapper
-  return {
-    kind: DOCUMENT,
-    definitions: mutationDefinition
+    return cachedMutationObj.fullMutation;
   }
 };
 
-const buildAccessLogs = function(isAList, mutationNameListener, variables) {
-  const accessLogs = [];
-  for (let [componentId, mutationListener] of mutationNameListener) {
-
-    // get currently cached response
-    const {data: responseData} = this._denormalizedResults[componentId].response;
-
-    // make proxy doc to figure out what fields will be mutated
-    const {proxy, accessLog} = detectAccess({});
-
-    // make a copy of the response that we can throw away
-    const responseClone = JSON.parse(JSON.stringify(responseData));
-
-    // if the result coming back is an array, make the proxy an array to get into some possible conditionals
-    const finalProxy = isAList ? [proxy] : proxy;
-
-    // run through a mock optimistic update
-    debugger
-    mutationListener(variables, null, responseClone, () => {});
-    // call listener with proxy doc
-    // this would break if we need to get inside a proxy-based conditional (eg if response.foo === 5 response.bar)
-    mutationListener(null, finalProxy, responseClone, () => {});
-    if (Object.keys(accessLog)) {
-      accessLogs.push(accessLog);
-    }
-  }
-  return accessLogs;
+const mergeStringSet = (mutationStringSet, schema) => {
+  const mutationArr = Array.from(mutationStringSet);
+  const mutationASTs = mutationArr.map(mutStr => parse(mutStr, {noLocation: true, noSource: true}));
+  const mergedAST =  mergeMutationASTs(mutationASTs, schema);
+  return print(mergedAST);
 };
 
-const detectAccess = obj => {
-  if (!isObject(obj)) return {proxy: obj, accessLog: true};
-  const subProxies = {};
-  const accessLog = {};
-  var proxy = new Proxy(obj, {
-    get: function (target, prop) {
-      if (prop === 'splice' || prop === '__proto__' || typeof prop === 'symbol') return;
-      target[prop] = target[prop] || {};
-      if (!accessLog[prop]) {
-        var recur = detectAccess(obj[prop]);
-        accessLog[prop] = recur.accessLog;
-        return subProxies[prop] = recur.proxy;
+const mergeMutationASTs = (mutationASTs, schema) => {
+
+  // create the base AST
+  const mergedAST = mutationASTs.pop();
+  const operationDefinition = mergedAST.definitions[0];
+  const variableDefinitionBag = operationDefinition.variableDefinitions || [];
+  const mutationSelection = operationDefinition.selectionSet.selections[0];
+
+  const operationName = schema.mutationType.name;
+  const operationSchema = schema.types.find(type => type.name === operationName);
+  const fieldSchema = operationSchema.fields.find(field => field.name === mutationSelection.name.value);
+
+  bagArgs(variableDefinitionBag, mutationSelection.arguments, fieldSchema);
+
+  // now add the new ASTs one-by-one
+  for (let ast of mutationASTs) {
+    mergeNewAST(mergedAST, ast, variableDefinitionBag, fieldSchema, schema);
+  }
+  return mergedAST;
+};
+
+const mergeNewAST = (target, src, variableDefinitionBag, fieldSchema, schema) => {
+  const srcMutationSelection = src.definitions[0].selectionSet.selections[0];
+  const targetMutationSelection = target.definitions[0].selectionSet.selections[0];
+  bagArgs(variableDefinitionBag, srcMutationSelection.arguments, fieldSchema);
+  const rootSchemaType = ensureRootType(fieldSchema.type);
+  const subSchema = schema.types.find(type => type.name === rootSchemaType.name);
+  mergeSelections(targetMutationSelection, srcMutationSelection, variableDefinitionBag, subSchema, schema)
+};
+
+const bagArgs = (bag, args, fieldSchema) => {
+  for (let arg of args) {
+    const variableDefName = arg.value.name.value;
+    const variableDefOfArg = bag.find(def => def.variable.name.value === variableDefName);
+    if (!variableDefOfArg) {
+      const newVariableDef = makeVariableDefinition(variableDefName, fieldSchema);
+      bag.push(newVariableDef);
+    }
+  }
+};
+
+const mergeSelections = (target, src, bag, fieldSchema, schema) => {
+  if (!target.selectionSet) {
+    target.selectionSet = src.selectionSet;
+  } else if (src.selectionSet) {
+    const targetSelections = target.selectionSet.selections;
+    const srcSelections = src.selectionSet.selections;
+    for (let srcSelection of srcSelections) {
+      const matchingValue = targetSelections.find(targetSelection => targetSelection.name.value === srcSelection.name.value);
+      if (matchingValue) {
+        const rootSchemaType = ensureRootType(matchingValue.type);
+        const subSchema = schema.types.find(type => type.name === rootSchemaType.name);
+        mergeSelections(matchingValue, srcSelection, bag, subSchema, schema);
       } else {
-        return subProxies[prop];
+        targetSelections.push(srcSelection);
       }
     }
-  });
-  return {proxy, accessLog};
-};
-
-const makeVariableDefinitions = (mutationSchema, usefulVariables) => {
-  return usefulVariables.reduce((reduction, variable)=> {
-    const argType = ensureTypeFromNonNull(mutationSchema.args.find(arg => arg.name === variable.name.value).type);
-    reduction.push({
-      type: {
-        kind: NAMED_TYPE,
-        name: {
-          kind: NAME,
-          value: argType.name
-        },
-        variable: {
-          kind: VARIABLE,
-          name: variable.name
-        }
-      }
-    });
-    return reduction;
-  }, [])
-};
-
-const makeUsefulArguments = (mutationSchema, variables = {}) => {
-  if (!mutationSchema.args || mutationSchema.args.length === 0) {
-    return [];
   }
-
-  return Object.keys(variables).reduce((reduction, variable)=> {
-    const varInSchema = mutationSchema.args.find(arg => arg.name === variable);
-    if (varInSchema) {
-      reduction.push(createArg(variable));
+  if (src.arguments) {
+    bagArgs(bag, src.arguments, fieldSchema);
+  }
+  if (!target.arguments) {
+    target.arguments = src.arguments;
+  } else if (src.arguments) {
+    for (let srcArg of src.arguments) {
+      const matchingValue = target.arguments.find(targetSelection => targetSelection.name.value === srcArg.name.value);
+      if (!matchingValue) {
+        target.arguments.push(srcArg);
+      }
     }
-    return reduction;
-  }, []);
+  }
 };
 
-const createArg = value => {
-  const name = {
-    kind: NAME,
-    value
-  };
+const makeVariableDefinition = (argName, fieldSchema) => {
+  const argSchema = fieldSchema.args.find(schemaArg => schemaArg.name === argName);
+  if (!argSchema) {
+    throw new Error(`invalid argument: ${argName}`);
+  }
+  const argType = ensureRootType(argSchema.type);
   return {
-    kind: ARGUMENT,
-    name,
-    value: {
-      kind: VARIABLE,
-      name
-    }
-  }
-};
-
-const walkAccessLog = (accessLog, typeSchema, schema) => {
-  if (Object.keys(accessLog)) {
-    return {
-      kind: SELECTION_SET,
-      selections: makeSelectionsArray(accessLog, typeSchema, schema)
-    }
-  }
-};
-
-const makeSelectionsArray = (accessLog, typeSchema, schema) => {
-  return Object.keys(accessLog).reduce((reduction, key) => {
-    const keyField = typeSchema.fields.find(field => field.name === key);
-    if (!keyField) {
-      console.error(`you tried to access ${key} but that's not in your ${typeSchema.name} schema!`);
-    }
-    const rootFieldType = ensureRootType(keyField.type);
-    const keySchema = schema.types.find(type => type.name === rootFieldType.name);
-
-    if (rootFieldType.kind === OBJECT) {
-      if (Object.keys(accessLog[key]).length === 0) {
-        // if we don't declare any specific subfields, but it's an object, grab em all
-        accessLog[key] = keySchema.fields.reduce((reduction, field) => {
-          reduction[field.name] = {};
-        }, {});
-      }
-    }
-    reduction.push({
-      arguments: [],
-      directives: [],
-      kind: FIELD,
+    defaultValue: null,
+    kind: VARIABLE_DEFINITION,
+    type: {
+      kind: NAMED_TYPE,
       name: {
         kind: NAME,
-        value: key
-      },
-      selectionSet: walkAccessLog(accessLog[key], keySchema, schema)
-    });
-    return reduction;
-  }, [])
-};
-
-const mergeAccessLogs = accessLogs => {
-  const mergedAccessLog = accessLogs.pop();
-  if (!mergedAccessLog) return;
-  for (let i = accessLogs.length - 1; i >= 0; i--) {
-    merge2AccessLogs(mergedAccessLog, accessLogs[i]);
-  }
-  return mergedAccessLog;
-};
-
-const merge2AccessLogs = (target, src) => {
-  Object.keys(src).forEach(srcKey => {
-    if (!target[srcKey]) {
-      target[srcKey] = src[srcKey];
-    } else if (Object.keys(target[srcKey])) {
-      // if target[srcKey] is empty, leave it that way. empty means we'll grab ALL CHILDREN from the schema
-      merge2AccessLogs(target[srcKey], src[srcKey])
+        value: argType.name
+      }
+    },
+    variable: {
+      kind: VARIABLE,
+      name: {
+        kind: NAME,
+        value: argName
+      }
     }
-  })
+  }
 };
