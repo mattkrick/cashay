@@ -11,13 +11,13 @@ export const createMutationString = function(mutationName, componentIdsToUpdate)
 
   // return quickly without needing to save to cache for single components
   if (componentIdsToUpdate.length === 1) {
-    return listenerMap.get(componentIdsToUpdate[0]).fullMutation;
+    return listenerMap.get(componentIdsToUpdate[0]).mutation;
   }
 
   // return quickly without needing to save to cache for multiple components that need the same thing
   const mutationStringSet = makeMutationStringSet(listenerMap, componentIdsToUpdate);
   if (mutationStringSet.size === 1) {
-    return listenerMap.get(componentIdsToUpdate[0]).fullMutation;
+    return listenerMap.get(componentIdsToUpdate[0]).mutation;
   }
 
   // if the components we want are the ones we cached, grab the mutation string from the cache

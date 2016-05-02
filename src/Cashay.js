@@ -251,15 +251,8 @@ export default class Cashay {
     // attach a function to the response that supplies the currentVariables so the user can create a new vars object
     fullDenormalizedResponse.setVariables = this._setVariablesFactory(componentId, variables);
 
-    this._denormalizedResults[componentId] = {
-      response: fullDenormalizedResponse,
-      options: {
-        paginationWords: context.paginationWords,
-        idFieldName: context.idFieldName,
-        transport
-      },
-      queryString: context.queryString
-    };
+    // setVariables comes in & removes the cache, but puts a new one back in synchronously, so we're sure we have one
+    this._denormalizedResults[componentId].response  = fullDenormalizedResponse;
 
     // add denormalizedDeps so we can invalidate when other queries come in
     // add normalizedDeps to find those deps when a denormalizedReponse is mutated
@@ -401,11 +394,12 @@ export default class Cashay {
     this._addListenersHandler(mutationName, componentIdsToUpdate, null, variables);
 
     // async call the server
-    this._mutateServer(mutationName, componentIdsToUpdate, mutationString, variables);
+    this._mutateServer(mutationName, componentIdsToUpdate, mutationString, options);
   }
 
   
-  async _mutateServer(mutationName, componentIdsToUpdate, mutationString, variables) {
+  async _mutateServer(mutationName, componentIdsToUpdate, mutationString, options) {
+    const {variables} = options;
     const transport = this._getTransport(options);
     const docFromServer = await transport(mutationString, variables);
     // update state with new doc from server
@@ -427,14 +421,14 @@ export default class Cashay {
       const {resolve} = listenerMap.get(componentId);
         // find current cached result for this particular componentId
       const cachedResult = this._denormalizedResults[componentId];
-      const {queryString, response, options: {paginationWords, idFieldName, transport}} = cachedResult;
-
+      const {queryString, response: {data}, options: {paginationWords, idFieldName, transport}} = cachedResult;
+      if (docFromServer) debugger
       // for the denormalized response, mutate it in place or return undefined if no mutation was made
       const modifiedResponse = docFromServer ?
         // if it's from the server, send the doc we got back
-        resolve(null, docFromServer, response, this._invalidate) :
+        resolve(null, docFromServer.data, data, this._invalidate) :
         // otherwise, treat it as an optimistic update
-        resolve(variables, null, response, this._invalidate);
+        resolve(variables, null, data, this._invalidate);
 
       // see if we want to rerun the listening query again. if so, put it in a map & we'll run them after
       // this means there's a possible 3 updates: optimistic, doc from server, full array from server (invalidated)
@@ -456,6 +450,10 @@ export default class Cashay {
       if (!modifiedResponse) {
         continue;
       }
+
+      // create a new object to make sure react-redux's updateStatePropsIfNeeded returns true
+      this._denormalizedResults[componentId].response = Object.assign({}, this._denormalizedResults[componentId].response)
+
       // TODO: normalizing requires context, requires the queryAST, but we don't wanna parse that over & over!
       // let's parse for alpha, then figure out whether to store it or do something intelligent
       // like store the AST for hot queries

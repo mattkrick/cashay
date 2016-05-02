@@ -1,9 +1,9 @@
-import {mergeDeepWithArrs, mergeArrays} from './mergeDeep';
+import {mergeDeepWithArrs} from './mergeDeep';
 import {separateArgs} from './separateArgs';
 import {getSubReqAST} from './getSubReqAST';
 import {ensureRootType, getRegularArgsKey, isObject} from './utils';
 import {TypeKind} from 'graphql/type/introspection';
-const {UNION, INTERFACE, LIST, OBJECT, NON_NULL, SCALAR} = TypeKind;
+const {UNION} = TypeKind;
 
 const mapResponseToResult = (nestedResult, response, regularArgs, paginationArgs) => {
   const regularArgsString = getRegularArgsKey(regularArgs);
@@ -34,6 +34,7 @@ const visitObject = (bag, subResponse, reqAST, subSchema, context) => {
     let subReqAST = getSubReqAST(key, reqAST, context.fragments);
     const name = subReqAST.name.value;
     const field = subSchema.fields.find(field => field.name === name);
+    if (!field) debugger
     let fieldType = ensureRootType(field.type);
     let fieldSchema = context.schema.types.find(type => type.name === fieldType.name);
     //debugger
