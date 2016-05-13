@@ -1,7 +1,7 @@
 import test from 'ava';
 import 'babel-register';
 import 'babel-polyfill';
-import {parse} from 'graphql/language/parser';
+import {parse} from '../node_modules/graphql/language/parser';
 import {buildExecutionContext} from '../buildExecutionContext';
 import {unionQueryString, unionResponse, unionNormalized,
   unionQueryStringExtraTwitter, unionResponsePartialTwitter,

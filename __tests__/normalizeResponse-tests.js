@@ -6,7 +6,7 @@ import '../normalizeResponse';
 import {unionQueryString, unionResponse, unionNormalized} from './_union';
 import clientSchema from './clientSchema.json';
 import {normalizeResponse} from '../normalizeResponse';
-import {parse} from 'graphql/language/parser';
+import {parse} from '../node_modules/graphql/language/parser';
 import {buildExecutionContext} from '../buildExecutionContext';
 import {nestedQueryString, nestedResponse, nestedNormalized, nestedPaginationWords, nestedVariableValues} from './_nested';
 import {front5Response, front5Query, front3Query, front2AfterQuery, front3Response,

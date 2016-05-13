@@ -22,16 +22,14 @@ export const shortenNormalizedResponse = (normalizedResponse, cashayDataStore) =
   // TODO what if a forceFetched result is the same as what's already in the store? Need to handle results, too.
   const {entities} = normalizedResponse;
   const entityKeys = Object.keys(entities);
-  for (let i = 0; i < entityKeys.length; i++) {
-    const entityName = entityKeys[i];
+  for (let entityName of entityKeys) {
     const storeEntity = cashayDataStore.entities[entityName];
     if (!storeEntity) {
       continue;
     }
     const newEntity = entities[entityName];
     const itemKeys = Object.keys(newEntity);
-    for (let j = 0; j < itemKeys.length; j++) {
-      const itemName = itemKeys[j];
+    for (let itemName of itemKeys) {
       const storeItem = storeEntity[itemName];
       if (!storeItem) {
         continue;
@@ -43,7 +41,7 @@ export const shortenNormalizedResponse = (normalizedResponse, cashayDataStore) =
       deepEqualAndReduce(storeItem, newItem);
     }
   }
-  return normalizedResponse;
+  return Object.keys(normalizedResponse).length && normalizedResponse;
 };
 
 /*
@@ -51,8 +49,7 @@ export const shortenNormalizedResponse = (normalizedResponse, cashayDataStore) =
  */
 const deepEqualAndReduce = (state, newItem, reducedNewItem = {}) => {
   const propsToCheck = Object.keys(newItem);
-  for (let i = 0; i < propsToCheck.length; i++) {
-    const propName = propsToCheck[i];
+  for (let propName of propsToCheck) {
     const newItemProp = newItem[propName];
 
     // it the prop doesn't exist in state, put it there

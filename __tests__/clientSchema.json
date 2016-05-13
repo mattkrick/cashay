@@ -12,55 +12,19 @@
       "name": "BlogSchema",
       "fields": [
         {
-          "name": "posts",
-          "args": [
-            {
-              "name": "category",
-              "type": {
-                "kind": "ENUM",
-                "name": "Category",
-                "ofType": null
-              },
-              "defaultValue": null
-            }
-          ],
-          "type": {
-            "kind": "LIST",
-            "name": null,
-            "ofType": {
-              "kind": "OBJECT",
-              "name": "Post",
-              "ofType": null
-            }
-          }
-        },
-        {
-          "name": "latestPost",
+          "name": "getLatestPost",
           "args": [],
           "type": {
             "kind": "OBJECT",
-            "name": "Post",
+            "name": "PostType",
             "ofType": null
           }
         },
         {
-          "name": "recentPosts",
+          "name": "getRecentPosts",
           "args": [
             {
-              "name": "count",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "after",
+              "name": "beforeCursor",
               "type": {
                 "kind": "SCALAR",
                 "name": "String",
@@ -69,10 +33,28 @@
               "defaultValue": null
             },
             {
-              "name": "before",
+              "name": "afterCursor",
               "type": {
                 "kind": "SCALAR",
                 "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "first",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Int",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "last",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Int",
                 "ofType": null
               },
               "defaultValue": null
@@ -83,13 +65,13 @@
             "name": null,
             "ofType": {
               "kind": "OBJECT",
-              "name": "Post",
+              "name": "PostType",
               "ofType": null
             }
           }
         },
         {
-          "name": "post",
+          "name": "getPostById",
           "args": [
             {
               "name": "_id",
@@ -107,43 +89,7 @@
           ],
           "type": {
             "kind": "OBJECT",
-            "name": "Post",
-            "ofType": null
-          }
-        },
-        {
-          "name": "authors",
-          "args": [],
-          "type": {
-            "kind": "LIST",
-            "name": null,
-            "ofType": {
-              "kind": "OBJECT",
-              "name": "Author",
-              "ofType": null
-            }
-          }
-        },
-        {
-          "name": "author",
-          "args": [
-            {
-              "name": "_id",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            }
-          ],
-          "type": {
-            "kind": "OBJECT",
-            "name": "Author",
+            "name": "PostType",
             "ofType": null
           }
         },
@@ -177,30 +123,8 @@
       "possibleTypes": null
     },
     {
-      "kind": "ENUM",
-      "name": "Category",
-      "fields": null,
-      "inputFields": null,
-      "interfaces": null,
-      "enumValues": [
-        {
-          "name": "METEOR"
-        },
-        {
-          "name": "PRODUCT"
-        },
-        {
-          "name": "USER_STORY"
-        },
-        {
-          "name": "OTHER"
-        }
-      ],
-      "possibleTypes": null
-    },
-    {
       "kind": "OBJECT",
-      "name": "Post",
+      "name": "PostType",
       "fields": [
         {
           "name": "_id",
@@ -235,16 +159,7 @@
           "args": [],
           "type": {
             "kind": "ENUM",
-            "name": "Category",
-            "ofType": null
-          }
-        },
-        {
-          "name": "summary",
-          "args": [],
-          "type": {
-            "kind": "SCALAR",
-            "name": "String",
+            "name": "CategoryType",
             "ofType": null
           }
         },
@@ -258,11 +173,11 @@
           }
         },
         {
-          "name": "timestamp",
+          "name": "createdAt",
           "args": [],
           "type": {
             "kind": "SCALAR",
-            "name": "Float",
+            "name": "Int",
             "ofType": null
           }
         },
@@ -270,7 +185,34 @@
           "name": "comments",
           "args": [
             {
-              "name": "limit",
+              "name": "beforeCursor",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "afterCursor",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "first",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Int",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "last",
               "type": {
                 "kind": "SCALAR",
                 "name": "Int",
@@ -284,7 +226,7 @@
             "name": null,
             "ofType": {
               "kind": "OBJECT",
-              "name": "Comment",
+              "name": "CommentType",
               "ofType": null
             }
           }
@@ -294,7 +236,7 @@
           "args": [],
           "type": {
             "kind": "OBJECT",
-            "name": "Author",
+            "name": "AuthorType",
             "ofType": null
           }
         },
@@ -312,7 +254,7 @@
       "interfaces": [
         {
           "kind": "INTERFACE",
-          "name": "HasAuthor",
+          "name": "HasAuthorType",
           "ofType": null
         }
       ],
@@ -321,14 +263,14 @@
     },
     {
       "kind": "INTERFACE",
-      "name": "HasAuthor",
+      "name": "HasAuthorType",
       "fields": [
         {
           "name": "author",
           "args": [],
           "type": {
             "kind": "OBJECT",
-            "name": "Author",
+            "name": "AuthorType",
             "ofType": null
           }
         }
@@ -339,102 +281,19 @@
       "possibleTypes": [
         {
           "kind": "OBJECT",
-          "name": "Comment",
+          "name": "PostType",
           "ofType": null
         },
         {
           "kind": "OBJECT",
-          "name": "Post",
+          "name": "CommentType",
           "ofType": null
         }
       ]
     },
     {
       "kind": "OBJECT",
-      "name": "Comment",
-      "fields": [
-        {
-          "name": "_id",
-          "args": [],
-          "type": {
-            "kind": "SCALAR",
-            "name": "String",
-            "ofType": null
-          }
-        },
-        {
-          "name": "content",
-          "args": [],
-          "type": {
-            "kind": "SCALAR",
-            "name": "String",
-            "ofType": null
-          }
-        },
-        {
-          "name": "author",
-          "args": [],
-          "type": {
-            "kind": "OBJECT",
-            "name": "Author",
-            "ofType": null
-          }
-        },
-        {
-          "name": "timestamp",
-          "args": [],
-          "type": {
-            "kind": "SCALAR",
-            "name": "Float",
-            "ofType": null
-          }
-        },
-        {
-          "name": "replies",
-          "args": [],
-          "type": {
-            "kind": "LIST",
-            "name": null,
-            "ofType": {
-              "kind": "OBJECT",
-              "name": "Comment",
-              "ofType": null
-            }
-          }
-        },
-        {
-          "name": "cursor",
-          "args": [],
-          "type": {
-            "kind": "SCALAR",
-            "name": "String",
-            "ofType": null
-          }
-        }
-      ],
-      "inputFields": null,
-      "interfaces": [
-        {
-          "kind": "INTERFACE",
-          "name": "HasAuthor",
-          "ofType": null
-        }
-      ],
-      "enumValues": null,
-      "possibleTypes": null
-    },
-    {
-      "kind": "SCALAR",
-      "name": "String",
-      "fields": null,
-      "inputFields": null,
-      "interfaces": null,
-      "enumValues": null,
-      "possibleTypes": null
-    },
-    {
-      "kind": "OBJECT",
-      "name": "Author",
+      "name": "AuthorType",
       "fields": [
         {
           "name": "_id",
@@ -471,11 +330,27 @@
     },
     {
       "kind": "SCALAR",
-      "name": "Float",
+      "name": "String",
       "fields": null,
       "inputFields": null,
       "interfaces": null,
       "enumValues": null,
+      "possibleTypes": null
+    },
+    {
+      "kind": "ENUM",
+      "name": "CategoryType",
+      "fields": null,
+      "inputFields": null,
+      "interfaces": null,
+      "enumValues": [
+        {
+          "name": "HOT_STUFF"
+        },
+        {
+          "name": "ICE_COLD"
+        }
+      ],
       "possibleTypes": null
     },
     {
@@ -484,6 +359,67 @@
       "fields": null,
       "inputFields": null,
       "interfaces": null,
+      "enumValues": null,
+      "possibleTypes": null
+    },
+    {
+      "kind": "OBJECT",
+      "name": "CommentType",
+      "fields": [
+        {
+          "name": "_id",
+          "args": [],
+          "type": {
+            "kind": "SCALAR",
+            "name": "String",
+            "ofType": null
+          }
+        },
+        {
+          "name": "content",
+          "args": [],
+          "type": {
+            "kind": "SCALAR",
+            "name": "String",
+            "ofType": null
+          }
+        },
+        {
+          "name": "author",
+          "args": [],
+          "type": {
+            "kind": "OBJECT",
+            "name": "AuthorType",
+            "ofType": null
+          }
+        },
+        {
+          "name": "createdAt",
+          "args": [],
+          "type": {
+            "kind": "SCALAR",
+            "name": "Int",
+            "ofType": null
+          }
+        },
+        {
+          "name": "cursor",
+          "args": [],
+          "type": {
+            "kind": "SCALAR",
+            "name": "String",
+            "ofType": null
+          }
+        }
+      ],
+      "inputFields": null,
+      "interfaces": [
+        {
+          "kind": "INTERFACE",
+          "name": "HasAuthorType",
+          "ofType": null
+        }
+      ],
       "enumValues": null,
       "possibleTypes": null
     },
@@ -543,7 +479,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "Author",
+          "name": "AuthorType",
           "ofType": null
         }
       ]
@@ -554,6 +490,29 @@
       "fields": [
         {
           "name": "createPost",
+          "args": [
+            {
+              "name": "newPost",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "INPUT_OBJECT",
+                  "name": "NewPost",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            }
+          ],
+          "type": {
+            "kind": "OBJECT",
+            "name": "CreatePostMutationPayload",
+            "ofType": null
+          }
+        },
+        {
+          "name": "createComment",
           "args": [
             {
               "name": "_id",
@@ -569,7 +528,7 @@
               "defaultValue": null
             },
             {
-              "name": "title",
+              "name": "postId",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -593,87 +552,98 @@
                 }
               },
               "defaultValue": null
-            },
-            {
-              "name": "summary",
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "category",
-              "type": {
-                "kind": "ENUM",
-                "name": "Category",
-                "ofType": null
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "author",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
             }
           ],
           "type": {
             "kind": "OBJECT",
-            "name": "Post",
+            "name": "CommentType",
+            "ofType": null
+          }
+        }
+      ],
+      "inputFields": null,
+      "interfaces": [],
+      "enumValues": null,
+      "possibleTypes": null
+    },
+    {
+      "kind": "INPUT_OBJECT",
+      "name": "NewPost",
+      "fields": null,
+      "inputFields": [
+        {
+          "name": "_id",
+          "type": {
+            "kind": "NON_NULL",
+            "name": null,
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "String",
+              "ofType": null
+            }
+          },
+          "defaultValue": null
+        },
+        {
+          "name": "author",
+          "type": {
+            "kind": "SCALAR",
+            "name": "String",
+            "ofType": null
+          },
+          "defaultValue": null
+        },
+        {
+          "name": "content",
+          "type": {
+            "kind": "SCALAR",
+            "name": "String",
+            "ofType": null
+          },
+          "defaultValue": null
+        },
+        {
+          "name": "title",
+          "type": {
+            "kind": "SCALAR",
+            "name": "String",
+            "ofType": null
+          },
+          "defaultValue": null
+        },
+        {
+          "name": "category",
+          "type": {
+            "kind": "SCALAR",
+            "name": "String",
+            "ofType": null
+          },
+          "defaultValue": null
+        }
+      ],
+      "interfaces": null,
+      "enumValues": null,
+      "possibleTypes": null
+    },
+    {
+      "kind": "OBJECT",
+      "name": "CreatePostMutationPayload",
+      "fields": [
+        {
+          "name": "post",
+          "args": [],
+          "type": {
+            "kind": "OBJECT",
+            "name": "PostType",
             "ofType": null
           }
         },
         {
-          "name": "createAuthor",
-          "args": [
-            {
-              "name": "_id",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "name",
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
-                  "ofType": null
-                }
-              },
-              "defaultValue": null
-            },
-            {
-              "name": "twitterHandle",
-              "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
-              },
-              "defaultValue": null
-            }
-          ],
+          "name": "postCount",
+          "args": [],
           "type": {
-            "kind": "OBJECT",
-            "name": "Author",
+            "kind": "SCALAR",
+            "name": "Int",
             "ofType": null
           }
         }
@@ -1184,6 +1154,26 @@
           }
         },
         {
+          "name": "locations",
+          "args": [],
+          "type": {
+            "kind": "NON_NULL",
+            "name": null,
+            "ofType": {
+              "kind": "LIST",
+              "name": null,
+              "ofType": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "ENUM",
+                  "name": "__DirectiveLocation"
+                }
+              }
+            }
+          }
+        },
+        {
           "name": "args",
           "args": [],
           "type": {
@@ -1202,50 +1192,75 @@
               }
             }
           }
-        },
-        {
-          "name": "onOperation",
-          "args": [],
-          "type": {
-            "kind": "NON_NULL",
-            "name": null,
-            "ofType": {
-              "kind": "SCALAR",
-              "name": "Boolean",
-              "ofType": null
-            }
-          }
-        },
-        {
-          "name": "onFragment",
-          "args": [],
-          "type": {
-            "kind": "NON_NULL",
-            "name": null,
-            "ofType": {
-              "kind": "SCALAR",
-              "name": "Boolean",
-              "ofType": null
-            }
-          }
-        },
-        {
-          "name": "onField",
-          "args": [],
-          "type": {
-            "kind": "NON_NULL",
-            "name": null,
-            "ofType": {
-              "kind": "SCALAR",
-              "name": "Boolean",
-              "ofType": null
-            }
-          }
         }
       ],
       "inputFields": null,
       "interfaces": [],
       "enumValues": null,
+      "possibleTypes": null
+    },
+    {
+      "kind": "ENUM",
+      "name": "__DirectiveLocation",
+      "fields": null,
+      "inputFields": null,
+      "interfaces": null,
+      "enumValues": [
+        {
+          "name": "QUERY"
+        },
+        {
+          "name": "MUTATION"
+        },
+        {
+          "name": "SUBSCRIPTION"
+        },
+        {
+          "name": "FIELD"
+        },
+        {
+          "name": "FRAGMENT_DEFINITION"
+        },
+        {
+          "name": "FRAGMENT_SPREAD"
+        },
+        {
+          "name": "INLINE_FRAGMENT"
+        },
+        {
+          "name": "SCHEMA"
+        },
+        {
+          "name": "SCALAR"
+        },
+        {
+          "name": "OBJECT"
+        },
+        {
+          "name": "FIELD_DEFINITION"
+        },
+        {
+          "name": "ARGUMENT_DEFINITION"
+        },
+        {
+          "name": "INTERFACE"
+        },
+        {
+          "name": "UNION"
+        },
+        {
+          "name": "ENUM"
+        },
+        {
+          "name": "ENUM_VALUE"
+        },
+        {
+          "name": "INPUT_OBJECT"
+        },
+        {
+          "name": "INPUT_FIELD_DEFINITION"
+        }
+      ],
       "possibleTypes": null
     }
   ],
@@ -1291,6 +1306,23 @@
       "onOperation": false,
       "onFragment": true,
       "onField": true
+    },
+    {
+      "name": "deprecated",
+      "args": [
+        {
+          "name": "reason",
+          "type": {
+            "kind": "SCALAR",
+            "name": "String",
+            "ofType": null
+          },
+          "defaultValue": "\"No longer supported\""
+        }
+      ],
+      "onOperation": false,
+      "onFragment": false,
+      "onField": false
     }
   ]
 }

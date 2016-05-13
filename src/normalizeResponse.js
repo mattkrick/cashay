@@ -1,4 +1,5 @@
-import {mergeDeepWithArrs} from './mergeDeep';
+// import {mergeDeepWithArrs} from './mergeDeep';
+import {deepAssign} from './deepAssign';
 import {separateArgs} from './separateArgs';
 import {getSubReqAST} from './getSubReqAST';
 import {ensureRootType, getRegularArgsKey, isObject} from './utils';
@@ -19,9 +20,8 @@ const mapResponseToResult = (nestedResult, response, regularArgs, paginationArgs
   } else {
     const resultObj = {[regularArgsString]: response};
     if (isObject(nestedResult) && !Array.isArray(nestedResult)) {
-      // Not sure if I need recursive merging, but playing it safe
-      const mutatedNestedResult = mergeDeepWithArrs(nestedResult, resultObj, {mergeArrays});
-      return mutatedNestedResult;
+      // Not sure if I'll need recursive merging, but playing it safe
+      return deepAssign(nestedResult, resultObj);
     } else {
       return resultObj
     }
@@ -54,9 +54,9 @@ const visitEntity = (bag, subResponse, reqAST, subSchema, context, id) => {
   const entityKey = subSchema.name;
   bag[entityKey] = bag[entityKey] || {};
   bag[entityKey][id] = bag[entityKey][id] || {};
-  let stored = bag[entityKey][id];
+  // let stored = bag[entityKey][id];
   let normalized = visitObject(bag, subResponse, reqAST, subSchema, context);
-  mergeDeepWithArrs(stored, normalized, {mergeArrays});
+  bag[entityKey][id] = deepAssign(bag[entityKey][id], normalized);
   return `${entityKey}:${id}`;
 };
 

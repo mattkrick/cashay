@@ -11,22 +11,8 @@ export const defaultPaginationWords = {
 export const buildExecutionContext = (schema, queryString, options) => {
   // the request query + vars combo are not stored
   const documentAST = parse(queryString, {noLocation: true, noSource: true});
-  
-  let operation;
-  const fragments = documentAST.definitions.reduce((reduction, definition) => {
-    if (definition.kind === OPERATION_DEFINITION) {
-      if (operation) {
-        console.error('Multiple operations not supported');
-      }
-      operation = definition;
-    } else if (definition.kind === FRAGMENT_DEFINITION) {
-      reduction[definition.name.value] = definition;
-    }
-    return reduction;
-  }, {});
-  if (!operation) {
-    console.error('Must provide an operation.');
-  }
+  const {operation, fragments} = teardownDocumentAST(documentAST);
+
   // TODO: Open to PR for defaultValue. Useful if someone called the same query with & without it delcaring it
   return {
     schema,
@@ -39,3 +25,21 @@ export const buildExecutionContext = (schema, queryString, options) => {
   };
 };
 
+export const teardownDocumentAST = documentAST => {
+  let operation;
+  const fragments = documentAST.definitions.reduce((reduction, definition) => {
+    if (definition.kind === OPERATION_DEFINITION) {
+      if (operation) {
+        throw new Error('Multiple operations not supported');
+      }
+      operation = definition;
+    } else if (definition.kind === FRAGMENT_DEFINITION) {
+      reduction[definition.name.value] = definition;
+    }
+    return reduction;
+  }, {});
+  if (!operation) {
+    throw new Error('Must provide an operation.');
+  }
+  return {operation, fragments};
+};
