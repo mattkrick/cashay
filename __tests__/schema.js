@@ -189,7 +189,6 @@ const NewPost = new GraphQLInputObjectType({
   description: "input object for a new post",
   fields: () => ({
     _id: {type: new GraphQLNonNull(GraphQLString)},
-    author: {type: GraphQLString},
     content: {type: GraphQLString},
     title: {type: GraphQLString},
     category: {type: GraphQLString}
@@ -253,13 +252,16 @@ const Mutation = new GraphQLObjectType({
       type: CreatePostMutationPayload,
       description: "Create a post",
       args: {
-        newPost: {type: new GraphQLNonNull(NewPost)}
+        newPost: {type: new GraphQLNonNull(NewPost)},
+        // this is wrong to break out the author, but useful for testing different arg types
+        author: {type: GraphQLString}
       },
-      resolve(source, {newPost}) {
+      resolve(source, {newPost, author}) {
         const post = Object.assign({}, newPost, {
           karma: 0,
           createdAt: Date.now(),
-          title_ES: `${newPost.title} EN ESPANOL!`
+          title_ES: `${newPost.title} EN ESPANOL!`,
+          author
         });
         PostDB[post._id] = post;
         return {

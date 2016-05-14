@@ -1,8 +1,8 @@
 import {TypeKind} from 'graphql/type/introspection';
 import {INLINE_FRAGMENT, STRING, NAME, ARGUMENT, INT, VARIABLE} from 'graphql/language/kinds';
-import {getRegularArgsKey, ensureTypeFromNonNull} from './utils';
+import {isObject, getRegularArgsKey, ensureTypeFromNonNull} from './utils';
 import {separateArgs} from './separateArgs';
-
+import {isObject, ensureRootType, ensureTypeFromNonNull} from './utils';
 /**
  * given a parent field state & some args, drill down to the data using the args as a map
  *
@@ -14,6 +14,9 @@ import {separateArgs} from './separateArgs';
  * @returns {*} the an object, or array, or scalar from the normalized store
  * */
 export const getFieldState = (fieldState, fieldSchema, selection, context) => {
+  if (!isObject(fieldState)) {
+    return fieldState
+  }
   const {arguments: fieldArgs} = selection;
   const {regularArgs, paginationArgs} = separateArgs(fieldSchema, fieldArgs, context);
   if (regularArgs) {

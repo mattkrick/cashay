@@ -14,3 +14,10 @@ export const getRegularArgsKey = regularArgs => {
 };
 
 export const isObject = val => val && typeof val === 'object';
+
+export const checkMutationInSchema = (rootMutation, mutationName) => {
+  const mutationSchema = rootMutation.fields.find(field => field.name === mutationName);
+  if (!mutationSchema) {
+    throw new Error(`Invalid mutation: ${mutationName}.\nDid you make a typo?`);
+  }
+};

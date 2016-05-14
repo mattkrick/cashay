@@ -2,65 +2,42 @@ import 'babel-register';
 import 'babel-polyfill';
 import test from 'ava';
 import clientSchema from './clientSchema.json';
-import {mergeStringSet} from '../src/mergeMutations';
-import {parse} from 'graphql/language/parser';
-import {print} from 'graphql/language/printer';
+import {mergeMutationASTs} from '../src/mergeMutations';
+import {parseSortPrint} from './parseAndSort';
 
-/* Setup */
-const creatCommentMutation1 = `
-  mutation($postId: String!, $content: String!) {
-    createComment(postId: $postId, content: $content) {
-      _id,
-      content,
-      karma
-    }
-  }`;
-const creatCommentMutation2 = `
-  mutation($postId: String!, $content: String!) {
-    createComment(postId: $postId, content: $content) {
-      _id,
-      content,
-      createdAt
-    }
-  }`;
-const createPostMutation1 = `
-  mutation {
-    createPost(newPost: {_id: "129", author: "a123", content: "X", title:"Y", category:"hot stuff"}) {
-      post {
-        title
-        content
-      }
-      postCount
-    }
-  }`;
-const createPostMutation2 = `
-  mutation {
-    createPost(newPost: {_id: "129", author: "a123", content: "X", title:"Y", category:"hot stuff"}) {
-      post {
-        _id
-      }
-    }
-  }`;
+import {
+  creatCommentMutationWithId,
+  createPostMutationWithPostTitleAndCount,
+  creatCommentMutationWithContent,
+  createPostMutationWithDifferentId,
+  createPostMutationWithIncompleteArgs,
+  createPostMutationWithPostId,
+  createPostMutationWithSpanishTitle
+} from './mergeMutations-data';
 
 /* Tests */
 test('throws when merging 2 different mutations', t => {
-  const mutationStringSet = new Set([creatCommentMutation1, createPostMutation1]);
-  t.throws(() => mergeStringSet(mutationStringSet, clientSchema));
+  const cachedSingles = {
+    commentWithId: creatCommentMutationWithId,
+    postTitleCount: createPostMutationWithPostTitleAndCount
+  };
+  t.throws(() => mergeMutationASTs(cachedSingles, clientSchema));
 });
 
 test('merge fields from 2 simple mutation results', t => {
   const expectedRaw = `
   mutation($postId: String!, $content: String!) {
     createComment(postId: $postId, content: $content) {
-      _id,
-      content,
-      createdAt,
-      karma
+      content
+      _id
     }
   }`;
-  const expected = print(parse(expectedRaw));
-  const mutationStringSet = new Set([creatCommentMutation1, creatCommentMutation2]);
-  const actual = mergeStringSet(mutationStringSet, clientSchema);
+  const expected = parseSortPrint(expectedRaw);
+  const cachedSingles = {
+    commentWithId: creatCommentMutationWithId,
+    commentWithContent: creatCommentMutationWithContent
+  };
+  const actual = parseSortPrint(mergeMutationASTs(cachedSingles, clientSchema));
   t.is(actual, expected);
 });
 
@@ -71,14 +48,83 @@ test('merge nested fields from 2 simple payloads', t => {
       post {
         _id
         title
-        content
       }
       postCount
     }
   }`;
-  const expected = print(parse(expectedRaw));
-  const mutationStringSet = new Set([createPostMutation1, createPostMutation2]);
-  const actual = mergeStringSet(mutationStringSet, clientSchema);
+  const expected = parseSortPrint(expectedRaw);
+  const cachedSingles = {
+    postTitleCount: createPostMutationWithPostTitleAndCount,
+    postWithId: createPostMutationWithPostId
+  };
+  const actual = parseSortPrint(mergeMutationASTs(cachedSingles, clientSchema));
+  
+  t.is(actual, expected);
+});
+
+test('merge mutation args', t => {
+  const expectedRaw = `
+  mutation {
+    createPost(newPost: {_id: "129", author: "a123", content: "X", title:"Y", category:"hot stuff"}) {
+      post {
+        _id
+      }
+    }
+  }`;
+  const expected = parseSortPrint(expectedRaw);
+  const cachedSingles = {
+    postWithId: createPostMutationWithPostId,
+    postWithIncompleteArgs: createPostMutationWithIncompleteArgs
+  };
+  const actual = parseSortPrint(mergeMutationASTs(cachedSingles, clientSchema));
+  t.is(actual, expected);
+});
+
+test('throw if incomplete mutation args have different values', t => {
+  const cachedSingles = {
+    postWithIncompleteArgs: createPostMutationWithIncompleteArgs,
+    postWithDifferentId: createPostMutationWithDifferentId
+  };
+  t.throws(() => mergeMutationASTs(cachedSingles, clientSchema));
+});
+
+test('add an alias when fields have conflicting args', t => {
+  const expectedRaw = `
+  mutation {
+    createPost(newPost: {_id: "129", author: "a123", content: "X", title:"Y", category:"hot stuff"}) {
+      post {
+        cashay_title_postSpanishTitle: title(language:"spanish")
+        title
+      }
+      postCount
+    }
+  }`;
+  const expected = parseSortPrint(expectedRaw);
+  const cachedSingles = {
+    postTitleCount: createPostMutationWithPostTitleAndCount,
+    postSpanishTitle: createPostMutationWithSpanishTitle
+  };
+  const actual = parseSortPrint(mergeMutationASTs(cachedSingles, clientSchema));
+  t.is(actual, expected);
+});
+
+test('add an alias when fields have conflicting args (reverse order)', t => {
+  const expectedRaw = `
+  mutation {
+    createPost(newPost: {_id: "129", author: "a123", content: "X", title:"Y", category:"hot stuff"}) {
+      post {
+        cashay_title_postSpanishTitle: title(language:"spanish")
+        title
+      }
+      postCount
+    }
+  }`;
+  const expected = parseSortPrint(expectedRaw);
+  const cachedSingles = {
+    postSpanishTitle: createPostMutationWithSpanishTitle,
+    postTitleCount: createPostMutationWithPostTitleAndCount
+  };
+  const actual = parseSortPrint(mergeMutationASTs(cachedSingles, clientSchema));
   t.is(actual, expected);
 });
 

@@ -10,12 +10,13 @@ import {
 
 const {UNION, LIST, OBJECT, SCALAR} = TypeKind;
 
+//TODO instead of mutating the context, create a new operation
+
 const handleMissingData = (aliasOrFieldName, field, fieldSchema, context) => {
   const fieldType = ensureTypeFromNonNull(fieldSchema.type);
   if (fieldType.kind === SCALAR) {
     return null;
   } else if (fieldType.kind === LIST) {
-    // TODO don't return a list? if there's a list, then we don't know the difference between missing data & no data
     return [];
   } else {
     const newFieldSchema = context.schema.types.find(type => type.name === fieldType.name);
@@ -25,8 +26,6 @@ const handleMissingData = (aliasOrFieldName, field, fieldSchema, context) => {
         const newFieldSchema = context.schema.types.find(type => type.name === objType.name);
         // take the old, add the new, keep typename null
         return Object.assign(reduction, visit(reduction, field, newFieldSchema, context), {__typename: null});
-        // sure to work, but less efficient
-        // return {...reduction, ...visit(reduction, field, newFieldSchema, context)};
       }, {});
     }
     return visit({}, field, newFieldSchema, context);
@@ -101,7 +100,6 @@ const visitIterable = (subState, reqAST, subSchema, context) => {
 };
 
 const visit = (subState, reqAST, subSchema, context) => {
-  // debugger
   // By implementing a ternary here, we can get rid of a pointless O(n) find in visitObject
   const objectType = subSchema.kind ? subSchema.kind : subSchema.type.kind;
 
@@ -141,14 +139,7 @@ export const denormalizeStore = context => {
     let queryInState = context.cashayDataState.result[queryName];
 
     // if there's no results stored or being fetched, save some time & don't bother with the args
-    let fieldState;
-    if (queryInState) {
-      if (isObject(queryInState)) {
-        fieldState = getFieldState(queryInState, querySchema, selection, context);
-      } else {
-        fieldState = queryInState;
-      }
-    }
+    const fieldState = queryInState && getFieldState(queryInState, querySchema, selection, context);
 
     // if a result exists in the state, this isn't the first time the query was called.
     // a firstRun flag means there's no need to try to minimize the query pre-server fetch & no need to add deps

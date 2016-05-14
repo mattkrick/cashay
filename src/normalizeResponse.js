@@ -1,4 +1,3 @@
-// import {mergeDeepWithArrs} from './mergeDeep';
 import {deepAssign} from './deepAssign';
 import {separateArgs} from './separateArgs';
 import {getSubReqAST} from './getSubReqAST';
@@ -34,10 +33,8 @@ const visitObject = (bag, subResponse, reqAST, subSchema, context) => {
     let subReqAST = getSubReqAST(key, reqAST, context.fragments);
     const name = subReqAST.name.value;
     const field = subSchema.fields.find(field => field.name === name);
-    if (!field) debugger
     let fieldType = ensureRootType(field.type);
     let fieldSchema = context.schema.types.find(type => type.name === fieldType.name);
-    //debugger
     // handle first recursion where things are stored in the query
     fieldSchema = fieldSchema || subSchema.types.find(type => type.name === fieldType.name);
     const normalizedResponse = visit(bag, subResponse[key], subReqAST, fieldSchema, context);
@@ -54,7 +51,6 @@ const visitEntity = (bag, subResponse, reqAST, subSchema, context, id) => {
   const entityKey = subSchema.name;
   bag[entityKey] = bag[entityKey] || {};
   bag[entityKey][id] = bag[entityKey][id] || {};
-  // let stored = bag[entityKey][id];
   let normalized = visitObject(bag, subResponse, reqAST, subSchema, context);
   bag[entityKey][id] = deepAssign(bag[entityKey][id], normalized);
   return `${entityKey}:${id}`;
@@ -106,8 +102,7 @@ const visit = (bag, subResponse, reqAST, subSchema, context) => {
 
 export const normalizeResponse = (response, context) => {
   let bag = {};
-  const operationType = `${context.operation.operation}Type`;
-  const operationSchema = context.schema.types.find(type => type.name === context.schema[operationType].name);
+  const operationSchema = context.schema.types.find(type => type.name === context.schema.queryType.name);
   const result = visit(bag, response, context.operation, operationSchema, context);
   return {
     entities: bag,
