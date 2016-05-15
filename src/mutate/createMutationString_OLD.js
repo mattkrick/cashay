@@ -1,4 +1,4 @@
-import {ensureTypeFromNonNull, ensureRootType, isObject} from './utils';
+import {ensureTypeFromNonNull, ensureRootType, isObject} from '../utils';
 import {
   OPERATION_DEFINITION,
   DOCUMENT,

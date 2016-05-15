@@ -3,11 +3,13 @@ import {INLINE_FRAGMENT} from 'graphql/language/kinds';
 import {DOCUMENT} from 'graphql/language/kinds';
 
 export const printMinimalQuery = (reqAST, idFieldName) => {
+  // remove variableDefinitions that are no longer in use, flag is set during denorm
+  reqAST.variableDefinitions = reqAST.variableDefinitions.filter(varDef => varDef._inUse === true);
   minimizeQueryAST(reqAST, idFieldName);
   return print(reqAST);
 };
 
-export const minimizeQueryAST = (reqAST, idFieldName) => {
+const minimizeQueryAST = (reqAST, idFieldName) => {
   // if the value is a scalar, we're done here
   if (!reqAST.selectionSet) {
     return

@@ -1,6 +1,6 @@
 import fs from 'fs';
 import clientSchema from './__tests__/clientSchema.json';
-import {mergeMutationASTs} from './src/mergeMutations';
+import {mergeMutationASTs} from './src/mutate/mergeMutations';
 import {parseSortPrint} from './__tests__/parseAndSort';
 
 import {parse} from 'graphql/language/parser';

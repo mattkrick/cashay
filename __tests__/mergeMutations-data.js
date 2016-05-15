@@ -1,4 +1,4 @@
-import {parseAndAlias} from '../src/mergeMutations';
+import {parseAndAlias} from '../src/mutate/mergeMutations';
 
 const creatCommentMutationWithIdString = `
   mutation($postId: String!, $content: String!) {

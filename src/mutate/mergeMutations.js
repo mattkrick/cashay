@@ -1,4 +1,4 @@
-import {ensureRootType} from './utils';
+import {ensureRootType} from '../utils';
 import {
   NAME,
   VARIABLE,

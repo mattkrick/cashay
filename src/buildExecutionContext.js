@@ -1,25 +1,17 @@
 import {OPERATION_DEFINITION, FRAGMENT_DEFINITION} from 'graphql/language/kinds';
 
-export const defaultPaginationWords = {
-  before: 'before',
-  after: 'after',
-  first: 'first',
-  last: 'last'
-};
-
-export const buildExecutionContext = (schema, queryAST, options) => {
-  const {operation, fragments} = teardownDocumentAST(queryAST);
-
-  // TODO: Open to PR for defaultValue. Useful if someone called the same query with & without it delcaring it
+export const buildExecutionContext = (queryAST, cashayDataState, variables, paginationWords, idFieldName) => {
+  const clonedAST = clone(queryAST);
+  const {operation, fragments} = teardownDocumentAST(clonedAST);
   return {
-    schema,
-    fragments,
+    cashayDataState,
     operation,
-    paginationWords: Object.assign(defaultPaginationWords, options.paginationWords),
-    variables: options.variables,
-    idFieldName: options.idFieldName || 'id',
-    cashayDataState: options.cashayDataState
+    fragments,
+    variables,
+    paginationWords,
+    idFieldName
   };
+  // TODO: Open to PR for defaultValue. Useful if someone called the same query with & without it delcaring it
 };
 
 export const teardownDocumentAST = queryAST => {

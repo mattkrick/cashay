@@ -1,6 +1,6 @@
 import {TypeKind} from 'graphql/type/introspection';
 const {LIST} = TypeKind;
-import {ensureTypeFromNonNull} from './utils';
+import {ensureTypeFromNonNull} from '../utils';
 
 const getSuppliedArgs = (args, variables = {}, paginationWords) => {
   const regularArgs = {};

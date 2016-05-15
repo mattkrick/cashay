@@ -1,12 +1,13 @@
 import {TypeKind} from 'graphql/type/introspection';
 import {FRAGMENT_SPREAD, INLINE_FRAGMENT} from 'graphql/language/kinds';
-import {isObject, ensureRootType, ensureTypeFromNonNull} from './utils';
+import {isObject, ensureRootType, ensureTypeFromNonNull, getRootOperation} from '../utils';
 import {
-  getFieldState,
   convertFragmentToInline,
   calculateSendToServer,
   sendChildrenToServer
 } from './denormalizeHelpers';
+import getFieldState from './getFieldState';
+
 
 const {UNION, LIST, OBJECT, SCALAR} = TypeKind;
 
@@ -123,7 +124,7 @@ export const denormalizeStore = context => {
   let firstRun = true;
 
   // Lookup the root schema for the queryType (hardcoded name in the return of the introspection query)
-  const operationSchema = context.schema.types.find(type => type.name === context.schema.queryType.name);
+  const operationSchema = getRootOperation(context.schema, 'query');
 
   // a query operation can have multiple queries, gotta catch 'em all
   const queryReduction = context.operation.selectionSet.selections.reduce((reduction, selection) => {
@@ -166,11 +167,6 @@ export const denormalizeStore = context => {
 
   return {
     data: queryReduction,
-    // this is handy if the user wants to do something when a query is run for the first time
-    _firstRun: firstRun,
-    // this is handy if the user wants to know if the data is complete as requested (eg top-level spinners)
-    _isComplete: !context.operation.sendToServer,
-    // we'll define this later
-    setVariables: undefined
+    firstRun
   };
 };

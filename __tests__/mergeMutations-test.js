@@ -2,7 +2,7 @@ import 'babel-register';
 import 'babel-polyfill';
 import test from 'ava';
 import clientSchema from './clientSchema.json';
-import {mergeMutationASTs} from '../src/mergeMutations';
+import {mergeMutationASTs} from '../src/mutate/mergeMutations';
 import {parseSortPrint} from './parseAndSort';
 
 import {

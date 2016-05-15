@@ -1,7 +1,7 @@
-import {deepAssign} from './deepAssign';
-import {separateArgs} from './separateArgs';
+import {deepAssign} from '../deepAssign';
+import {separateArgs} from '../denormalize/separateArgs';
 import {getSubReqAST} from './getSubReqAST';
-import {ensureRootType, getRegularArgsKey, isObject} from './utils';
+import {ensureRootType, getRegularArgsKey, isObject} from '../utils';
 import {TypeKind} from 'graphql/type/introspection';
 const {UNION} = TypeKind;
 

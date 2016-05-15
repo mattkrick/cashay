@@ -1,6 +1,6 @@
-import {ensureTypeFromNonNull, ensureRootType, isObject} from './utils';
+import {ensureTypeFromNonNull, ensureRootType, isObject} from '../utils';
 import {parse} from 'graphql/language/parser';
-import {teardownDocumentAST} from './buildExecutionContext';
+import {teardownDocumentAST} from '../buildExecutionContext';
 import {
   OPERATION_DEFINITION,
   DOCUMENT,
