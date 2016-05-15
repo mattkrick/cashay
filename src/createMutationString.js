@@ -68,7 +68,7 @@ export const createMutationString = function(mutationName, componentIdsToUpdate,
   debugger
   // expensive duck typing
   const queryASTs = componentIdsToUpdate.map(componentId => {
-    const {queryString} = this._denormalizedResults[componentId];
+    const {queryString} = this._cachedQueries[componentId];
     return parse(queryString, {noLocation: true, noSource: true});
   });
 
@@ -192,7 +192,7 @@ const buildAccessLogs = function(isAList, mutationNameListener, variables) {
   for (let [componentId, mutationListener] of mutationNameListener) {
 
     // get currently cached response
-    const {data: responseData} = this._denormalizedResults[componentId].response;
+    const {data: responseData} = this._cachedQueries[componentId].response;
 
     // make proxy doc to figure out what fields will be mutated
     const {proxy, accessLog} = detectAccess({});

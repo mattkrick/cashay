@@ -80,7 +80,7 @@ const buildAccessLogs = function(isAList, mutationNameListener, variables) {
   for (let [componentId, mutationListener] of mutationNameListener) {
 
     // get currently cached response
-    const {data: responseData} = this._denormalizedResults[componentId].response;
+    const {data: responseData} = this._cachedQueries[componentId].response;
 
     // make proxy doc to figure out what fields will be mutated
     const {proxy, accessLog} = detectAccess({});

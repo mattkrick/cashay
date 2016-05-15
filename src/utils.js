@@ -15,6 +15,8 @@ export const getRegularArgsKey = regularArgs => {
 
 export const isObject = val => val && typeof val === 'object';
 
+export const clone = obj => JSON.parse(JSON.stringify(obj));
+
 export const checkMutationInSchema = (rootMutation, mutationName) => {
   const mutationSchema = rootMutation.fields.find(field => field.name === mutationName);
   if (!mutationSchema) {

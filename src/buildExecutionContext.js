@@ -1,5 +1,4 @@
 import {OPERATION_DEFINITION, FRAGMENT_DEFINITION} from 'graphql/language/kinds';
-import {parse} from 'graphql/language/parser';
 
 export const defaultPaginationWords = {
   before: 'before',
@@ -8,10 +7,8 @@ export const defaultPaginationWords = {
   last: 'last'
 };
 
-export const buildExecutionContext = (schema, queryString, options) => {
-  // the request query + vars combo are not stored
-  const documentAST = parse(queryString, {noLocation: true, noSource: true});
-  const {operation, fragments} = teardownDocumentAST(documentAST);
+export const buildExecutionContext = (schema, queryAST, options) => {
+  const {operation, fragments} = teardownDocumentAST(queryAST);
 
   // TODO: Open to PR for defaultValue. Useful if someone called the same query with & without it delcaring it
   return {
@@ -25,9 +22,9 @@ export const buildExecutionContext = (schema, queryString, options) => {
   };
 };
 
-export const teardownDocumentAST = documentAST => {
+export const teardownDocumentAST = queryAST => {
   let operation;
-  const fragments = documentAST.definitions.reduce((reduction, definition) => {
+  const fragments = queryAST.definitions.reduce((reduction, definition) => {
     if (definition.kind === OPERATION_DEFINITION) {
       if (operation) {
         throw new Error('Multiple operations not supported');
