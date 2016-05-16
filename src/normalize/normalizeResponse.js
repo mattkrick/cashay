@@ -102,8 +102,7 @@ const visit = (bag, subResponse, reqAST, subSchema, context) => {
 
 export const normalizeResponse = (response, context) => {
   let bag = {};
-  const operationSchema = context.schema.types.find(type => type.name === context.schema.queryType.name);
-  const result = visit(bag, response, context.operation, operationSchema, context);
+  const result = visit(bag, response, context.operation, context.schema.querySchema, context);
   return {
     entities: bag,
     result

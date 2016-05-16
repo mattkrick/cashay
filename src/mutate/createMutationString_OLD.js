@@ -14,8 +14,8 @@ import {
 
 export const createMutationString = function(mutationName, variables) {
   // find the mutation in the schema
-  const operationName = this._schema.mutationType.name;
-  const rootMutation = this._schema.types.find(type => type.name === operationName);
+  // const operationName = this._schema.mutationType.name;
+  // const rootMutation = this._schema.types.find(type => type.name === operationName); BAD
   const mutationSchema = rootMutation.fields.find(field => field.name === mutationName);
   const nonNullMutationType = ensureTypeFromNonNull(mutationSchema.type);
   const rootMutationType = ensureRootType(nonNullMutationType);

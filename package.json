@@ -9,7 +9,8 @@
     "build": "babel --presets es2015,stage-0 -d lib/ src/",
     "watch": "babel -w --presets es2015,stage-0 -d lib/ src/",
     "prepublish": "npm run clean && npm run build",
-    "test": "ava ./__tests__/**/*-test.js"
+    "test": "ava ./src/**/__tests__/**/*-test.js",
+    "buildTestSchema": "node src/updateSchema.js __tests__/schema.js __tests__/clientSchema.json 2"
   },
   "repository": {
     "type": "git",

@@ -23,9 +23,3 @@ export const checkMutationInSchema = (rootMutation, mutationName) => {
     throw new Error(`Invalid mutation: ${mutationName}.\nDid you make a typo?`);
   }
 };
-
-export const getRootOperation = (schema, operation) => {
-  const operationString = `${operation}Type`;
-  const operationName = schema[operationString].name;
-  return schema.types.find(type => type.name === operationName);
-}

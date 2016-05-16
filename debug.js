@@ -13,7 +13,7 @@ import {
   createPostMutationWithIncompleteArgs,
   createPostMutationWithPostId,
   createPostMutationWithSpanishTitle
-} from './__tests__/mergeMutations-data';
+} from './src/mutate/__tests__/mergeMutations-data';
 
 const expectedRaw = `
   mutation {

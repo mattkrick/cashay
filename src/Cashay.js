@@ -5,7 +5,7 @@ import {normalizeResponse} from './normalize/normalizeResponse';
 import {printMinimalQuery} from './query/printMinimalQuery';
 import {buildExecutionContext} from './buildExecutionContext';
 import {makeNormalizedDeps, shortenNormalizedResponse} from './query/queryHelpers';
-import {isObject, checkMutationInSchema, getRootOperation} from './utils';
+import {isObject, checkMutationInSchema} from './utils';
 import {deepAssign} from './deepAssign';
 import {createMutationString} from './mutate/createMutationString';
 import {parseAndAlias} from './mutate/mergeMutations';
@@ -293,11 +293,11 @@ export default class Cashay {
   }
 
   _prepareMutations(componentId, mutationHandlers, customMutations) {
-    const rootMutation = getRootOperation(this.schema, 'mutation');
+    const {mutationSchema} = this.schema;
     if (isObject(mutationHandlers)) {
       const mutationHandlerNames = Object.keys(mutationHandlers);
       for (let mutationName of mutationHandlerNames) {
-        checkMutationInSchema(rootMutation, mutationName);
+        checkMutationInSchema(mutationSchema, mutationName);
         this.mutationHandlers[mutationName] = this.mutationHandlers[mutationName] || {};
         this.mutationHandlers[mutationName][componentId] = mutationHandlers[mutationName];
       }
@@ -305,7 +305,7 @@ export default class Cashay {
     if (isObject(customMutations)) {
       const mutationNames = Object.keys(customMutations);
       for (let mutationName of mutationNames) {
-        checkMutationInSchema(rootMutation, mutationName);
+        checkMutationInSchema(mutationSchema, mutationName);
         this.cachedMutations[mutationName] = this.cachedMutations[mutationName] || new CachedMutation();
         const cachedSingles = this.cachedMutations[mutationName].singles;
         if (!cachedSingles[componentId]) {
@@ -327,7 +327,7 @@ export default class Cashay {
     if (!componentIdsToUpdate) {
       throw new Error(`Mutation has no queries to update: ${mutationName}`);
     }
-    createMutationsFromQueries(componentIdsToUpdate, mutationName, this.cachedMutations, this.cachedQueries);
+    this._createMutationsFromQueries(componentIdsToUpdate, mutationName, variables);
 
     const mutationString = createMutationString.call(this, mutationName, componentIdsToUpdate);
 
@@ -339,10 +339,9 @@ export default class Cashay {
   }
 
   _createMutationsFromQueries(componentIds, mutationName, variables) {
-    const rootMutation = getRootOperation(this.schema, 'mutation');
-
+    const {mutationSchema} = this.schema;
     // createComment
-    const mutationFieldSchema = rootMutation.fields.find(field => field.name === mutationName);
+    const mutationFieldSchema = mutationSchema.fields.find(field => field.name === mutationName);
 
     this.cachedMutations[mutationName] = this.cachedMutations[mutationName] || new CachedMutation();
     const cachedSingles = this.cachedMutations[mutationName].singles;

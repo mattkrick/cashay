@@ -52,9 +52,7 @@ export const mergeMutationASTs = (cachedSingles, schema) => {
   const operationDefinition = mergedAST.definitions[0];
   const variableDefinitionBag = operationDefinition.variableDefinitions || [];
   const mutationSelection = operationDefinition.selectionSet.selections[0];
-  const operationName = schema.mutationType.name;
-  const operationSchema = schema.types.find(type => type.name === operationName);
-  const fieldSchema = operationSchema.fields.find(field => field.name === mutationSelection.name.value);
+  const fieldSchema = schema.mutationSchema.fields.find(field => field.name === mutationSelection.name.value);
   bagArgs(variableDefinitionBag, mutationSelection.arguments, fieldSchema);
   // now add the new ASTs one-by-one
   for (let componentId of cachedSinglesComponentIds) {
@@ -225,7 +223,7 @@ export const parseAndAlias = (mutationString, componentId) => {
 
 const parseAndAliasRecurse = (astSelections, componentId) => {
   for (let selection of astSelections) {
-    if (selection.arguments.length) {
+    if (selection.arguments && selection.arguments.length) {
       const aliasOrFieldName = selection.alias && selection.alias.value || selection.name.value;
       selection.alias = {
         kind: NAME,

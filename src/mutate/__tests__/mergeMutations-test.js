@@ -1,9 +1,9 @@
 import 'babel-register';
 import 'babel-polyfill';
 import test from 'ava';
-import clientSchema from './clientSchema.json';
-import {mergeMutationASTs} from '../src/mutate/mergeMutations';
-import {parseSortPrint} from './parseAndSort';
+import clientSchema from '../../../__tests__/clientSchema.json';
+import {mergeMutationASTs} from '../mergeMutations';
+import {parseSortPrint} from '../../../__tests__/parseAndSort';
 
 import {
   creatCommentMutationWithId,
@@ -12,7 +12,9 @@ import {
   createPostMutationWithDifferentId,
   createPostMutationWithIncompleteArgs,
   createPostMutationWithPostId,
-  createPostMutationWithSpanishTitle
+  createPostMutationWithSpanishTitle,
+  createPostMutationWithCrazyFrags,
+  createPostMutationWithCrazyFrags2
 } from './mergeMutations-data';
 
 /* Tests */
@@ -58,7 +60,7 @@ test('merge nested fields from 2 simple payloads', t => {
     postWithId: createPostMutationWithPostId
   };
   const actual = parseSortPrint(mergeMutationASTs(cachedSingles, clientSchema));
-  
+
   t.is(actual, expected);
 });
 
@@ -128,3 +130,32 @@ test('add an alias when fields have conflicting args (reverse order)', t => {
   t.is(actual, expected);
 });
 
+test('add an alias when fields have conflicting args within fragments', t => {
+  const expectedRaw = `
+  mutation {
+    createPost(newPost: {_id: "129", author: "a123", content: "Hii", title:"Sao", category:"hot stuff"}) {
+      post {
+        ...{
+          _id
+        }
+        ...spreadLevel1
+      }
+    }
+  }
+  fragment spreadLevel1 on PostType {
+      ... {
+        category
+        ...spreadLevel2
+      }
+  }
+  fragment spreadLevel2 on PostType {
+    cashay_title_postCrazyFrags2: title(language:"spanish")
+  }`;
+  const expected = parseSortPrint(expectedRaw);
+  const cachedSingles = {
+    postCrazyFrags1: createPostMutationWithCrazyFrags,
+    postCrazyFrags2: createPostMutationWithCrazyFrags2
+  };
+  const actual = parseSortPrint(mergeMutationASTs(cachedSingles, clientSchema));
+  t.is(actual, expected);
+});

@@ -79,8 +79,8 @@ export const createMutationString = function(mutationName, componentIdsToUpdate,
   context.schema = this._schema;
 
   // BlogMutation
-  const rootMutationName = this._schema.mutationType.name;
-  const rootMutationType = this._schema.types.find(type => type.name === rootMutationName);
+  // const rootMutationName = this._schema.mutationType.name;
+  // const rootMutationType = this._schema.types.find(type => type.name === rootMutationName); BAD
   
   // createComment
   const mutationFieldSchema = rootMutationType.fields.find(field => field.name === mutationName);
@@ -96,7 +96,7 @@ export const createMutationString = function(mutationName, componentIdsToUpdate,
   // level 1, if necessary, will have all the fields of level 0
   const payloadTypes = [[mutationPayloadSchema]];
   // TODO make an array of all the fields it could be, too
-  const rootQuery = context.schema.types.find(type => type.name === context.schema.queryType.name);
+  // const rootQuery = context.schema.types.find(type => type.name === context.schema.queryType.name);
   
   const snaggedSelections = [];
   if (rootMutationFieldType.kind === OBJECT_KIND) {

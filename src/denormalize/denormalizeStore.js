@@ -1,6 +1,6 @@
 import {TypeKind} from 'graphql/type/introspection';
 import {FRAGMENT_SPREAD, INLINE_FRAGMENT} from 'graphql/language/kinds';
-import {isObject, ensureRootType, ensureTypeFromNonNull, getRootOperation} from '../utils';
+import {isObject, ensureRootType, ensureTypeFromNonNull} from '../utils';
 import {
   convertFragmentToInline,
   calculateSendToServer,
@@ -124,7 +124,7 @@ export const denormalizeStore = context => {
   let firstRun = true;
 
   // Lookup the root schema for the queryType (hardcoded name in the return of the introspection query)
-  const operationSchema = getRootOperation(context.schema, 'query');
+  const {querySchema} = context.schema;
 
   // a query operation can have multiple queries, gotta catch 'em all
   const queryReduction = context.operation.selectionSet.selections.reduce((reduction, selection) => {
@@ -134,13 +134,13 @@ export const denormalizeStore = context => {
     const aliasOrName = selection.alias && selection.alias.value || queryName;
 
     // get the query schema to know the expected type and args
-    let querySchema = operationSchema.fields.find(field => field.name === queryName);
+    let queryFieldSchema = querySchema.fields.find(field => field.name === queryName);
 
     // look into the current redux state to see if we can borrow any data from it
     let queryInState = context.cashayDataState.result[queryName];
 
     // if there's no results stored or being fetched, save some time & don't bother with the args
-    const fieldState = queryInState && getFieldState(queryInState, querySchema, selection, context);
+    const fieldState = queryInState && getFieldState(queryInState, queryFieldSchema, selection, context);
 
     // if a result exists in the state, this isn't the first time the query was called.
     // a firstRun flag means there's no need to try to minimize the query pre-server fetch & no need to add deps
@@ -149,8 +149,8 @@ export const denormalizeStore = context => {
     }
     // const query
     // get the expected return value, devs can be silly, so if the had the return value in a nonnull, remove it.
-    const subSchema = querySchema.type.kind === LIST ?
-      querySchema : ensureTypeFromNonNull(context.schema.types.find(type => type.name === querySchema.type.name));
+    const subSchema = queryFieldSchema.type.kind === LIST ?
+      queryFieldSchema : ensureTypeFromNonNull(context.schema.types.find(type => type.name === queryFieldSchema.type.name));
 
     // recursively visit each branch, flag missing branches with a sendToServer flag
     reduction[aliasOrName] = visit(fieldState, selection, subSchema, context);
