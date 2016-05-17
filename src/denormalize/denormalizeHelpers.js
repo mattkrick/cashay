@@ -1,11 +1,5 @@
 import {INLINE_FRAGMENT} from 'graphql/language/kinds';
 
-export const convertFragmentToInline = fragment => {
-  delete fragment.name;
-  fragment.kind = INLINE_FRAGMENT;
-  return fragment;
-};
-
 export const calculateSendToServer = (field, idFieldName) => {
   const {selections} = field.selectionSet;
   for (let i = 0; i < selections.length; i++) {

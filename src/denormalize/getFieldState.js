@@ -1,7 +1,6 @@
 import {STRING, INT, VARIABLE} from 'graphql/language/kinds';
 import {isObject, getRegularArgsKey} from '../utils';
 import {separateArgs} from './separateArgs';
-import {isObject} from '../utils';
 /**
  * given a parent field state & some args, drill down to the data using the args as a map
  *

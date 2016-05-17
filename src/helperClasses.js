@@ -6,11 +6,16 @@ import {
   ARGUMENT,
   VARIABLE,
   NAMED_TYPE,
-  FIELD
+  FIELD,
+  INLINE_FRAGMENT,
+  VARIABLE_DEFINITION,
+  LIST,
+  LIST_TYPE
 } from 'graphql/language/kinds';
 import {SET_VARIABLES} from './duck';
 import {denormalizeStore} from './denormalize/denormalizeStore';
 import {makeArgsAndDefs} from './mutate/mutationHelpers';
+import {parse, ensureRootType, ensureTypeFromNonNull} from './utils';
 
 export class CachedMutation {
   constructor() {
@@ -22,7 +27,7 @@ export class CachedMutation {
 
 export class CachedQuery {
   constructor(queryFunction, queryString, options, response) {
-    this.ast = parse(queryString, {noLocation: true, noSource: true});
+    this.ast = parse(queryString);
     this.refetch = () => queryFunction(queryString, options);
     this.response = response;
   }
@@ -63,6 +68,27 @@ export class CachedQuery {
   }
 }
 
+class SelectionSet {
+  constructor(selections = []) {
+    this.kind = SELECTION_SET;
+    this.selections = selections;
+  }
+}
+
+export class Name {
+  constructor(value) {
+    this.kind = NAME;
+    this.value = value;
+  }
+}
+
+class TypeCondition {
+  constructor(condition) {
+    this.kind = NAMED_TYPE;
+    this.name = new Name(condition);
+  }
+}
+
 export class MutationShell {
   constructor(mutationName, mutationFieldSchema, variables) {
     const {mutationArgs, variableDefinitions} = makeArgsAndDefs(mutationFieldSchema, variables);
@@ -71,41 +97,28 @@ export class MutationShell {
       kind: OPERATION_DEFINITION,
       operation: 'mutation',
       variableDefinitions,
-      selectionSet: {
-        kind: SELECTION_SET,
-        // only 1 mutation at a time (for now?)
-        selections: [{
-          alias: null,
-          arguments: mutationArgs,
-          // TODO add directives support
-          directives: [],
-          kind: FIELD,
-          name: {
-            kind: NAME,
-            value: mutationName
-          },
-          selectionSet: {
-            kind: SELECTION_SET,
-            selections: []
-          }
-        }]
-      }
-    };
+      selectionSet: new SelectionSet([{
+        alias: null,
+        arguments: mutationArgs,
+        // TODO add directives support
+        directives: [],
+        kind: FIELD,
+        name: new Name(mutationName),
+        selectionSet: new SelectionSet()
+      }])
+    }
   }
 }
 
 export class RequestArgument {
   constructor(nameValue, valueKind, valueValue) {
     this.kind = ARGUMENT;
-    this.name = {
-      kind: NAME,
-      value: nameValue
-    };
+    this.name = new Name(nameValue);
     this.value = {
       kind: valueKind
     };
     if (valueKind === VARIABLE) {
-      this.value.name = this.name;
+      this.value.name = new Name(valueValue);
     } else {
       this.value.value = valueValue
     }
@@ -113,20 +126,31 @@ export class RequestArgument {
 }
 
 export class VariableDefinition {
-  constructor(argTypeName, variableName) {
-    this.type = {
+  constructor(variableName, argType) {
+    debugger
+    let argTypeNN = ensureTypeFromNonNull(argType);
+    const rootType = ensureRootType(argTypeNN);
+    const varDefType = {
       kind: NAMED_TYPE,
-      name: {
-        kind: NAME,
-        value: argTypeName
-      },
-      variable: {
-        kind: VARIABLE,
-        name: {
-          kind: NAME,
-          value: variableName
-        }
-      }
+      name: new Name(rootType.name)
+    };
+    this.kind = VARIABLE_DEFINITION;
+    this.type = argTypeNN.kind !== LIST ? varDefType : {
+      kind: LIST_TYPE,
+      type: varDefType
+    };
+    this.variable = {
+      kind: VARIABLE,
+      name: new Name(variableName)
     }
+  }
+}
+
+export class InlineFragment {
+  constructor(condition) {
+    this.directives = [];
+    this.kind = INLINE_FRAGMENT;
+    this.selectionSet = new SelectionSet();
+    this.typeCondition = new TypeCondition(condition);
   }
 }

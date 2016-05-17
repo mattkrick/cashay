@@ -1,13 +1,20 @@
-import {ensureRootType} from '../utils';
+import {ensureRootType, ensureTypeFromNonNull} from '../utils';
 import {
   NAME,
   VARIABLE,
   VARIABLE_DEFINITION,
   NAMED_TYPE,
-  OBJECT
+  OBJECT,
+  FRAGMENT_SPREAD,
+  INLINE_FRAGMENT
 } from 'graphql/language/kinds';
-import {parse} from 'graphql/language/parser';
+import {clone, convertFragmentToInline} from '../utils';
+import {parse} from '../utils';
 import {print} from 'graphql/language/printer';
+import {teardownDocumentAST} from '../buildExecutionContext';
+import {InlineFragment, Name, VariableDefinition} from '../helperClasses';
+
+const ALIAS_PREFIX = 'CASHAY';
 
 export const createMutationString = function(mutationName, componentIdsToUpdate) {
   const cachedMutationObj = this._cachedMutations[mutationName];
@@ -48,24 +55,27 @@ export const mergeMutationASTs = (cachedSingles, schema) => {
   const cachedSinglesComponentIds = Object.keys(cachedSingles);
   const startingComponentId = cachedSinglesComponentIds.pop();
   // deep copy to create the base AST (slow, but faster than a parse!)
-  const mergedAST = JSON.parse(JSON.stringify(cachedSingles[startingComponentId]));
-  const operationDefinition = mergedAST.definitions[0];
-  const variableDefinitionBag = operationDefinition.variableDefinitions || [];
-  const mutationSelection = operationDefinition.selectionSet.selections[0];
+  const mergedAST = clone(cachedSingles[startingComponentId]);
+  const {operation, fragments} = teardownDocumentAST(mergedAST);
+  // TODO
+  const variableDefinitionBag = operation.variableDefinitions || [];
+  const mutationSelection = operation.selectionSet.selections[0];
   const fieldSchema = schema.mutationSchema.fields.find(field => field.name === mutationSelection.name.value);
   bagArgs(variableDefinitionBag, mutationSelection.arguments, fieldSchema);
   // now add the new ASTs one-by-one
+
   for (let componentId of cachedSinglesComponentIds) {
     const nextAST = cachedSingles[componentId];
-    mergeNewAST(mergedAST, nextAST, componentId, variableDefinitionBag, fieldSchema, schema);
+    mergeNewAST(operation, fragments, nextAST, componentId, variableDefinitionBag, fieldSchema, schema);
   }
   return print(mergedAST);
 };
 
-const mergeNewAST = (target, src, srcComponentId, bag, fieldSchema, schema) => {
-  const targetMutationSelections = target.definitions[0].selectionSet.selections;
+const mergeNewAST = (target, targetFragments, nextAST, srcComponentId, bag, fieldSchema, schema) => {
+  const targetMutationSelections = target.selectionSet.selections;
   const targetMutationSelection = targetMutationSelections[0];
-  const srcMutationSelection = src.definitions[0].selectionSet.selections[0];
+  const {operation, fragments} = teardownDocumentAST(nextAST);
+  const srcMutationSelection = operation.selectionSet.selections[0];
   if (srcMutationSelection.name.value !== targetMutationSelection.name.value) {
     throw new Error(`Cannot merge two different mutations: 
     ${srcMutationSelection.name.value} and ${targetMutationSelection.name.value}.
@@ -73,6 +83,7 @@ const mergeNewAST = (target, src, srcComponentId, bag, fieldSchema, schema) => {
     Make sure each mutation operation only calls a single mutation 
     and that customMutations are correct.`)
   }
+  // aliasAndInlineFrags(srcMutationSelection.selectionSet.selections); already done in a previous step
   // mutates targetMutationSelection.arguments
   mergeMutationArgs(targetMutationSelection.arguments, srcMutationSelection.arguments);
   bagArgs(bag, srcMutationSelection.arguments, fieldSchema);
@@ -82,30 +93,71 @@ const mergeNewAST = (target, src, srcComponentId, bag, fieldSchema, schema) => {
     bag,
     srcComponentId,
     schema,
+    targetFragments,
+    srcFragments: fragments,
     initialRun: true
   };
-  mergeSelections(targetMutationSelections, 0, srcMutationSelection, subSchema, context)
+  const targetSelections = targetMutationSelection.selectionSet.selections;
+  mergeSelections2(targetSelections, srcMutationSelection, subSchema, context);
+  // mergeSelections(targetMutationSelections, 0, srcMutationSelection, subSchema, context)
 };
 
-const bagArgs = (bag, argsToDefine, fieldSchema) => {
-  for (let arg of argsToDefine) {
-    if (arg.value.kind === VARIABLE) {
-      const variableDefName = arg.value.name.value;
-      const variableDefOfArg = bag.find(def => def.variable.name.value === variableDefName);
-      if (!variableDefOfArg) {
-        const newVariableDef = makeVariableDefinition(variableDefName, fieldSchema);
-        bag.push(newVariableDef);
-      }
-    }
+
+const mergeSelections2 = (target, src, fieldSchema, context) => {
+  for (let selection of src.selectionSet.selections) {
+    mergeSingleProp(target, selection, fieldSchema, context)
   }
 };
 
+const mergeSingleProp = (target, srcProp, fieldSchema, context) => {
+  if (srcProp.kind === INLINE_FRAGMENT) {
+    if (srcProp.typeCondition === null) {
+      mergeSelections2(target, srcProp, fieldSchema, context);
+    } else {
+      const srcPropFragType = srcProp.typeCondition.name.value;
+      let targetFragment = target.find(field => field.kind === INLINE_FRAGMENT && field.typeCondition.name.value === srcPropFragType);
+      if (!targetFragment) {
+        targetFragment = new InlineFragment(srcPropFragType);
+        target.push(targetFragment);
+      }
+      mergeSelections2(targetFragment, srcProp, fieldSchema, context);
+    }
+    return;
+  }
+  const alias = srcProp.alias && srcProp.alias.name; 
+  if (alias) {
+    // TODO bag Args
+    const [prefix, field, component] = alias.split('_');
+    const searchString = `${prefix}_${field}`;
+    const matchingTargetProp = findSrcInTarget(srcProp, searchString, target);
+    if (matchingTargetProp) {
+      matchingTargetProp.alias += `_${component}`;
+    } else {
+      
+      target.selectionSet.selections.push(srcProp)
+    }
+  }
+  const aliasOrFieldName = srcProp.alias && srcProp.alias.value || srcProp.name.value;
+};
+
+const findSrcInTarget = (srcProp, searchString, target) => {
+  let targetFound;
+  for (let targetProp of target.selectionSet.selections) {
+    if (targetProp.kind === INLINE_FRAGMENT) {
+      targetFound = findSrcInTarget(srcProp, searchString, targetProp);
+      if (targetFound) return targetFound;
+    } else {
+      if (!targetProp.alias || !targetProp.alias.startsWith(searchString)) continue;
+      const allArgsEqual = argsAreEqual(targetProp.arguments, srcProp.arguments);
+      if (allArgsEqual) return targetProp;
+    }
+  }
+};
 const mergeSelections = (target, targetIdx, srcProp, fieldSchema, context) => {
   const targetProp = target[targetIdx];
   const {srcComponentId, bag, schema, initialRun} = context;
   // use an initialRun flag to ignore arg checking the parent mutation since we already merged args
-  if (srcProp.arguments.length && !initialRun) {
-    debugger
+  if (!initialRun && srcProp.arguments && srcProp.arguments.length) {
     bagArgs(bag, srcProp.arguments, fieldSchema);
     const allArgsEqual = argsAreEqual(targetProp.arguments, srcProp.arguments);
     if (allArgsEqual) {
@@ -127,61 +179,47 @@ const mergeSelections = (target, targetIdx, srcProp, fieldSchema, context) => {
   context.initialRun = false;
   // if srcProp has a selectionSet, targetProp has it, too, guaranteed
   if (srcProp.selectionSet) {
-    const targetSelections = targetProp.selectionSet.selections;
+    // const targetSelections = targetProp.selectionSet.selections;
     const srcSelections = srcProp.selectionSet.selections;
     // go in reverse in case we need to push stuff to the target & keep the idx
     for (let i = srcSelections.length - 1; i >= 0; i--) {
       const srcSelection = srcSelections[i];
+      if (srcSelection.kind === FRAGMENT_SPREAD) {
+        const fragment = context.srcFragments[srcSelection.name.value];
+        mergeSelections(target, targetIdx, fragment, fieldSchema, context);
+        continue;
+      }
+      debugger
+      // loop through each value in target Selection
+      // if value is inline or frag, look through it's children
+      // if value is found in 
       const nextTargetPropIdx = srcSelection.alias ? -1 : targetSelections.findIndex(targetSelection => {
-        return !targetSelection.alias && targetSelection.name.value === srcSelection.name.value;
+        return !targetSelection.alias && targetSelection.name && targetSelection.name.value === srcSelection.name.value;
       });
       if (nextTargetPropIdx > -1) {
         const nextTargetPropVal = targetSelections[nextTargetPropIdx].name.value;
         const field = fieldSchema.fields.find(field => field.name === nextTargetPropVal);
+        if (!field) debugger
         const rootFieldSchemaType = ensureRootType(field.type);
         const subSchema = schema.types.find(type => type.name === rootFieldSchemaType.name);
         mergeSelections(targetSelections, nextTargetPropIdx, srcSelection, subSchema, context);
       } else {
-        const srcSelectionClone = JSON.parse(JSON.stringify(srcSelection));
+        const srcSelectionClone = clone(srcSelection);
         targetSelections.push(srcSelectionClone);
       }
     }
   }
 };
 
-const makeVariableDefinition = (argName, fieldSchema) => {
-  const argSchema = fieldSchema.args.find(schemaArg => schemaArg.name === argName);
-  if (!argSchema) {
-    throw new Error(`invalid argument: ${argName}`);
-  }
-  const argType = ensureRootType(argSchema.type);
-  return {
-    defaultValue: null,
-    kind: VARIABLE_DEFINITION,
-    type: {
-      kind: NAMED_TYPE,
-      name: {
-        kind: NAME,
-        value: argType.name
-      }
-    },
-    variable: {
-      kind: VARIABLE,
-      name: {
-        kind: NAME,
-        value: argName
-      }
-    }
-  }
-};
-
 const argsAreEqual = (targetArgs = [], srcArgs) => {
+  if (srcArgs.length !== targetArgs.length) return false;
   for (let srcArg of srcArgs) {
     const targetArg = targetArgs.find(arg => arg.name.value === srcArg.name.value);
     if (targetArg) {
       if (targetArg.value.kind === OBJECT) {
         if (srcArg.value.kind === OBJECT) {
-          mergeArgs(targetArg.value.fields, srcArg.value.fields);
+          const equalObj = argsAreEqual(targetArg.value.fields, srcArg.value.fields);
+          if (!equalObj) return false;
         } else {
           return false;
         }
@@ -195,6 +233,10 @@ const argsAreEqual = (targetArgs = [], srcArgs) => {
   return true;
 };
 
+/**
+ * For the mutation itself, try to merge args
+ * but for children of the mutation, don't
+ */
 const mergeMutationArgs = (targetArgs, srcArgs) => {
   for (let srcArg of srcArgs) {
     const targetArg = targetArgs.find(arg => arg.name.value === srcArg.name.value);
@@ -210,31 +252,6 @@ const mergeMutationArgs = (targetArgs, srcArgs) => {
       }
     } else {
       targetArgs.push(srcArg);
-    }
-  }
-};
-
-export const parseAndAlias = (mutationString, componentId) => {
-  const mutationAST = parse(mutationString, {noLocation: true, noSource: true});
-  const astSelections = mutationAST.definitions[0].selectionSet.selections[0].selectionSet.selections;
-  parseAndAliasRecurse(astSelections, componentId);
-  return mutationAST
-};
-
-const parseAndAliasRecurse = (astSelections, componentId) => {
-  for (let selection of astSelections) {
-    if (selection.arguments && selection.arguments.length) {
-      const aliasOrFieldName = selection.alias && selection.alias.value || selection.name.value;
-      selection.alias = {
-        kind: NAME,
-        value: `cashay_${aliasOrFieldName}_${componentId}`
-      }
-    } else {
-      // guarantee that props without args are also without aliases
-      selection.alias = null;
-    }
-    if (selection.selectionSet) {
-      parseAndAliasRecurse(selection.selectionSet.selections, componentId);
     }
   }
 };

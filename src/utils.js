@@ -1,4 +1,7 @@
+import {INLINE_FRAGMENT} from 'graphql/language/kinds';
 import {TypeKind} from 'graphql/type/introspection';
+import {parse as gqlParse} from 'graphql/language/parser';
+
 const {NON_NULL} = TypeKind;
 
 export const ensureTypeFromNonNull = type => type.kind === NON_NULL ? type.ofType : type;
@@ -23,3 +26,11 @@ export const checkMutationInSchema = (rootMutation, mutationName) => {
     throw new Error(`Invalid mutation: ${mutationName}.\nDid you make a typo?`);
   }
 };
+
+export const convertFragmentToInline = fragment => {
+  delete fragment.name;
+  fragment.kind = INLINE_FRAGMENT;
+  return fragment;
+};
+
+export const parse = graphQLString => gqlParse(graphQLString, {noLocation: true, noSource: true});

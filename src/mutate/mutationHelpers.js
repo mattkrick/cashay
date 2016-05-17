@@ -33,7 +33,7 @@ export const makeArgsAndDefs = (mutationFieldSchema, variables) => {
     if (variables[schemaArg.name]) {
       const argType = ensureTypeFromNonNull(schemaArg.type);
       variableDefinitions.push(new VariableDefinition(argType.name, schemaArg.name));
-      mutationArgs.push(new RequestArgument(schemaArg.name, VARIABLE));
+      mutationArgs.push(new RequestArgument(schemaArg.name, VARIABLE, schemaArg.name));
     }
   }
   return {mutationArgs, variableDefinitions};

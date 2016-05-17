@@ -1,8 +1,7 @@
 import {TypeKind} from 'graphql/type/introspection';
 import {FRAGMENT_SPREAD, INLINE_FRAGMENT} from 'graphql/language/kinds';
-import {isObject, ensureRootType, ensureTypeFromNonNull} from '../utils';
+import {isObject, ensureRootType, ensureTypeFromNonNull, clone, convertFragmentToInline} from '../utils';
 import {
-  convertFragmentToInline,
   calculateSendToServer,
   sendChildrenToServer
 } from './denormalizeHelpers';
@@ -36,10 +35,11 @@ const handleMissingData = (aliasOrFieldName, field, fieldSchema, context) => {
 const visitObject = (subState = {}, reqAST, subSchema, context, baseReduction = {}) => {
   return reqAST.selectionSet.selections.reduce((reduction, field, idx, selectionArr) => {
     if (field.kind === FRAGMENT_SPREAD) {
-      const fragment = context.fragments[field.name.value];
+      const fragment = clone(context.fragments[field.name.value]);
       selectionArr[idx] = field = convertFragmentToInline(fragment);
     }
     if (field.kind === INLINE_FRAGMENT) {
+      // TODO handle null typeCondition
       if (field.typeCondition.name.value === subSchema.name) {
         // only follow through if it's the correct union subtype
         visitObject(subState, field, subSchema, context, reduction);

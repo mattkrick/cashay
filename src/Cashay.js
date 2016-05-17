@@ -12,6 +12,7 @@ import {parseAndAlias} from './mutate/mergeMutations';
 import {CachedMutation, CachedQuery, MutationShell} from './helperClasses'
 import flushDependencies from './query/flushDependencies';
 import {makeComponentsToUpdate} from './mutate/mutationHelpers';
+import {parse} from 'graphql/language/parser';
 
 const defaultGetToState = store => store.getState().cashay;
 
@@ -47,12 +48,15 @@ export default class Cashay {
     //     setKey: Set(...[componentIds]),
     //     fullMutation: MutationString,
     //     singles: {
-    //       [componentId]: MutationAST
+    //       [componentId]: {
+    //          ast: MutationAST,
+    //          variableEnhancer: null || []
+    //       }
     //     }
     //   }
     // }
     this.cachedMutations = {};
-    
+
     // the object to hold the denormalized query responses
     // const example = {
     //   [componentId]: {
@@ -149,7 +153,7 @@ export default class Cashay {
     // create an AST that we can mutate
     const {paginationWords, idFieldName, state: {data: cashayDataState}} = this;
     const context = buildExecutionContext(cachedQuery.ast, cashayDataState, variables, paginationWords, idFieldName)
-    
+
     cachedQuery.createResponse(context, componentId, this.store.dispatch, forceFetch);
 
 
@@ -243,7 +247,7 @@ export default class Cashay {
 
     // remove the responses from this.cachedQueries where necessary 
     flushDependencies(normalizedResponseForStore, componentId, this.denormalizedDeps, this.cachedQueries);
-    
+
     // stick normalize data in store and recreate any invalidated denormalized structures
     this.store.dispatch({
       type: INSERT_NORMALIZED,
@@ -309,7 +313,11 @@ export default class Cashay {
         this.cachedMutations[mutationName] = this.cachedMutations[mutationName] || new CachedMutation();
         const cachedSingles = this.cachedMutations[mutationName].singles;
         if (!cachedSingles[componentId]) {
-          cachedSingles[componentId] = parseAndAlias(customMutations[mutationName], componentId)
+          cachedSingles[componentId] = {
+            // on first call, if !variableEnhancers, run parseAndAlias and namespacer
+            ast: parse(customMutations[mutationName], componentId),
+            variableEnhancers: undefined
+          }
         }
       }
     }

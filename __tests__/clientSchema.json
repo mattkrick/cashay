@@ -1,1 +1,562 @@
-{"querySchema":{"kind":"OBJECT","name":"BlogSchema","fields":[{"name":"getLatestPost","args":[],"type":{"kind":"OBJECT","name":"PostType"}},{"name":"getRecentPosts","args":[{"name":"beforeCursor","type":{"kind":"SCALAR","name":"String"}},{"name":"afterCursor","type":{"kind":"SCALAR","name":"String"}},{"name":"first","type":{"kind":"SCALAR","name":"Int"}},{"name":"last","type":{"kind":"SCALAR","name":"Int"}}],"type":{"kind":"LIST","ofType":{"kind":"OBJECT","name":"PostType"}}},{"name":"getPostById","args":[{"name":"_id","type":{"kind":"NON_NULL","ofType":{"kind":"SCALAR","name":"String"}}}],"type":{"kind":"OBJECT","name":"PostType"}},{"name":"getGroup","args":[{"name":"_id","type":{"kind":"NON_NULL","ofType":{"kind":"SCALAR","name":"String"}}}],"type":{"kind":"OBJECT","name":"Group"}}],"interfaces":[]},"types":[{"kind":"OBJECT","name":"PostType","fields":[{"name":"_id","args":[],"type":{"kind":"SCALAR","name":"String"}},{"name":"title","args":[{"name":"language","type":{"kind":"SCALAR","name":"String"}}],"type":{"kind":"SCALAR","name":"String"}},{"name":"category","args":[],"type":{"kind":"ENUM","name":"CategoryType"}},{"name":"content","args":[],"type":{"kind":"SCALAR","name":"String"}},{"name":"createdAt","args":[],"type":{"kind":"SCALAR","name":"Int"}},{"name":"comments","args":[{"name":"beforeCursor","type":{"kind":"SCALAR","name":"String"}},{"name":"afterCursor","type":{"kind":"SCALAR","name":"String"}},{"name":"first","type":{"kind":"SCALAR","name":"Int"}},{"name":"last","type":{"kind":"SCALAR","name":"Int"}}],"type":{"kind":"LIST","ofType":{"kind":"OBJECT","name":"CommentType"}}},{"name":"author","args":[],"type":{"kind":"OBJECT","name":"AuthorType"}},{"name":"cursor","args":[],"type":{"kind":"SCALAR","name":"String"}}],"interfaces":[{"kind":"INTERFACE","name":"HasAuthorType"}]},{"kind":"INTERFACE","name":"HasAuthorType","fields":[{"name":"author","args":[],"type":{"kind":"OBJECT","name":"AuthorType"}}],"possibleTypes":[{"kind":"OBJECT","name":"PostType"},{"kind":"OBJECT","name":"CommentType"}]},{"kind":"OBJECT","name":"AuthorType","fields":[{"name":"_id","args":[],"type":{"kind":"SCALAR","name":"String"}},{"name":"name","args":[],"type":{"kind":"SCALAR","name":"String"}},{"name":"twitterHandle","args":[],"type":{"kind":"SCALAR","name":"String"}}],"interfaces":[]},{"kind":"SCALAR","name":"String"},{"kind":"ENUM","name":"CategoryType","enumValues":[{"name":"HOT_STUFF"},{"name":"ICE_COLD"}]},{"kind":"SCALAR","name":"Int"},{"kind":"OBJECT","name":"CommentType","fields":[{"name":"_id","args":[],"type":{"kind":"SCALAR","name":"String"}},{"name":"content","args":[],"type":{"kind":"SCALAR","name":"String"}},{"name":"author","args":[],"type":{"kind":"OBJECT","name":"AuthorType"}},{"name":"createdAt","args":[],"type":{"kind":"SCALAR","name":"Int"}},{"name":"cursor","args":[],"type":{"kind":"SCALAR","name":"String"}}],"interfaces":[{"kind":"INTERFACE","name":"HasAuthorType"}]},{"kind":"OBJECT","name":"Group","fields":[{"name":"_id","args":[],"type":{"kind":"SCALAR","name":"String"}},{"name":"owner","args":[],"type":{"kind":"UNION","name":"Member"}},{"name":"members","args":[],"type":{"kind":"LIST","ofType":{"kind":"UNION","name":"Member"}}}],"interfaces":[]},{"kind":"UNION","name":"Member","possibleTypes":[{"kind":"OBJECT","name":"Group"},{"kind":"OBJECT","name":"AuthorType"}]},{"kind":"INPUT_OBJECT","name":"NewPost","inputFields":[{"name":"_id","type":{"kind":"NON_NULL","ofType":{"kind":"SCALAR","name":"String"}}},{"name":"content","type":{"kind":"SCALAR","name":"String"}},{"name":"title","type":{"kind":"SCALAR","name":"String"}},{"name":"category","type":{"kind":"SCALAR","name":"String"}}]},{"kind":"OBJECT","name":"CreatePostMutationPayload","fields":[{"name":"post","args":[],"type":{"kind":"OBJECT","name":"PostType"}},{"name":"postCount","args":[],"type":{"kind":"SCALAR","name":"Int"}}],"interfaces":[]},{"kind":"SCALAR","name":"Boolean"}],"directives":[{"name":"include","args":[{"name":"if","type":{"kind":"NON_NULL","ofType":{"kind":"SCALAR","name":"Boolean"}}}],"onOperation":false,"onFragment":true,"onField":true},{"name":"skip","args":[{"name":"if","type":{"kind":"NON_NULL","ofType":{"kind":"SCALAR","name":"Boolean"}}}],"onOperation":false,"onFragment":true,"onField":true}],"mutationSchema":{"kind":"OBJECT","name":"BlogMutations","fields":[{"name":"createPost","args":[{"name":"newPost","type":{"kind":"NON_NULL","ofType":{"kind":"INPUT_OBJECT","name":"NewPost"}}},{"name":"author","type":{"kind":"SCALAR","name":"String"}}],"type":{"kind":"OBJECT","name":"CreatePostMutationPayload"}},{"name":"createComment","args":[{"name":"_id","type":{"kind":"NON_NULL","ofType":{"kind":"SCALAR","name":"String"}}},{"name":"postId","type":{"kind":"NON_NULL","ofType":{"kind":"SCALAR","name":"String"}}},{"name":"content","type":{"kind":"NON_NULL","ofType":{"kind":"SCALAR","name":"String"}}}],"type":{"kind":"OBJECT","name":"CommentType"}}],"interfaces":[]}}
+{
+  "querySchema": {
+    "kind": "OBJECT",
+    "name": "BlogSchema",
+    "fields": [
+      {
+        "name": "getLatestPost",
+        "args": [],
+        "type": {
+          "kind": "OBJECT",
+          "name": "PostType"
+        }
+      },
+      {
+        "name": "getRecentPosts",
+        "args": [
+          {
+            "name": "beforeCursor",
+            "type": {
+              "kind": "SCALAR",
+              "name": "String"
+            }
+          },
+          {
+            "name": "afterCursor",
+            "type": {
+              "kind": "SCALAR",
+              "name": "String"
+            }
+          },
+          {
+            "name": "first",
+            "type": {
+              "kind": "SCALAR",
+              "name": "Int"
+            }
+          },
+          {
+            "name": "last",
+            "type": {
+              "kind": "SCALAR",
+              "name": "Int"
+            }
+          }
+        ],
+        "type": {
+          "kind": "LIST",
+          "ofType": {
+            "kind": "OBJECT",
+            "name": "PostType"
+          }
+        }
+      },
+      {
+        "name": "getPostById",
+        "args": [
+          {
+            "name": "_id",
+            "type": {
+              "kind": "NON_NULL",
+              "ofType": {
+                "kind": "SCALAR",
+                "name": "String"
+              }
+            }
+          }
+        ],
+        "type": {
+          "kind": "OBJECT",
+          "name": "PostType"
+        }
+      },
+      {
+        "name": "getGroup",
+        "args": [
+          {
+            "name": "_id",
+            "type": {
+              "kind": "NON_NULL",
+              "ofType": {
+                "kind": "SCALAR",
+                "name": "String"
+              }
+            }
+          }
+        ],
+        "type": {
+          "kind": "OBJECT",
+          "name": "Group"
+        }
+      }
+    ],
+    "interfaces": []
+  },
+  "types": [
+    {
+      "kind": "OBJECT",
+      "name": "PostType",
+      "fields": [
+        {
+          "name": "_id",
+          "args": [],
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        },
+        {
+          "name": "title",
+          "args": [
+            {
+              "name": "language",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String"
+              }
+            }
+          ],
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        },
+        {
+          "name": "category",
+          "args": [],
+          "type": {
+            "kind": "ENUM",
+            "name": "CategoryType"
+          }
+        },
+        {
+          "name": "content",
+          "args": [],
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        },
+        {
+          "name": "createdAt",
+          "args": [],
+          "type": {
+            "kind": "SCALAR",
+            "name": "Int"
+          }
+        },
+        {
+          "name": "comments",
+          "args": [
+            {
+              "name": "beforeCursor",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String"
+              }
+            },
+            {
+              "name": "afterCursor",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String"
+              }
+            },
+            {
+              "name": "first",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Int"
+              }
+            },
+            {
+              "name": "last",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Int"
+              }
+            }
+          ],
+          "type": {
+            "kind": "LIST",
+            "ofType": {
+              "kind": "OBJECT",
+              "name": "CommentType"
+            }
+          }
+        },
+        {
+          "name": "author",
+          "args": [],
+          "type": {
+            "kind": "OBJECT",
+            "name": "AuthorType"
+          }
+        },
+        {
+          "name": "cursor",
+          "args": [],
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        }
+      ],
+      "interfaces": [
+        {
+          "kind": "INTERFACE",
+          "name": "HasAuthorType"
+        }
+      ]
+    },
+    {
+      "kind": "INTERFACE",
+      "name": "HasAuthorType",
+      "fields": [
+        {
+          "name": "author",
+          "args": [],
+          "type": {
+            "kind": "OBJECT",
+            "name": "AuthorType"
+          }
+        }
+      ],
+      "possibleTypes": [
+        {
+          "kind": "OBJECT",
+          "name": "PostType"
+        },
+        {
+          "kind": "OBJECT",
+          "name": "CommentType"
+        }
+      ]
+    },
+    {
+      "kind": "OBJECT",
+      "name": "AuthorType",
+      "fields": [
+        {
+          "name": "_id",
+          "args": [],
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        },
+        {
+          "name": "name",
+          "args": [],
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        },
+        {
+          "name": "twitterHandle",
+          "args": [],
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        }
+      ],
+      "interfaces": []
+    },
+    {
+      "kind": "SCALAR",
+      "name": "String"
+    },
+    {
+      "kind": "ENUM",
+      "name": "CategoryType",
+      "enumValues": [
+        {
+          "name": "HOT_STUFF"
+        },
+        {
+          "name": "ICE_COLD"
+        }
+      ]
+    },
+    {
+      "kind": "SCALAR",
+      "name": "Int"
+    },
+    {
+      "kind": "OBJECT",
+      "name": "CommentType",
+      "fields": [
+        {
+          "name": "_id",
+          "args": [],
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        },
+        {
+          "name": "content",
+          "args": [],
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        },
+        {
+          "name": "author",
+          "args": [],
+          "type": {
+            "kind": "OBJECT",
+            "name": "AuthorType"
+          }
+        },
+        {
+          "name": "createdAt",
+          "args": [],
+          "type": {
+            "kind": "SCALAR",
+            "name": "Int"
+          }
+        },
+        {
+          "name": "cursor",
+          "args": [],
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        }
+      ],
+      "interfaces": [
+        {
+          "kind": "INTERFACE",
+          "name": "HasAuthorType"
+        }
+      ]
+    },
+    {
+      "kind": "OBJECT",
+      "name": "Group",
+      "fields": [
+        {
+          "name": "_id",
+          "args": [],
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        },
+        {
+          "name": "owner",
+          "args": [],
+          "type": {
+            "kind": "UNION",
+            "name": "Member"
+          }
+        },
+        {
+          "name": "members",
+          "args": [],
+          "type": {
+            "kind": "LIST",
+            "ofType": {
+              "kind": "UNION",
+              "name": "Member"
+            }
+          }
+        }
+      ],
+      "interfaces": []
+    },
+    {
+      "kind": "UNION",
+      "name": "Member",
+      "possibleTypes": [
+        {
+          "kind": "OBJECT",
+          "name": "Group"
+        },
+        {
+          "kind": "OBJECT",
+          "name": "AuthorType"
+        }
+      ]
+    },
+    {
+      "kind": "INPUT_OBJECT",
+      "name": "NewPost",
+      "inputFields": [
+        {
+          "name": "_id",
+          "type": {
+            "kind": "NON_NULL",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "String"
+            }
+          }
+        },
+        {
+          "name": "content",
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        },
+        {
+          "name": "title",
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        },
+        {
+          "name": "category",
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "OBJECT",
+      "name": "CreatePostMutationPayload",
+      "fields": [
+        {
+          "name": "post",
+          "args": [],
+          "type": {
+            "kind": "OBJECT",
+            "name": "PostType"
+          }
+        },
+        {
+          "name": "postCount",
+          "args": [],
+          "type": {
+            "kind": "SCALAR",
+            "name": "Int"
+          }
+        }
+      ],
+      "interfaces": []
+    },
+    {
+      "kind": "SCALAR",
+      "name": "Boolean"
+    }
+  ],
+  "directives": [
+    {
+      "name": "include",
+      "args": [
+        {
+          "name": "if",
+          "type": {
+            "kind": "NON_NULL",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "Boolean"
+            }
+          }
+        }
+      ],
+      "onOperation": false,
+      "onFragment": true,
+      "onField": true
+    },
+    {
+      "name": "skip",
+      "args": [
+        {
+          "name": "if",
+          "type": {
+            "kind": "NON_NULL",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "Boolean"
+            }
+          }
+        }
+      ],
+      "onOperation": false,
+      "onFragment": true,
+      "onField": true
+    }
+  ],
+  "mutationSchema": {
+    "kind": "OBJECT",
+    "name": "BlogMutations",
+    "fields": [
+      {
+        "name": "createPost",
+        "args": [
+          {
+            "name": "newPost",
+            "type": {
+              "kind": "NON_NULL",
+              "ofType": {
+                "kind": "INPUT_OBJECT",
+                "name": "NewPost"
+              }
+            }
+          },
+          {
+            "name": "author",
+            "type": {
+              "kind": "SCALAR",
+              "name": "String"
+            }
+          }
+        ],
+        "type": {
+          "kind": "OBJECT",
+          "name": "CreatePostMutationPayload"
+        }
+      },
+      {
+        "name": "createComment",
+        "args": [
+          {
+            "name": "_id",
+            "type": {
+              "kind": "NON_NULL",
+              "ofType": {
+                "kind": "SCALAR",
+                "name": "String"
+              }
+            }
+          },
+          {
+            "name": "postId",
+            "type": {
+              "kind": "NON_NULL",
+              "ofType": {
+                "kind": "SCALAR",
+                "name": "String"
+              }
+            }
+          },
+          {
+            "name": "content",
+            "type": {
+              "kind": "NON_NULL",
+              "ofType": {
+                "kind": "SCALAR",
+                "name": "String"
+              }
+            }
+          }
+        ],
+        "type": {
+          "kind": "OBJECT",
+          "name": "CommentType"
+        }
+      }
+    ],
+    "interfaces": []
+  }
+}

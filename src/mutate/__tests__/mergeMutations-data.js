@@ -1,22 +1,20 @@
 import {parseAndAlias} from '../mergeMutations';
 
-const creatCommentMutationWithIdString = `
+export const creatCommentWithId = `
   mutation($postId: String!, $content: String!) {
     createComment(postId: $postId, content: $content) {
       _id,
     }
   }`;
-export const creatCommentMutationWithId = parseAndAlias(creatCommentMutationWithIdString, 'commentWithId');
 
-const creatCommentMutationWithContentString = `
+export const creatCommentWithContent = `
   mutation($postId: String!, $content: String!) {
     createComment(postId: $postId, content: $content) {
       content
     }
   }`;
-export const creatCommentMutationWithContent = parseAndAlias(creatCommentMutationWithContentString, 'commentWithContent');
 
-const createPostMutationWithPostTitleAndCountString = `
+export const createPostWithPostTitleAndCount = `
   mutation {
     createPost(newPost: {_id: "129", author: "a123", content: "X", title:"Y", category:"hot stuff"}) {
       post {
@@ -25,9 +23,8 @@ const createPostMutationWithPostTitleAndCountString = `
       postCount
     }
   }`;
-export const createPostMutationWithPostTitleAndCount = parseAndAlias(createPostMutationWithPostTitleAndCountString, 'postTitleCount')
 
-const createPostMutationWithPostIdString = `
+export const createPostWithPostId = `
   mutation {
     createPost(newPost: {_id: "129", author: "a123", content: "X", title:"Y", category:"hot stuff"}) {
       post {
@@ -35,9 +32,8 @@ const createPostMutationWithPostIdString = `
       }
     }
   }`;
-export const createPostMutationWithPostId = parseAndAlias(createPostMutationWithPostIdString, 'postWithId')
 
-const createPostMutationWithIncompleteArgsString = `
+export const createPostWithIncompleteArgs = `
   mutation {
     createPost(newPost: {_id: "129"}) {
       post {
@@ -45,9 +41,8 @@ const createPostMutationWithIncompleteArgsString = `
       }
     }
   }`;
-export const createPostMutationWithIncompleteArgs = parseAndAlias(createPostMutationWithIncompleteArgsString, 'postIncompleteArgs')
 
-const createPostMutationWithDifferentIdString = `
+export const createPostWithDifferentId = `
   mutation {
     createPost(newPost: {_id: "130"}) {
       post {
@@ -55,9 +50,8 @@ const createPostMutationWithDifferentIdString = `
       }
     }
   }`;
-export const createPostMutationWithDifferentId = parseAndAlias(createPostMutationWithDifferentIdString, 'postDifferentId')
 
-const createPostMutationWithSpanishTitleString = `
+export const createPostWithSpanishTitle = `
   mutation {
     createPost(newPost: {_id: "129", author: "a123", content: "X", title:"Y", category:"hot stuff"}) {
       post {
@@ -65,11 +59,10 @@ const createPostMutationWithSpanishTitleString = `
       }
     }
   }`;
-export const createPostMutationWithSpanishTitle = parseAndAlias(createPostMutationWithSpanishTitleString, 'postSpanishTitle')
 
-const createPostMutationWithCrazyFragsString = `
+export const createPostWithCrazyFrags = `
 mutation {
-  createPost(newPost: {_id: "129", author: "a123", content: "Hii", title:"Sao", category:"hot stuff"}) {
+  createPost(newPost: {_id: "129", author: "a123", content: "Hii", title:"Sao", category:"hot stuff"}, author: $author) {
     post {
       _id
       content
@@ -90,9 +83,8 @@ fragment spreadLevel1 on PostType {
 fragment spreadLevel2 on PostType {
   createdAt
 }`;
-export const createPostMutationWithCrazyFrags = parseAndAlias(createPostMutationWithCrazyFragsString, 'postCrazyFrags1');
 
-const createPostMutationWithCrazyFrags2String = `
+export const createPostWithCrazyFrags2 = `
 mutation {
   createPost(newPost: {_id: "129", author: "a123", content: "Hii", title:"Sao", category:"hot stuff"}) {
     post {
@@ -112,4 +104,3 @@ fragment spreadLevel1 on PostType {
 fragment spreadLevel2 on PostType {
   title(language:"spanish")
 }`;
-export const createPostMutationWithCrazyFrags2 = parseAndAlias(createPostMutationWithCrazyFrags2String, 'postCrazyFrags2');
