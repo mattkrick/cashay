@@ -2,33 +2,31 @@ import fs from 'fs';
 import clientSchema from './__tests__/clientSchema.json';
 // import {mergeMutationASTs} from './src/mutate/mergeMutations';
 import namespaceMutation from './src/mutate/namespaceMutation';
+import mergeMutations from './src/mutate/mergeMutations'
 import {parseSortPrint, sortPrint} from './__tests__/parseSortPrint';
-
 import {parse} from './src/utils';
 import {print} from 'graphql/language/printer';
 
 import {
-  createCommentWithId,
-  createCommentDifferentArg,
-  createMembers,
-  nestedFragmentSpreads,
-  mixHardSoftArgs,
-  postSpanishTitleVars,
-  mixPostFieldArgs
-} from './src/mutate/__tests__/namespaceMutation-data';
+  parseAndNamespace,
+  createPostWithPostTitleAndCount,
+  createPostWithPostId,
+  createPostWithSpanishTitle
+} from './src/mutate/__tests__/mergeMutations-data';
 
 const expectedRaw = `
-  mutation($CASHAY_component1_day: Boolean, $CASHAY_component1_year: Boolean) {
-    createPost(newPost: {_id: "123"}) {
+  mutation {
+    createPost(newPost: {_id: "129", author: "a123", content: "X", title:"Y", category:"hot stuff"}) {
       post {
-        CASHAY_component1_createdAt: createdAt(dateOptions: {day: $day, month: true, year: $year})
+        CASHAY_component1_title: title(language:"spanish")
+        title
       }
+      postCount
     }
   }`;
 const expected = parseSortPrint(expectedRaw);
-const mutationAST = parse(mixPostFieldArgs);
-const {namespaceAST} = namespaceMutation(mutationAST, 'component1', {}, clientSchema);
-const actual = sortPrint(namespaceAST);
+const cachedSingles = parseAndNamespace([createPostWithPostTitleAndCount,createPostWithSpanishTitle]);
+const actual = parseSortPrint(mergeMutations(cachedSingles));
 
 
 fs.writeFileSync('./debugResults.js', `

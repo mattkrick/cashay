@@ -14,6 +14,13 @@ export const createCommentDifferentArg = `
     }
   }`;
 
+export const badArg = `
+  mutation {
+    createComment(postIdz: $postIdz) {
+      _id,
+    }
+  }`;
+
 export const createMembers = `mutation {
     createMembers(members: $newMembers) {
       __typename

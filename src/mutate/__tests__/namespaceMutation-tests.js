@@ -14,7 +14,8 @@ import {
   nestedFragmentSpreads,
   postSpanishTitle,
   postSpanishTitleVars,
-  mixPostFieldArgs
+  mixPostFieldArgs,
+  badArg
 } from './namespaceMutation-data';
 
 /* variableDefinitions Tests */
@@ -30,6 +31,11 @@ test('creates simple variableDefinitions from mutation arguments, ignore hardcod
   const {namespaceAST} = namespaceMutation(mutationAST, 'component1', {}, clientSchema);
   const actual = sortPrint(namespaceAST);
   t.is(actual, expected);
+});
+
+test('throws when trying to pass in a bogus argument', t => {
+  const mutationAST = parse(badArg);
+  t.throws(() => namespaceMutation(mutationAST, 'component1', {}, clientSchema));
 });
 
 test('creates variableDefinitions with different names', t => {

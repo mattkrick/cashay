@@ -1,4 +1,15 @@
-import {parseAndAlias} from '../mergeMutations';
+import {parse} from '../../utils';
+import namespaceMutation from '../namespaceMutation';
+import clientSchema from '../../../__tests__/clientSchema.json';
+
+export const parseAndNamespace = cachedSingles => {
+  return cachedSingles.map((single, idx) => {
+    const ast = parse(single);
+    const componentId = `component${idx}`;
+    const {namespaceAST} = namespaceMutation(ast, componentId, {}, clientSchema);
+    return namespaceAST;
+  });
+};
 
 export const creatCommentWithId = `
   mutation($postId: String!, $content: String!) {
