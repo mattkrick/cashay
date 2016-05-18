@@ -34,6 +34,7 @@ export default (namespaceAST, componentId, stateVars, schema) => {
 };
 
 const namespaceAndInlineFrags = (fieldSelections, typeSchema, context) => {
+  // let fieldSelectionLen = fieldSelections.length;
   for (let i = 0; i < fieldSelections.length; i++) {
     let selection = fieldSelections[i];
     if (selection.kind === FRAGMENT_SPREAD) {
@@ -41,7 +42,17 @@ const namespaceAndInlineFrags = (fieldSelections, typeSchema, context) => {
       fieldSelections[i] = selection = convertFragmentToInline(fragment);
     }
     if (selection.kind === INLINE_FRAGMENT) {
-      return namespaceAndInlineFrags(selection.selectionSet.selections, typeSchema, context);
+      debugger
+      // if the fragment is unnecessary, remove it
+      if (selection.typeCondition === null) {
+        fieldSelections.push(...selection.selectionSet.selections);
+        fieldSelections.splice(i--,1);
+        
+        // fieldSelectionLen += selection.selectionSet.selections.length;
+      } else {
+        namespaceAndInlineFrags(selection.selectionSet.selections, typeSchema, context);
+      }
+      continue;
     }
     const selectionName = selection.name.value;
     if (selectionName.startsWith('__')) continue;

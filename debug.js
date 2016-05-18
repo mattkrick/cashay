@@ -8,25 +8,25 @@ import {parse} from './src/utils';
 import {print} from 'graphql/language/printer';
 
 import {
-  parseAndNamespace,
-  createPostWithPostTitleAndCount,
-  createPostWithPostId,
-  createPostWithSpanishTitle
-} from './src/mutate/__tests__/mergeMutations-data';
+  nestedFragmentSpreads
+} from './src/mutate/__tests__/namespaceMutation-data';
 
 const expectedRaw = `
   mutation {
-    createPost(newPost: {_id: "129", author: "a123", content: "X", title:"Y", category:"hot stuff"}) {
+    createPost(newPost: {_id: "129"}) {
       post {
-        CASHAY_component1_title: title(language:"spanish")
-        title
+        ... on PostType {
+          ... on PostType {
+            createdAt
+          }
+        }
       }
-      postCount
     }
   }`;
 const expected = parseSortPrint(expectedRaw);
-const cachedSingles = parseAndNamespace([createPostWithPostTitleAndCount,createPostWithSpanishTitle]);
-const actual = parseSortPrint(mergeMutations(cachedSingles));
+const mutationAST = parse(nestedFragmentSpreads);
+const {namespaceAST} = namespaceMutation(mutationAST, 'component1', {}, clientSchema);
+const actual = sortPrint(namespaceAST);
 
 
 fs.writeFileSync('./debugResults.js', `

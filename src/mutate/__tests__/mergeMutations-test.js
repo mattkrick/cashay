@@ -6,18 +6,27 @@ import {parseSortPrint} from '../../../__tests__/parseSortPrint';
 
 import {
   parseAndNamespace,
-  creatCommentWithId,
+  createCommentWithId,
   createPostWithPostTitleAndCount,
-  creatCommentWithContent,
+  createCommentWithContent,
   createPostWithDifferentId,
   createPostWithIncompleteArgs,
   createPostWithPostId,
   createPostWithSpanishTitle,
+  typedInlineFrag1,
+  typedInlineFrag2,
+  createCommentWithId2,
+  createPostWithBadArgKind
 } from './mergeMutations-data';
 
 /* Tests */
 test('throws when merging 2 different mutations', t => {
-  const cachedSingles = [creatCommentWithId, createPostWithPostTitleAndCount];
+  const cachedSingles = parseAndNamespace([createCommentWithId, createPostWithPostTitleAndCount]);
+  t.throws(() => mergeMutations(cachedSingles));
+});
+
+test('throws when args are of a different kind', t => {
+  const cachedSingles = parseAndNamespace([createPostWithBadArgKind, createPostWithIncompleteArgs]);
   t.throws(() => mergeMutations(cachedSingles));
 });
 
@@ -30,7 +39,7 @@ test('merge fields from 2 simple mutation results', t => {
     }
   }`;
   const expected = parseSortPrint(expectedRaw);
-  const cachedSingles = parseAndNamespace([creatCommentWithId, creatCommentWithContent]);
+  const cachedSingles = parseAndNamespace([createCommentWithId, createCommentWithContent]);
   const actual = parseSortPrint(mergeMutations(cachedSingles));
   t.is(actual, expected);
 });
@@ -47,7 +56,7 @@ test('merge nested fields from 2 simple payloads', t => {
     }
   }`;
   const expected = parseSortPrint(expectedRaw);
-  const cachedSingles = parseAndNamespace([createPostWithPostTitleAndCount,createPostWithPostId]);
+  const cachedSingles = parseAndNamespace([createPostWithPostTitleAndCount, createPostWithPostId]);
   const actual = parseSortPrint(mergeMutations(cachedSingles));
   t.is(actual, expected);
 });
@@ -68,7 +77,7 @@ test('merge mutation args', t => {
 });
 
 test('throw if incomplete mutation args have different values', t => {
-  const cachedSingles = parseAndNamespace([createPostWithIncompleteArgs,createPostWithDifferentId]);
+  const cachedSingles = parseAndNamespace([createPostWithIncompleteArgs, createPostWithDifferentId]);
   t.throws(() => mergeMutations(cachedSingles));
 });
 
@@ -84,7 +93,7 @@ test('add an alias when fields have conflicting args', t => {
     }
   }`;
   const expected = parseSortPrint(expectedRaw);
-  const cachedSingles = parseAndNamespace([createPostWithPostTitleAndCount,createPostWithSpanishTitle]);
+  const cachedSingles = parseAndNamespace([createPostWithPostTitleAndCount, createPostWithSpanishTitle]);
   const actual = parseSortPrint(mergeMutations(cachedSingles));
   t.is(actual, expected);
 });
@@ -102,6 +111,55 @@ test('add an alias when fields have conflicting args (reverse order)', t => {
   }`;
   const expected = parseSortPrint(expectedRaw);
   const cachedSingles = parseAndNamespace([createPostWithSpanishTitle, createPostWithPostTitleAndCount]);
+  const actual = parseSortPrint(mergeMutations(cachedSingles));
+  t.is(actual, expected);
+});
+
+test('merge a typed inline fragment into an existing one', t => {
+  const expectedRaw = `
+  mutation {
+    createPost(newPost: {_id: "129"}) {
+      post {
+        ... on PostType {
+          title
+          category
+        }
+      }
+    }
+  }`;
+  const expected = parseSortPrint(expectedRaw);
+  const cachedSingles = parseAndNamespace([typedInlineFrag1, typedInlineFrag2]);
+  const actual = parseSortPrint(mergeMutations(cachedSingles));
+  t.is(actual, expected);
+});
+
+test('merge a typed inline fragment when the target does not have one', t => {
+  const expectedRaw = `
+  mutation {
+    createPost(newPost: {_id: "129", author: "a123", content: "X", title:"Y", category:"hot stuff"}) {
+      post {
+        _id
+        ... on PostType {
+          title
+        }
+      }
+    }
+  }`;
+  const expected = parseSortPrint(expectedRaw);
+  const cachedSingles = parseAndNamespace([typedInlineFrag1, createPostWithPostId]);
+  const actual = parseSortPrint(mergeMutations(cachedSingles));
+  t.is(actual, expected);
+});
+
+test('merge a new variableDefinition', t => {
+  const expectedRaw = `
+  mutation($postId: String!, $content: String!, $author: String!) {
+    createComment(postId: $postId, content: $content, author: $author) {
+      _id,
+    }
+  }`;
+  const expected = parseSortPrint(expectedRaw);
+  const cachedSingles = parseAndNamespace([createCommentWithId2, createCommentWithId]);
   const actual = parseSortPrint(mergeMutations(cachedSingles));
   t.is(actual, expected);
 });

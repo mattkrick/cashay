@@ -85,13 +85,9 @@ test('turns all fragment spreads to inline fragments', t => {
   mutation {
     createPost(newPost: {_id: "129"}) {
       post {
-        ... {
+        ... on PostType {
           ... on PostType {
-            ... {
-              ... on PostType {
-                createdAt
-              }
-            }
+            createdAt
           }
         }
       }

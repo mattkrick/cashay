@@ -26,4 +26,6 @@ const recurse = astSelections => {
 };
 
 // inline frags don't have names, so just stick em at the end
-const sortField = field => (field.alias && field.alias.value) || (field.name && field.name.value) || field.selectionSet.selections[0].name.value;
+const sortField = field => (field.alias && field.alias.value) ||
+(field.name && field.name.value) ||
+(field.selectionSet.selections[0].name && field.selectionSet.selections[0].name.value) || Infinity;

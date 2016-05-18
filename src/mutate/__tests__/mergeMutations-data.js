@@ -11,14 +11,21 @@ export const parseAndNamespace = cachedSingles => {
   });
 };
 
-export const creatCommentWithId = `
+export const createCommentWithId = `
   mutation($postId: String!, $content: String!) {
     createComment(postId: $postId, content: $content) {
       _id,
     }
   }`;
 
-export const creatCommentWithContent = `
+export const createCommentWithId2 = `
+  mutation($postId: String!, $content: String!, $author: String!) {
+    createComment(postId: $postId, content: $content, author: $author) {
+      _id,
+    }
+  }`;
+
+export const createCommentWithContent = `
   mutation($postId: String!, $content: String!) {
     createComment(postId: $postId, content: $content) {
       content
@@ -53,6 +60,15 @@ export const createPostWithIncompleteArgs = `
     }
   }`;
 
+export const createPostWithBadArgKind = `
+  mutation {
+    createPost(newPost: "foo") {
+      post {
+        _id
+      }
+    }
+  }`;
+
 export const createPostWithDifferentId = `
   mutation {
     createPost(newPost: {_id: "130"}) {
@@ -61,6 +77,7 @@ export const createPostWithDifferentId = `
       }
     }
   }`;
+
 
 export const createPostWithSpanishTitle = `
   mutation {
@@ -71,28 +88,26 @@ export const createPostWithSpanishTitle = `
     }
   }`;
 
-export const createPostWithCrazyFrags = `
+export const typedInlineFrag1 = `
 mutation {
-  createPost(newPost: {_id: "129", author: "a123", content: "Hii", title:"Sao", category:"hot stuff"}, author: $author) {
+  createPost(newPost: {_id: "129"}) {
     post {
-      _id
-      content
-      ...{
-        spanishTitle: title(language: "spanish")
+      ... on PostType {
+        title
       }
-      ...spreadLevel1
     }
   }
-}
-fragment spreadLevel1 on PostType {
-    title
-  	... {
-      category
-      ...spreadLevel2
+}`;
+
+export const typedInlineFrag2 = `
+mutation {
+  createPost(newPost: {_id: "129"}) {
+    post {
+      ... on PostType {
+        category
+      }
     }
-}
-fragment spreadLevel2 on PostType {
-  createdAt
+  }
 }`;
 
 export const createPostWithCrazyFrags2 = `
