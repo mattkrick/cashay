@@ -49,44 +49,48 @@ import {InlineFragment, Name, VariableDefinition} from '../helperClasses';
 //   }
 // };
 
+const mergeVariableDefinitions = (mainVarDefs, nextVarDefs) => {
+  for (let varDef of nextVarDefs) {
+    const nextName = varDef.variable.name.value;
+    const varDefInMain = mainVarDefs.find(def => def.variable.name.value === nextName);
+    if (!varDefInMain) {
+      mainVarDefs.push(varDef);
+    }
+  }
+};
+
+
 export default (cachedSingles, schema) => {
   const cachedSinglesComponentIds = Object.keys(cachedSingles);
   const startingComponentId = cachedSinglesComponentIds.pop();
   // deep copy to create the base AST (slow, but faster than a parse!)
   const mergedAST = clone(cachedSingles[startingComponentId]);
-  const {operation, fragments} = teardownDocumentAST(mergedAST);
-  // TODO
-  const variableDefinitionBag = operation.variableDefinitions || [];
-  const mutationSelection = operation.selectionSet.selections[0];
-  const fieldSchema = schema.mutationSchema.fields.find(field => field.name === mutationSelection.name.value);
-  // bagArgs(variableDefinitionBag, mutationSelection.arguments, fieldSchema);
+  const mainOperation = mergedAST.definitions[0];
+  
+  const mainMutation = mainOperation.selectionSet.selections[0];
+  const fieldSchema = schema.mutationSchema[mainMutation.name.value];
   // now add the new ASTs one-by-one
-
   for (let componentId of cachedSinglesComponentIds) {
-    const nextAST = cachedSingles[componentId];
-    mergeNewAST(operation, fragments, nextAST, componentId, variableDefinitionBag, fieldSchema, schema);
+    const nextOperation = cachedSingles[componentId].definitions[0];
+    const nextMutation = nextOperation.selectionSet.selections[0];
+    mergeVariableDefinitions(mainOperation.variableDefinitions, nextOperation.variableDefinitions);
+    mergeNewAST(mainMutation, nextMutation, componentId, fieldSchema, schema);
   }
   return print(mergedAST);
 };
 
-const mergeNewAST = (target, targetFragments, nextAST, srcComponentId, bag, fieldSchema, schema) => {
-  const targetMutationSelections = target.selectionSet.selections;
-  const targetMutationSelection = targetMutationSelections[0];
-  const {operation, fragments} = teardownDocumentAST(nextAST);
-  const srcMutationSelection = operation.selectionSet.selections[0];
-  if (srcMutationSelection.name.value !== targetMutationSelection.name.value) {
+const mergeNewAST = (target, src, componentId, fieldSchema, schema) => {
+  if (target.name.value !== src.name.value) {
     throw new Error(`Cannot merge two different mutations: 
-    ${srcMutationSelection.name.value} and ${targetMutationSelection.name.value}.
+    ${target.name.value} and ${src.name.value}.
     Did you include the wrong componentId in the mutation call?
     Make sure each mutation operation only calls a single mutation 
     and that customMutations are correct.`)
   }
-  // aliasAndInlineFrags(srcMutationSelection.selectionSet.selections); already done in a previous step
-  // mutates targetMutationSelection.arguments
   mergeMutationArgs(targetMutationSelection.arguments, srcMutationSelection.arguments);
   bagArgs(bag, srcMutationSelection.arguments, fieldSchema);
   const rootSchemaType = ensureRootType(fieldSchema.type);
-  const subSchema = schema.types.find(type => type.name === rootSchemaType.name);
+  const subSchema = schema.types[rootSchemaType.name];
   const context = {
     bag,
     srcComponentId,
@@ -196,10 +200,10 @@ const mergeSelections = (target, targetIdx, srcProp, fieldSchema, context) => {
       });
       if (nextTargetPropIdx > -1) {
         const nextTargetPropVal = targetSelections[nextTargetPropIdx].name.value;
-        const field = fieldSchema.fields.find(field => field.name === nextTargetPropVal);
+        const field = fieldSchema.fields[nextTargetPropVal];
         if (!field) debugger
         const rootFieldSchemaType = ensureRootType(field.type);
-        const subSchema = schema.types.find(type => type.name === rootFieldSchemaType.name);
+        const subSchema = schema.types[rootFieldSchemaType.name];
         mergeSelections(targetSelections, nextTargetPropIdx, srcSelection, subSchema, context);
       } else {
         const srcSelectionClone = clone(srcSelection);

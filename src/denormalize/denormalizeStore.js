@@ -19,11 +19,11 @@ const handleMissingData = (aliasOrFieldName, field, fieldSchema, context) => {
   } else if (fieldType.kind === LIST) {
     return [];
   } else {
-    const newFieldSchema = context.schema.types.find(type => type.name === fieldType.name);
+    const newFieldSchema = context.schema.types[fieldType.name];
     if (fieldType.kind === UNION) {
       // since we don't know what the shape will look like, make it look like everything
       return newFieldSchema.possibleTypes.reduce((reduction, objType) => {
-        const newFieldSchema = context.schema.types.find(type => type.name === objType.name);
+        const newFieldSchema = context.schema.types[objType.name];
         // take the old, add the new, keep typename null
         return Object.assign(reduction, visit(reduction, field, newFieldSchema, context), {__typename: null});
       }, {});
@@ -49,7 +49,7 @@ const visitObject = (subState = {}, reqAST, subSchema, context, baseReduction = 
     } else {
       const fieldName = field.name.value;
       const aliasOrFieldName = field.alias && field.alias.value || fieldName;
-      const fieldSchema = subSchema.fields.find(field => field.name === fieldName);
+      const fieldSchema = subSchema.fields[fieldName];
       const hasData = subState.hasOwnProperty(fieldName);
 
       if (hasData) {
@@ -74,7 +74,7 @@ const visitObject = (subState = {}, reqAST, subSchema, context, baseReduction = 
 const visitNormalizedString = (subState, reqAST, subSchema, context) => {
   const [typeName, docId] = subState.split(':');
   const doc = context.cashayDataState.entities[typeName][docId];
-  const fieldSchema = context.schema.types.find(type => type.name === typeName);
+  const fieldSchema = context.schema.types[typeName];
   return visit(doc, reqAST, fieldSchema, context);
 };
 
@@ -85,7 +85,7 @@ const visitIterable = (subState, reqAST, subSchema, context) => {
 
   if (Array.isArray(subState)) {
     // get the schema for the root type, could be a union
-    const fieldSchema = context.schema.types.find(type => type.name === fieldType.name);
+    const fieldSchema = context.schema.types[fieldType.name];
 
     // for each value in the array, get the denormalized item
     const mappedState = subState.map(res => visit(res, reqAST, fieldSchema, context));
@@ -134,7 +134,7 @@ export const denormalizeStore = context => {
     const aliasOrName = selection.alias && selection.alias.value || queryName;
 
     // get the query schema to know the expected type and args
-    let queryFieldSchema = querySchema.fields.find(field => field.name === queryName);
+    let queryFieldSchema = querySchema.fields[queryName];
 
     // look into the current redux state to see if we can borrow any data from it
     let queryInState = context.cashayDataState.result[queryName];
@@ -150,7 +150,7 @@ export const denormalizeStore = context => {
     // const query
     // get the expected return value, devs can be silly, so if the had the return value in a nonnull, remove it.
     const subSchema = queryFieldSchema.type.kind === LIST ?
-      queryFieldSchema : ensureTypeFromNonNull(context.schema.types.find(type => type.name === queryFieldSchema.type.name));
+      queryFieldSchema : ensureTypeFromNonNull(context.schema.types[queryFieldSchema.type.name]);
 
     // recursively visit each branch, flag missing branches with a sendToServer flag
     reduction[aliasOrName] = visit(fieldState, selection, subSchema, context);

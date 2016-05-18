@@ -21,7 +21,7 @@ export const isObject = val => val && typeof val === 'object';
 export const clone = obj => JSON.parse(JSON.stringify(obj));
 
 export const checkMutationInSchema = (rootMutation, mutationName) => {
-  const mutationSchema = rootMutation.fields.find(field => field.name === mutationName);
+  const mutationSchema = rootMutation.fields[mutationName];
   if (!mutationSchema) {
     throw new Error(`Invalid mutation: ${mutationName}.\nDid you make a typo?`);
   }

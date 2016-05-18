@@ -42,29 +42,77 @@ const removeNullsFromObject = obj => {
   }
 };
 
+//TODO filter out interfaces
 const makeMinimalSchema = schema => {
   removeNullsFromObject(schema);
   const queryName = schema.queryType && schema.queryType.name;
   const mutationName = schema.mutationType && schema.mutationType.name;
   const subscriptionName = schema.subscriptionType && schema.subscriptionType.name;
-  const filteredTypes = schema.types.filter(type => {
-    return type.name !== queryName &&
-      type.name !== mutationName &&
-      type.name !== subscriptionName && !type.name.startsWith('__')
-  });
+  const filteredTypes = schema.types.filter(type => !type.name.startsWith('__'));
+
+  for (let type of filteredTypes) {
+    if (type.fields) {
+      for (let field of type.fields) {
+        if (field.args) {
+          if (field.args.length) {
+            field.args = objArrayToHashMap(field.args);
+          } else {
+            delete field.args;
+          }
+        }
+      }
+      type.fields = objArrayToHashMap(type.fields);
+    }
+    if (type.enumValues) {
+      type.enumValues = objArrayToHashMap(type.enumValues);
+    }
+    if (type.inputFields) {
+      type.inputFields = objArrayToHashMap(type.inputFields)
+    }
+    if (type.possibleTypes) {
+      type.possibleTypes = objArrayToHashMap(type.possibleTypes);
+    }
+    if (type.interfaces) {
+      if (type.interfaces.length) {
+        type.interfaces = objArrayToHashMap(type.interfaces);
+      } else {
+        delete type.interfaces;
+      }
+    }
+  }
+  const filteredTypesMap = objArrayToHashMap(filteredTypes);
   const filteredDirectives = schema.directives.filter(directive => {
     return directive.name !== 'deprecated';
   });
-  const finalResult = {
-    querySchema: schema.types.find(type => type.name === queryName),
-    types: filteredTypes,
-    directives: filteredDirectives
-  };
-  if (mutationName) {
-    finalResult.mutationSchema = schema.types.find(type => type.name === mutationName);
+  for (let directive of filteredDirectives) {
+    directive.args = objArrayToHashMap(directive.args);
   }
-  if (subscriptionName) {
-    finalResult.subscriptionSchema = schema.types.find(type => type.name === subscriptionName);
+  const filteredDirectivesMap = objArrayToHashMap(filteredDirectives);
+  const querySchema = filteredTypesMap[queryName];
+  delete filteredTypesMap[queryName];
+  const mutationSchema = filteredTypesMap[mutationName];
+  delete filteredTypesMap[mutationName];
+  const subscriptionSchema = filteredTypesMap[subscriptionName];
+  delete filteredTypesMap[subscriptionName];
+
+  const finalResult = {
+    querySchema,
+    types: filteredTypesMap,
+    directives: filteredDirectivesMap
+  };
+  if (mutationSchema) {
+    finalResult.mutationSchema = mutationSchema;
+  }
+  if (subscriptionSchema) {
+    finalResult.subscriptionSchema = subscriptionSchema;
   }
   return finalResult;
 };
+
+const objArrayToHashMap = arr => {
+  const hashMap = {};
+  for (let field of arr) {
+    hashMap[field.name] = field;
+  }
+  return hashMap;
+}

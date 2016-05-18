@@ -1,6 +1,7 @@
 import {STRING, INT, VARIABLE} from 'graphql/language/kinds';
 import {isObject, getRegularArgsKey} from '../utils';
 import {separateArgs} from './separateArgs';
+import {getDocFromNormalString, sendChildrenToServer} from './denormalizeHelpers';
 /**
  * given a parent field state & some args, drill down to the data using the args as a map
  *
@@ -76,7 +77,7 @@ const handlePaginationArgs = (paginationArgs, fieldState, fieldSchema, selection
     console.log(`not enough data, need to fetch ${missingDocCount} more`);
 
     // if we have a partial response & the backend accepts a cursor, only ask for the missing pieces
-    if (missingDocCount < count && fieldSchema.args.find(arg => arg.name === cursorWord)) {
+    if (missingDocCount < count && fieldSchema.args[cursorWord]) {
 
       // flag all AST children with sendToServer = true
       sendChildrenToServer(selection);

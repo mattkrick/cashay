@@ -16,7 +16,7 @@ export default (namespaceAST, componentId, stateVars, schema) => {
   const {operation, fragments} = teardownDocumentAST(namespaceAST);
   const variableDefinitions = operation.variableDefinitions || [];
   const mainMutation = operation.selectionSet.selections[0];
-  const fieldSchema = schema.mutationSchema.fields.find(field => field.name === mainMutation.name.value);
+  const fieldSchema = schema.mutationSchema.fields[mainMutation.name.value];
   const context = {
     variableDefinitions,
     stateVars,
@@ -27,7 +27,7 @@ export default (namespaceAST, componentId, stateVars, schema) => {
   };
   bagArgs(mainMutation.arguments, fieldSchema, true, context);
   const rootSchemaType = ensureRootType(fieldSchema.type);
-  const subSchema = schema.types.find(type => type.name === rootSchemaType.name);
+  const subSchema = schema.types[rootSchemaType.name];
   namespaceAndInlineFrags(mainMutation.selectionSet.selections, subSchema, context);
   namespaceAST.definitions = [operation];
   return {namespaceAST, variableEnhancers}
@@ -45,7 +45,7 @@ const namespaceAndInlineFrags = (fieldSelections, typeSchema, context) => {
     }
     const selectionName = selection.name.value;
     if (selectionName.startsWith('__')) continue;
-    const fieldSchema = typeSchema.fields.find(field => field.name === selectionName);
+    const fieldSchema = typeSchema.fields[selectionName];
     if (selection.arguments && selection.arguments.length) {
       const aliasOrFieldName = selection.alias && selection.alias.value || selection.name.value;
       const namespaceAlias = makeNamespaceString(context.componentId, aliasOrFieldName);
@@ -58,7 +58,7 @@ const namespaceAndInlineFrags = (fieldSelections, typeSchema, context) => {
     }
     if (selection.selectionSet) {
       const fieldType = ensureRootType(fieldSchema.type);
-      typeSchema = context.schema.types.find(type => type.name === fieldType.name);
+      typeSchema = context.schema.types[fieldType.name];
       namespaceAndInlineFrags(selection.selectionSet.selections, typeSchema, context);
     }
   }
@@ -92,9 +92,9 @@ const bagArgs = (argsToDefine, fieldSchema, isMain, context) => {
         variableEnhancers.push(variableEnhancer);
       }
     } else if (arg.value.kind === OBJECT) {
-      const argSchema = fieldSchema.args.find(arg => arg.name === argName);
+      const argSchema = fieldSchema.args[argName];
       const rootArgType = ensureRootType(argSchema.type);
-      const subSchema = context.schema.types.find(type => type.name === rootArgType.name);
+      const subSchema = context.schema.types[rootArgType.name];
       bagArgs(arg.value.fields, subSchema, isMain, context);
     }
   }
@@ -103,7 +103,7 @@ const bagArgs = (argsToDefine, fieldSchema, isMain, context) => {
 const makeVariableDefinition = (argName, variableName, fieldSchema) => {
   // we're not sure whether we're inside an arg or an input object
   const fields = fieldSchema.args || fieldSchema.inputFields;
-  const argSchema = fields.find(schemaArg => schemaArg.name === argName);
+  const argSchema = fields[argName];
   if (!argSchema) {
     throw new Error(`Invalid mutation argument: ${argName}`);
   }

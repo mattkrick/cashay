@@ -379,7 +379,7 @@ export default class Cashay {
   _createMutationsFromQueries(componentIds, mutationName, variables) {
     const {mutationSchema} = this.schema;
     // createComment
-    const mutationFieldSchema = mutationSchema.fields.find(field => field.name === mutationName);
+    const mutationFieldSchema = mutationSchema.fields[mutationName];
 
     this.cachedMutations[mutationName] = this.cachedMutations[mutationName] || new CachedMutation();
     const cachedSingles = this.cachedMutations[mutationName].singles;
@@ -396,8 +396,7 @@ export default class Cashay {
   async _mutateServer(mutationName, componentIdsToUpdate, mutationString, options) {
     const {variables} = options;
     const transport = this._getTransport(options);
-    const docFromServer = await
-      transport(mutationString, variables);
+    const docFromServer = await transport(mutationString, variables);
     // update state with new doc from server
     this._addListenersHandler(mutationName, componentIdsToUpdate, docFromServer);
 
