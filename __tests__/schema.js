@@ -13,7 +13,8 @@ import {
   GraphQLNonNull,
   GraphQLInterfaceType,
   GraphQLUnionType,
-  GraphQLInputObjectType
+  GraphQLInputObjectType,
+  GraphQLBoolean
 } from 'graphql';
 
 const handlePaginationArgs = ({beforeCursor, afterCursor, first, last}, keys) => {
@@ -74,7 +75,7 @@ const CommentType = new GraphQLObjectType({
     content: {type: GraphQLString},
     author: {
       type: AuthorType,
-      resolve: function ({author}) {
+      resolve: function({author}) {
         return AuthorDB[author];
       }
     },
@@ -146,7 +147,15 @@ const PostType = new GraphQLObjectType({
     },
     category: {type: CategoryType},
     content: {type: GraphQLString},
-    createdAt: {type: GraphQLInt},
+    createdAt: {
+      type: GraphQLInt,
+      args: {
+        dateOptions: {type: DateOptionsType, description: "example of a subfield with an input obj"}
+      },
+      resolve(source) {
+        return source.createdAt
+      }
+    },
     comments: {
       type: new GraphQLList(CommentType),
       args: {
@@ -155,14 +164,14 @@ const PostType = new GraphQLObjectType({
         first: {type: GraphQLInt, description: "Limit the comments from the front"},
         last: {type: GraphQLInt, description: "Limit the comments from the back"}
       },
-      resolve: function (post, args) {
+      resolve: function(post, args) {
         const keys = Object.keys(CommentDB);
         return handlePaginationArgs(args, keys)
       }
     },
     author: {
       type: AuthorType,
-      resolve: function ({author}) {
+      resolve: function({author}) {
         return AuthorDB[author];
       }
     },
@@ -192,6 +201,28 @@ const NewPost = new GraphQLInputObjectType({
     content: {type: GraphQLString},
     title: {type: GraphQLString},
     category: {type: GraphQLString}
+  })
+});
+
+const DateOptionsType = new GraphQLInputObjectType({
+  name: "DateOptions",
+  description: "formatting options for the date",
+  fields: () => ({
+    day: {type: GraphQLBoolean},
+    month: {type: GraphQLBoolean},
+    year: {type: GraphQLBoolean},
+  })
+});
+
+const NewMember = new GraphQLInputObjectType({
+  name: "NewMember",
+  description: "input object for a new member",
+  fields: () => ({
+    _id: {type: new GraphQLNonNull(GraphQLString)},
+    name: {type: GraphQLString},
+    ownerId: {type: GraphQLString},
+    members: {type: new GraphQLList(GraphQLString)},
+    twitterHandle: {type: GraphQLString}
   })
 });
 
@@ -229,7 +260,7 @@ const Query = new GraphQLObjectType({
       args: {
         _id: {type: new GraphQLNonNull(GraphQLString)}
       },
-      resolve: function (source, {_id}) {
+      resolve: function(source, {_id}) {
         return PostDB[_id];
       }
     },
@@ -289,6 +320,25 @@ const Mutation = new GraphQLObjectType({
         };
         CommentDB[_id] = newPost;
         return newPost;
+      }
+    },
+    createMembers: {
+      type: new GraphQLList(MemberType),
+      description: "Create multiple members",
+      args: {
+        members: {type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(NewMember)))}
+      },
+      resolve(source, {members}) {
+        // const newPost = {
+        //   _id,
+        //   content,
+        //   postId,
+        //   karma: 0,
+        //   author: 'a125',
+        //   createdAt: Date.now()
+        // };
+        // CommentDB[_id] = newPost;
+        return members;
       }
     }
   })

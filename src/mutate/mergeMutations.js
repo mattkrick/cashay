@@ -14,44 +14,42 @@ import {print} from 'graphql/language/printer';
 import {teardownDocumentAST} from '../buildExecutionContext';
 import {InlineFragment, Name, VariableDefinition} from '../helperClasses';
 
-const ALIAS_PREFIX = 'CASHAY';
+// export const createMutationString = function(mutationName, componentIdsToUpdate) {
+//   const cachedMutationObj = this._cachedMutations[mutationName];
+//   // const cachedSingles = cachedMutationObj.singles;
+//
+//   // return quickly without needing to save to cache for single components
+//   if (componentIdsToUpdate.length === 1) {
+//     return cachedMutationObj.singles[componentIdsToUpdate[0]];
+//   }
+//
+//   // if the components we want are the ones we cached, grab the mutation string from the cache
+//   const cachedMutationString = getCachedMutationString(cachedMutationObj, componentIdsToUpdate);
+//   if (cachedMutationString) {
+//     return cachedMutationString;
+//   }
+//
+//   // do the super expensive AST parse and merge
+//   const fullMutation = mergeMutationASTs(cachedMutationObj.singles, this._schema);
+//   Object.assign(cachedMutationObj, {
+//     fullMutation,
+//     setKey: new Set([componentIdsToUpdate])
+//   });
+//   return fullMutation;
+// };
+//
+// const getCachedMutationString = (cachedMutationObj, componentIdsToUpdate) => {
+//   if (cachedMutationObj && cachedMutationObj.setKey.size === componentIdsToUpdate.length) {
+//     for (let componentId of componentIdsToUpdate) {
+//       if (!cachedMutationObj.setKey.has(componentId)) {
+//         return
+//       }
+//     }
+//     return cachedMutationObj.fullMutation;
+//   }
+// };
 
-export const createMutationString = function(mutationName, componentIdsToUpdate) {
-  const cachedMutationObj = this._cachedMutations[mutationName];
-  // const cachedSingles = cachedMutationObj.singles;
-
-  // return quickly without needing to save to cache for single components
-  if (componentIdsToUpdate.length === 1) {
-    return cachedMutationObj.singles[componentIdsToUpdate[0]];
-  }
-
-  // if the components we want are the ones we cached, grab the mutation string from the cache
-  const cachedMutationString = getCachedMutationString(cachedMutationObj, componentIdsToUpdate);
-  if (cachedMutationString) {
-    return cachedMutationString;
-  }
-
-  // do the super expensive AST parse and merge
-  const fullMutation = mergeMutationASTs(cachedMutationObj.singles, this._schema);
-  Object.assign(cachedMutationObj, {
-    fullMutation,
-    setKey: new Set([componentIdsToUpdate])
-  });
-  return fullMutation;
-};
-
-const getCachedMutationString = (cachedMutationObj, componentIdsToUpdate) => {
-  if (cachedMutationObj && cachedMutationObj.setKey.size === componentIdsToUpdate.length) {
-    for (let componentId of componentIdsToUpdate) {
-      if (!cachedMutationObj.setKey.has(componentId)) {
-        return
-      }
-    }
-    return cachedMutationObj.fullMutation;
-  }
-};
-
-export const mergeMutationASTs = (cachedSingles, schema) => {
+export default (cachedSingles, schema) => {
   const cachedSinglesComponentIds = Object.keys(cachedSingles);
   const startingComponentId = cachedSinglesComponentIds.pop();
   // deep copy to create the base AST (slow, but faster than a parse!)
@@ -61,7 +59,7 @@ export const mergeMutationASTs = (cachedSingles, schema) => {
   const variableDefinitionBag = operation.variableDefinitions || [];
   const mutationSelection = operation.selectionSet.selections[0];
   const fieldSchema = schema.mutationSchema.fields.find(field => field.name === mutationSelection.name.value);
-  bagArgs(variableDefinitionBag, mutationSelection.arguments, fieldSchema);
+  // bagArgs(variableDefinitionBag, mutationSelection.arguments, fieldSchema);
   // now add the new ASTs one-by-one
 
   for (let componentId of cachedSinglesComponentIds) {

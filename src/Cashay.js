@@ -12,10 +12,11 @@ import {parseAndAlias} from './mutate/mergeMutations';
 import {CachedMutation, CachedQuery, MutationShell} from './helperClasses'
 import flushDependencies from './query/flushDependencies';
 import {makeComponentsToUpdate} from './mutate/mutationHelpers';
-import {parse} from 'graphql/language/parser';
+import {parse, arraysShallowEqual} from './utils';
+import namespaceMutation from './mutate/namespaceMutation';
+import mergeMutations from './mutate/mergeMutations';
 
 const defaultGetToState = store => store.getState().cashay;
-
 const defaultPaginationWords = {
   before: 'before',
   after: 'after',
@@ -43,14 +44,17 @@ export default class Cashay {
     // the client graphQL schema
     this.schema = schema;
 
+    // many mutations can share the same mutationName, making it hard to cache stuff without adding complexity
     // const example = {
     //   [mutationName]: {
-    //     setKey: Set(...[componentIds]),
+    //     activeComponents: [],
+    //     setKey: Set(...[componentIds]), // TODO get rid of this & just invalidate when new handles are added
     //     fullMutation: MutationString,
+    //     variableEnhancers: []
     //     singles: {
     //       [componentId]: {
     //          ast: MutationAST,
-    //          variableEnhancer: null || []
+    //          variableEnhancers: null || []
     //       }
     //     }
     //   }
@@ -313,10 +317,11 @@ export default class Cashay {
         this.cachedMutations[mutationName] = this.cachedMutations[mutationName] || new CachedMutation();
         const cachedSingles = this.cachedMutations[mutationName].singles;
         if (!cachedSingles[componentId]) {
+          const mutationAST = parse(customMutations[mutationName]);
+          const {operation, variableEnhancers} = namespaceMutation(mutationAST, componentId, this.state, this.schema);
           cachedSingles[componentId] = {
-            // on first call, if !variableEnhancers, run parseAndAlias and namespacer
-            ast: parse(customMutations[mutationName], componentId),
-            variableEnhancers: undefined
+            ast: operation,
+            variableEnhancers
           }
         }
       }
@@ -325,19 +330,44 @@ export default class Cashay {
 
   /**
    *
-   * An external method to be used whenever someone wants to
+   * A mutationName is not unique to a mutation, but a name + possibleComponentIds is
    *
    */
   mutate(mutationName, possibleComponentIds, options = {}) {
-
     const {variables} = options;
-    const componentIdsToUpdate = makeComponentsToUpdate(mutationName, possibleComponentIds, this.cachedQueries);
-    if (!componentIdsToUpdate) {
-      throw new Error(`Mutation has no queries to update: ${mutationName}`);
+    const cachedMutation = this.cachedMutations[mutationName];
+    const {fullMutation, cachedComponentIds, singles} = cachedMutation;
+    let mutationString;
+    if (fullMutation) {
+      if (possibleComponentIds === cachedComponentIds) {
+        mutationString = fullMutation;
+      } else if (arraysShallowEqual(possibleComponentIds, cachedComponentIds)) {
+        console.warn(`For a performance boost, create your ${mutationName} mutation 
+        componentId array outside the render function`);
+        mutationString = fullMutation;
+      }
     }
-    this._createMutationsFromQueries(componentIdsToUpdate, mutationName, variables);
+    if (!mutationString) {
+      const componentIdsToUpdate = makeComponentsToUpdate(mutationName, possibleComponentIds, this.cachedQueries, this.mutationHandlers);
+      if (!componentIdsToUpdate) {
+        throw new Error(`Mutation has no queries to update: ${mutationName}`);
+      }
+      //TODO
+      const cachedSingles = {};
+      this._createMutationsFromQueries(componentIdsToUpdate, mutationName, variables);
 
-    const mutationString = createMutationString.call(this, mutationName, componentIdsToUpdate);
+      for (let componentId of componentIdsToUpdate) {
+        const {ast, variableEnhancers} = singles[componentId];
+        cachedSingles[componentId] = ast;
+        cachedMutation.variableEnhancers.push(...variableEnhancers);
+      }
+      mergeMutations(cachedSingles, this.schema);
+      // TODO handle performance boost if only 1 componentIdToUpdate
+    }
+    const namespacedVariables = cachedMutation.variableEnhancers.reduce((enhancer, reduction) => enhancer(reduction), variables);
+
+
+    // const mutationString = createMutationString.call(this, mutationName, componentIdsToUpdate);
 
     // optimistcally update
     this._addListenersHandler(mutationName, componentIdsToUpdate, null, variables);

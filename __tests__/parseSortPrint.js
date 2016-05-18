@@ -1,14 +1,18 @@
 import {parse} from 'graphql/language/parser';
 import {print} from 'graphql/language/printer';
-
+import {teardownDocumentAST} from '../src/buildExecutionContext';
 /**
  * This is a stupid little function that sorts fields by alias & then by name
  * That way, testing equality is easy
  */
-export const parseSortPrint = mutationString => {
-  const ast = parse(mutationString, {noLocation: true, noSource: true});
-  const astSelections = ast.definitions[0].selectionSet.selections;
-  recurse(astSelections);
+export const parseSortPrint = graphQLString => {
+  const ast = parse(graphQLString, {noLocation: true, noSource: true});
+  return sortPrint(ast);
+};
+
+export const sortPrint = ast => {
+  const {operation} = teardownDocumentAST(ast);
+  recurse(operation.selectionSet.selections);
   return print(ast);
 };
 
@@ -18,13 +22,8 @@ const recurse = astSelections => {
       recurse(selection.selectionSet.selections);
     }
   }
-  astSelections = astSelections.sort((a,b) => {
-    if (!a.name) {
-      console.log(a)
-    }
-    // inline frags don't have names, so just stick em at the end
-    const aAliasOrFieldName = a.alias && a.alias.value || (a.name && a.name.value) || a.selectionSet.selections[0].name.value;
-    const bAliasOrFieldName = b.alias && b.alias.value || (b.name && b.name.value) || b.selectionSet.selections[0].name.value;
-    return aAliasOrFieldName > bAliasOrFieldName;
-  });
+  astSelections.sort((a,b) => sortField(a) > sortField(b));
 };
+
+// inline frags don't have names, so just stick em at the end
+const sortField = field => (field.alias && field.alias.value) || (field.name && field.name.value) || field.selectionSet.selections[0].name.value;

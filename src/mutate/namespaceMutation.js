@@ -1,34 +1,36 @@
-import {ensureRootType, ensureTypeFromNonNull} from '../utils';
+import {ensureRootType} from '../utils';
 import {
   VARIABLE,
   FRAGMENT_SPREAD,
-  INLINE_FRAGMENT
+  INLINE_FRAGMENT,
+  OBJECT
 } from 'graphql/language/kinds';
 import {clone, convertFragmentToInline} from '../utils';
 import {teardownDocumentAST} from '../buildExecutionContext';
 import {Name, VariableDefinition} from '../helperClasses';
 
-const makeNamespaceString = (componentId, name, delim = '_') => `'CASHAY'${delim}${componentId}${delim}${name}`;
+const makeNamespaceString = (componentId, name, delim = '_') => `CASHAY${delim}${componentId}${delim}${name}`;
 
-export default (mutationAST, componentId, state, schema) => {
+export default (namespaceAST, componentId, stateVars, schema) => {
   const variableEnhancers = [];
-  const {operation, fragments} = teardownDocumentAST(mutationAST);
+  const {operation, fragments} = teardownDocumentAST(namespaceAST);
   const variableDefinitions = operation.variableDefinitions || [];
   const mainMutation = operation.selectionSet.selections[0];
   const fieldSchema = schema.mutationSchema.fields.find(field => field.name === mainMutation.name.value);
-  bagArgs(variableDefinitions, mainMutation.arguments, fieldSchema);
   const context = {
     variableDefinitions,
-    state,
+    stateVars,
     componentId,
     fragments,
     schema,
     variableEnhancers
   };
+  bagArgs(mainMutation.arguments, fieldSchema, true, context);
   const rootSchemaType = ensureRootType(fieldSchema.type);
   const subSchema = schema.types.find(type => type.name === rootSchemaType.name);
   namespaceAndInlineFrags(mainMutation.selectionSet.selections, subSchema, context);
-  return {operation, variableEnhancers}
+  namespaceAST.definitions = [operation];
+  return {namespaceAST, variableEnhancers}
 };
 
 const namespaceAndInlineFrags = (fieldSelections, typeSchema, context) => {
@@ -39,11 +41,16 @@ const namespaceAndInlineFrags = (fieldSelections, typeSchema, context) => {
       fieldSelections[i] = selection = convertFragmentToInline(fragment);
     }
     if (selection.kind === INLINE_FRAGMENT) {
-      return namespaceAndInlineFrags(selection, typeSchema, context);
+      return namespaceAndInlineFrags(selection.selectionSet.selections, typeSchema, context);
     }
-    const fieldSchema = typeSchema.fields.find(field => field.name === selection.name.value);
+    const selectionName = selection.name.value;
+    if (selectionName.startsWith('__')) continue;
+    const fieldSchema = typeSchema.fields.find(field => field.name === selectionName);
     if (selection.arguments && selection.arguments.length) {
-      namespaceArgs(selection, fieldSchema, context);
+      const aliasOrFieldName = selection.alias && selection.alias.value || selection.name.value;
+      const namespaceAlias = makeNamespaceString(context.componentId, aliasOrFieldName);
+      selection.alias = new Name(namespaceAlias);
+      bagArgs(selection.arguments, fieldSchema, false, context);
     } else {
       // guarantee that props without args are also without aliases
       // that way, we can share fields across mutations & not make the server repeat the same action twice
@@ -52,55 +59,53 @@ const namespaceAndInlineFrags = (fieldSelections, typeSchema, context) => {
     if (selection.selectionSet) {
       const fieldType = ensureRootType(fieldSchema.type);
       typeSchema = context.schema.types.find(type => type.name === fieldType.name);
-      namespaceAndInlineFrags(selection, typeSchema, context);
+      namespaceAndInlineFrags(selection.selectionSet.selections, typeSchema, context);
     }
   }
 };
 
-const enhancerFactory = (state, componentId, variableName, namespacedKey) => {
+const enhancerFactory = (stateVars, componentId, variableName, namespaceKey) => {
   return variablesObj => {
     return {
       ...variablesObj,
-      [namespacedKey]: state.variables[componentId][variableName]
+      [namespaceKey]: stateVars[componentId][variableName]
     }
   }
 };
 
-const bagArgs = (bag, argsToDefine, fieldSchema) => {
+const bagArgs = (argsToDefine, fieldSchema, isMain, context) => {
+  const {variableDefinitions, componentId} = context;
   for (let arg of argsToDefine) {
+    const argName = arg.name.value;
     if (arg.value.kind === VARIABLE) {
-      const variableDefName = arg.value.name.value;
-      const variableDefOfArg = bag.find(def => def.variable.name.value === variableDefName);
+      const variableName = arg.value.name.value;
+      const namespaceKey = makeNamespaceString(componentId, variableName);
+      const variableDefOfArg = variableDefinitions.find(def => def.variable.name.value === variableName);
       if (!variableDefOfArg) {
-        const newVariableDef = makeVariableDefinition(variableDefName, fieldSchema);
-        bag.push(newVariableDef);
+        const varDefKey = isMain ? variableName : namespaceKey;
+        const newVariableDef = makeVariableDefinition(argName, varDefKey, fieldSchema);
+        variableDefinitions.push(newVariableDef);
       }
+      if (!isMain) {
+        const {stateVars, variableEnhancers} = context;
+        const variableEnhancer = enhancerFactory(stateVars, componentId, variableName, namespaceKey);
+        variableEnhancers.push(variableEnhancer);
+      }
+    } else if (arg.value.kind === OBJECT) {
+      const argSchema = fieldSchema.args.find(arg => arg.name === argName);
+      const rootArgType = ensureRootType(argSchema.type);
+      const subSchema = context.schema.types.find(type => type.name === rootArgType.name);
+      bagArgs(arg.value.fields, subSchema, isMain, context);
     }
   }
 };
 
-const makeVariableDefinition = (argName, fieldSchema) => {
-  const argSchema = fieldSchema.args.find(schemaArg => schemaArg.name === argName);
+const makeVariableDefinition = (argName, variableName, fieldSchema) => {
+  // we're not sure whether we're inside an arg or an input object
+  const fields = fieldSchema.args || fieldSchema.inputFields;
+  const argSchema = fields.find(schemaArg => schemaArg.name === argName);
   if (!argSchema) {
     throw new Error(`Invalid mutation argument: ${argName}`);
   }
-  return new VariableDefinition(argName, argSchema.type);
-};
-
-const namespaceArgs = (selection, fieldSchema, context) => {
-  const {state, variableEnhancers, variableDefinitions, componentId} = context;
-  const aliasOrFieldName = selection.alias && selection.alias.value || selection.name.value;
-  const namespaceAlias = makeNamespaceString(componentId, aliasOrFieldName);
-  selection.alias = new Name(namespaceAlias);
-  for (let arg of selection.arguments) {
-    if (arg.value.kind !== VARIABLE) continue;
-    const argName = arg.name.value;
-    const namespaceKey = makeNamespaceString(componentId, argName);
-    const variableEnhancer = enhancerFactory(state, componentId, argName, namespaceKey);
-    variableEnhancers.push(variableEnhancer);
-    const argSchema = fieldSchema.args.find(schemaArg => schemaArg.name === argName);
-    const argType = ensureTypeFromNonNull(argSchema.type);
-    const variableDefinition = new VariableDefinition(namespaceKey, argType);
-    variableDefinitions.push(variableDefinition);
-  }
+  return new VariableDefinition(variableName, argSchema.type);
 };

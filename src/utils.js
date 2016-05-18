@@ -34,3 +34,12 @@ export const convertFragmentToInline = fragment => {
 };
 
 export const parse = graphQLString => gqlParse(graphQLString, {noLocation: true, noSource: true});
+
+export const arraysShallowEqual = (arr1, arr2) => {
+  if (arr1.length !== arr2.length) return false;
+  const set2 = new Set(arr2);
+  for (let val of arr1) {
+    if (!set2.has(val)) return false;
+  }
+  return true;
+};

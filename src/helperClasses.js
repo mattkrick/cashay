@@ -9,19 +9,22 @@ import {
   FIELD,
   INLINE_FRAGMENT,
   VARIABLE_DEFINITION,
-  LIST,
   LIST_TYPE
 } from 'graphql/language/kinds';
+import {TypeKind} from 'graphql/type/introspection';
 import {SET_VARIABLES} from './duck';
 import {denormalizeStore} from './denormalize/denormalizeStore';
 import {makeArgsAndDefs} from './mutate/mutationHelpers';
 import {parse, ensureRootType, ensureTypeFromNonNull} from './utils';
 
+const {LIST} = TypeKind;
+
 export class CachedMutation {
   constructor() {
-    this.setKey = undefined;
+    // this.setKey = undefined;
     this.fullMutation = undefined;
     this.singles = {};
+    this.variableEnhancers = [];
   }
 }
 
@@ -127,7 +130,6 @@ export class RequestArgument {
 
 export class VariableDefinition {
   constructor(variableName, argType) {
-    debugger
     let argTypeNN = ensureTypeFromNonNull(argType);
     const rootType = ensureRootType(argTypeNN);
     const varDefType = {

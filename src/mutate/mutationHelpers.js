@@ -1,9 +1,9 @@
 
-export const makeComponentsToUpdate = (mutationName, possibleComponentIds, denormalizedResults) => {
+export const makeComponentsToUpdate = (mutationName, possibleComponentIds, denormalizedResults, mutationHandlers) => {
   const componentIds = [];
   // if there are no provided queries to update, try updating them all
   if (!possibleComponentIds) {
-    const mutationHandlerObj = this.mutationHandlers[mutationName];
+    const mutationHandlerObj = mutationHandlers[mutationName];
     const handlerComponents = Object.keys(mutationHandlerObj);
     for (let componentId of handlerComponents) {
       if (denormalizedResults[componentId]) {

@@ -139,7 +139,15 @@
         },
         {
           "name": "createdAt",
-          "args": [],
+          "args": [
+            {
+              "name": "dateOptions",
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "DateOptions"
+              }
+            }
+          ],
           "type": {
             "kind": "SCALAR",
             "name": "Int"
@@ -279,6 +287,37 @@
           "name": "ICE_COLD"
         }
       ]
+    },
+    {
+      "kind": "INPUT_OBJECT",
+      "name": "DateOptions",
+      "inputFields": [
+        {
+          "name": "day",
+          "type": {
+            "kind": "SCALAR",
+            "name": "Boolean"
+          }
+        },
+        {
+          "name": "month",
+          "type": {
+            "kind": "SCALAR",
+            "name": "Boolean"
+          }
+        },
+        {
+          "name": "year",
+          "type": {
+            "kind": "SCALAR",
+            "name": "Boolean"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "SCALAR",
+      "name": "Boolean"
     },
     {
       "kind": "SCALAR",
@@ -445,8 +484,51 @@
       "interfaces": []
     },
     {
-      "kind": "SCALAR",
-      "name": "Boolean"
+      "kind": "INPUT_OBJECT",
+      "name": "NewMember",
+      "inputFields": [
+        {
+          "name": "_id",
+          "type": {
+            "kind": "NON_NULL",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "String"
+            }
+          }
+        },
+        {
+          "name": "name",
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        },
+        {
+          "name": "ownerId",
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        },
+        {
+          "name": "members",
+          "type": {
+            "kind": "LIST",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "String"
+            }
+          }
+        },
+        {
+          "name": "twitterHandle",
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        }
+      ]
     }
   ],
   "directives": [
@@ -554,6 +636,34 @@
         "type": {
           "kind": "OBJECT",
           "name": "CommentType"
+        }
+      },
+      {
+        "name": "createMembers",
+        "args": [
+          {
+            "name": "members",
+            "type": {
+              "kind": "NON_NULL",
+              "ofType": {
+                "kind": "LIST",
+                "ofType": {
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "kind": "INPUT_OBJECT",
+                    "name": "NewMember"
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "type": {
+          "kind": "LIST",
+          "ofType": {
+            "kind": "UNION",
+            "name": "Member"
+          }
         }
       }
     ],

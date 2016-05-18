@@ -16,6 +16,7 @@ export const buildExecutionContext = (queryAST, cashayDataState, variables, pagi
 
 export const teardownDocumentAST = queryAST => {
   let operation;
+  // console.log(queryAST);
   const fragments = queryAST.definitions.reduce((reduction, definition) => {
     if (definition.kind === OPERATION_DEFINITION) {
       if (operation) {
