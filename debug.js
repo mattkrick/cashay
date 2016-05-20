@@ -17,14 +17,18 @@ import {
   queryPost,
   mutatePost,
   queryPostCount,
-  mutatePostCount
+  mutatePostCount,
+  queryPostWithInlineFieldVars,
+  mutatePostWithFieldVars,
+  mutatePostWithInlineFieldVars
 
 } from './src/mutate/__tests__/createMutationFromQuery-data';
+const expectedAST = parse(mutatePostWithFieldVars);
+
 const queryAST = parse(queryPostCount);
 const expected = parseSortPrint(mutatePostCount);
 const actualAST = createMutationFromQuery(queryAST, 'createPost', {}, clientSchema);
-const expectedAST = parse(mutatePostCount);
-// const actual = sortPrint(actualAST);
+const actual = sortPrint(actualAST);
 
-fs.writeFileSync('./actualResult.json', JSON.stringify(actualAST, null, 2).split("\n").join("\n    "));
-fs.writeFileSync('./expectedResult.json', JSON.stringify(expectedAST, null, 2).split("\n").join("\n    "));
+fs.writeFileSync('./actualResult.json', JSON.stringify(actual, null, 2).split("\n").join("\n    "));
+fs.writeFileSync('./expectedResult.json', JSON.stringify(expected, null, 2).split("\n").join("\n    "));

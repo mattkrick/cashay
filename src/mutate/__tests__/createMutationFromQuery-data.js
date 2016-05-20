@@ -88,3 +88,45 @@ export const queryPostCountAliased = `
   query {
     postCount: getPostCount
   }`;
+
+export const queryPostWithInlineFieldVars = `
+  query($first: Int!, $defaultLanguage: String, $secondaryLanguage: String) {
+    getRecentPosts(count: $first) {
+      ... on PostType {
+        title(language: $defaultLanguage),
+        secondaryTitle: title(language: $secondaryLanguage)
+      }
+    }
+  }`;
+
+export const mutatePostWithInlineFieldVars = `
+mutation {
+  createPost {
+    post {
+      ... on PostType {
+        title(language: $defaultLanguage),
+        secondaryTitle: title(language: $secondaryLanguage)
+      }
+    }
+  }
+}`;
+
+export const queryMultiplePosts = `
+query {
+  getLatestPost {
+    _id
+  }
+  getRecentPosts {
+    createdAt
+  }
+}`;
+
+export const mutationForMultiplePosts = `
+mutation {
+  createPost {
+    post {
+      _id
+      createdAt
+    }
+  }
+}`;

@@ -18,7 +18,11 @@ import {
   mutatePostWithFieldVars,
   queryPostCount,
   mutatePostCount,
-  queryPostCountAliased
+  queryPostCountAliased,
+  queryPostWithInlineFieldVars,
+  mutatePostWithInlineFieldVars,
+  queryMultiplePosts,
+  mutationForMultiplePosts
 } from './createMutationFromQuery-data';
 
 test('creates basic mutation from a query of many comments', t => {
@@ -63,12 +67,9 @@ test('creates payload mutation including an object', t => {
   t.is(actual, expected);
 });
 
-test('creates payload mutation including a scalar', t => {
+test('throws if no mutation can be created', t => {
   const queryAST = parse(queryPostCount);
-  const expected = parseSortPrint(mutatePostCount);
-  const actualAST = createMutationFromQuery(queryAST, 'createPost', {}, clientSchema);
-  const actual = sortPrint(actualAST);
-  t.is(actual, expected);
+  t.throws(() => createMutationFromQuery(queryAST, 'createPost', {}, clientSchema));
 });
 
 test('creates payload mutation including a scalar matched by name', t => {
@@ -82,6 +83,22 @@ test('creates payload mutation including a scalar matched by name', t => {
 test('creates payload mutation including an object with args', t => {
   const queryAST = parse(queryPostWithFieldVars);
   const expected = parseSortPrint(mutatePostWithFieldVars);
+  const actualAST = createMutationFromQuery(queryAST, 'createPost', {}, clientSchema);
+  const actual = sortPrint(actualAST);
+  t.is(actual, expected);
+});
+
+test('creates payload mutation when query has inline fragment', t => {
+  const queryAST = parse(queryPostWithInlineFieldVars);
+  const expected = parseSortPrint(mutatePostWithInlineFieldVars);
+  const actualAST = createMutationFromQuery(queryAST, 'createPost', {}, clientSchema);
+  const actual = sortPrint(actualAST);
+  t.is(actual, expected);
+});
+
+test('creates payload mutation from multi-part query', t => {
+  const queryAST = parse(queryMultiplePosts);
+  const expected = parseSortPrint(mutationForMultiplePosts);
   const actualAST = createMutationFromQuery(queryAST, 'createPost', {}, clientSchema);
   const actual = sortPrint(actualAST);
   t.is(actual, expected);

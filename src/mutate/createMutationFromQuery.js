@@ -51,9 +51,9 @@ const findTypeInQuery = (typeName, queryAST, schema, matchName) => {
           subSchema = ensureRootType(schema.types[rootFieldType.name]);
           if (subSchema.name === typeName) {
             if (matchName) {
-              bag[0] = clone(selection);
               const fieldNameOrAlias = selection.alias && selection.alias.value || selectionName;
               if (matchName === fieldNameOrAlias) {
+                bag[0] = clone(selection);
                 return bag;
               }
             } else {
@@ -83,6 +83,7 @@ const trySimpleObject = selectionsInQuery => {
 };
 
 const tryPayloadObject = (mutationAST, operation, mutationReturnSchema, schema) => {
+  let atLeastOne = false;
   const payloadFieldKeys = Object.keys(mutationReturnSchema.fields);
   for (let payloadFieldKey of payloadFieldKeys) {
     const payloadField = mutationReturnSchema.fields[payloadFieldKey];
@@ -91,6 +92,7 @@ const tryPayloadObject = (mutationAST, operation, mutationReturnSchema, schema) 
     const matchName = rootPayloadFieldType.kind === SCALAR && payloadField.name;
     const selectionsInQuery = findTypeInQuery(rootPayloadFieldType.name, operation, schema, matchName);
     if (selectionsInQuery.length) {
+      atLeastOne = true;
       let mutationField;
       if (matchName) {
         mutationField = new Field({name: matchName});
@@ -104,6 +106,11 @@ const tryPayloadObject = (mutationAST, operation, mutationReturnSchema, schema) 
       }
       mutationAST.definitions[0].selectionSet.selections[0].selectionSet.selections.push(mutationField);
     }
+  }
+  if (!atLeastOne) {
+    throw new Error(`Could not generate a mutation from ${operation.selectionSet.selections[0].name.value}. 
+    Verify that ${mutationReturnSchema.name} is correct and the schema is updated. 
+    If it includes scalars, make sure those are aliased in the query.`)
   }
   return mutationAST;
 };
