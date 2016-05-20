@@ -3,6 +3,16 @@
     "kind": "OBJECT",
     "name": "BlogSchema",
     "fields": {
+      "getPostCount": {
+        "name": "getPostCount",
+        "type": {
+          "kind": "NON_NULL",
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "Int"
+          }
+        }
+      },
       "getLatestPost": {
         "name": "getLatestPost",
         "type": {
@@ -113,6 +123,10 @@
     }
   },
   "types": {
+    "Int": {
+      "kind": "SCALAR",
+      "name": "Int"
+    },
     "PostType": {
       "kind": "OBJECT",
       "name": "PostType",
@@ -328,10 +342,6 @@
     "Boolean": {
       "kind": "SCALAR",
       "name": "Boolean"
-    },
-    "Int": {
-      "kind": "SCALAR",
-      "name": "Int"
     },
     "CommentType": {
       "kind": "OBJECT",

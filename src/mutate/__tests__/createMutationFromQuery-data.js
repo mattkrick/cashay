@@ -71,3 +71,20 @@ mutation {
     }
   }
 }`;
+
+export const queryPostCount = `
+  query {
+    getPostCount
+  }`;
+
+export const mutatePostCount = `
+mutation {
+  createPost {
+    postCount
+  }
+}`;
+
+export const queryPostCountAliased = `
+  query {
+    postCount: getPostCount
+  }`;

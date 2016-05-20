@@ -230,6 +230,13 @@ const Query = new GraphQLObjectType({
   name: 'BlogSchema',
   description: "Root of the Blog Schema",
   fields: () => ({
+    getPostCount: {
+      type: new GraphQLNonNull(GraphQLInt),
+      description: "the number of posts currently in the db",
+      resolve() {
+        return Object.keys(PostDB).length;
+      }
+    },
     getLatestPost: {
       type: PostType,
       description: "Latest post in the blog",

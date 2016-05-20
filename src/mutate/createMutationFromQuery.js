@@ -1,55 +1,40 @@
 import {ensureRootType} from '../utils';
-import {CachedMutation, CachedQuery, MutationShell, RequestArgument} from '../helperClasses';
-import {ensureTypeFromNonNull, clone} from '../utils';
+import {MutationShell, RequestArgument, Field} from '../helperClasses';
+import {clone} from '../utils';
 import {mergeSelections} from './mergeMutations';
-import {
-  OPERATION_DEFINITION,
-  DOCUMENT,
-  SELECTION_SET,
-  NAME,
-  ARGUMENT,
-  VARIABLE,
-  NAMED_TYPE,
-  FIELD,
-  INLINE_FRAGMENT,
-  VARIABLE_DEFINITION,
-  LIST_TYPE
-} from 'graphql/language/kinds';
+import {VARIABLE, INLINE_FRAGMENT} from 'graphql/language/kinds';
+import {TypeKind} from 'graphql/type/introspection';
+
+const {SCALAR} = TypeKind;
 
 export default (queryAST, mutationName, mutationVariables = {}, schema) => {
   const operation = queryAST.definitions[0];
   //createComment
   const mutationFieldSchema = schema.mutationSchema.fields[mutationName];
-  //commentType
   const mutationRootReturnType = ensureRootType(mutationFieldSchema.type);
-  // commentTypeSchema
   const mutationReturnSchema = schema.types[mutationRootReturnType.name];
 
   const mutationArgs = makeArgsFromVars(mutationFieldSchema, mutationVariables);
   const mutationAST = new MutationShell(mutationName, mutationArgs);
 
-
   // Assume the mutationReturnSchema is a single type (opposed to a payload full of many types)
   const selectionsInQuery = findTypeInQuery(mutationReturnSchema.name, operation, schema);
-  if (selectionsInQuery) {
-    debugger
-    const newSelections = selectionsInQuery.pop();
-    for (let srcSelections of selectionsInQuery) {
-      mergeSelections(newSelections, srcSelections);
-    }
-    mutationAST.definitions[0].selectionSet.selections[0].selectionSet.selections = newSelections;
-  } else {
-
-    // TODO treat as a payload
+  const simpleObject = trySimpleObject(selectionsInQuery);
+  if (simpleObject) {
+    mutationAST.definitions[0].selectionSet.selections[0].selectionSet.selections = simpleObject;
+    return mutationAST;
   }
-  return mutationAST;
+  return tryPayloadObject(mutationAST, operation, mutationReturnSchema, schema);
 };
 
-const findTypeInQuery = (typeName, initialReqAST, schema) => {
+/**
+ * Uses a BFS since types are likely high up the tree & scalars can possibly break early
+ */
+const findTypeInQuery = (typeName, queryAST, schema, matchName) => {
   const bag = [];
   const queue = [];
   let next = {
-    reqAST: initialReqAST,
+    reqAST: queryAST,
     typeSchema: schema.querySchema
   };
   while (next) {
@@ -62,11 +47,18 @@ const findTypeInQuery = (typeName, initialReqAST, schema) => {
         } else {
           const selectionName = selection.name.value;
           const fieldSchema = typeSchema.fields[selectionName];
-          if (!fieldSchema) debugger
           const rootFieldType = ensureRootType(fieldSchema.type);
           subSchema = ensureRootType(schema.types[rootFieldType.name]);
           if (subSchema.name === typeName) {
-            bag.push(clone(selection.selectionSet.selections));
+            if (matchName) {
+              bag[0] = clone(selection);
+              const fieldNameOrAlias = selection.alias && selection.alias.value || selectionName;
+              if (matchName === fieldNameOrAlias) {
+                return bag;
+              }
+            } else {
+              bag.push(clone(selection.selectionSet.selections));
+            }
           }
         }
         queue.push({
@@ -77,7 +69,43 @@ const findTypeInQuery = (typeName, initialReqAST, schema) => {
     }
     next = queue.shift();
   }
-  return bag.length && bag;
+  return bag;
+};
+
+const trySimpleObject = selectionsInQuery => {
+  if (selectionsInQuery.length) {
+    const newSelections = selectionsInQuery.pop();
+    for (let srcSelections of selectionsInQuery) {
+      mergeSelections(newSelections, srcSelections);
+    }
+    return newSelections;
+  }
+};
+
+const tryPayloadObject = (mutationAST, operation, mutationReturnSchema, schema) => {
+  const payloadFieldKeys = Object.keys(mutationReturnSchema.fields);
+  for (let payloadFieldKey of payloadFieldKeys) {
+    const payloadField = mutationReturnSchema.fields[payloadFieldKey];
+    const rootPayloadFieldType = ensureRootType(payloadField.type);
+    // 2 strings probably don't refer to the same field, so for scalars the name has to match, too
+    const matchName = rootPayloadFieldType.kind === SCALAR && payloadField.name;
+    const selectionsInQuery = findTypeInQuery(rootPayloadFieldType.name, operation, schema, matchName);
+    if (selectionsInQuery.length) {
+      let mutationField;
+      if (matchName) {
+        mutationField = new Field({name: matchName});
+      } else {
+        const newSelections = selectionsInQuery.pop();
+        for (let srcSelections of selectionsInQuery) {
+          mergeSelections(newSelections, srcSelections);
+        }
+        // make a payload field into a mutation field
+        mutationField = new Field({name: payloadField.name, selections: newSelections});
+      }
+      mutationAST.definitions[0].selectionSet.selections[0].selectionSet.selections.push(mutationField);
+    }
+  }
+  return mutationAST;
 };
 
 const makeArgsFromVars = (mutationFieldSchema, variables) => {

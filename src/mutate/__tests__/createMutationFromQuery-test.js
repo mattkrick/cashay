@@ -1,5 +1,5 @@
 import 'babel-register';
-import 'babel-polyfill';
+// import 'babel-polyfill';
 import test from 'ava';
 import clientSchema from '../../../__tests__/clientSchema.json';
 import createMutationFromQuery from '../createMutationFromQuery';
@@ -15,7 +15,10 @@ import {
   queryPost,
   mutatePost,
   queryPostWithFieldVars,
-  mutatePostWithFieldVars
+  mutatePostWithFieldVars,
+  queryPostCount,
+  mutatePostCount,
+  queryPostCountAliased
 } from './createMutationFromQuery-data';
 
 test('creates basic mutation from a query of many comments', t => {
@@ -55,6 +58,30 @@ test('creates basic mutation from multi-part query', t => {
 test('creates payload mutation including an object', t => {
   const queryAST = parse(queryPost);
   const expected = parseSortPrint(mutatePost);
+  const actualAST = createMutationFromQuery(queryAST, 'createPost', {}, clientSchema);
+  const actual = sortPrint(actualAST);
+  t.is(actual, expected);
+});
+
+test('creates payload mutation including a scalar', t => {
+  const queryAST = parse(queryPostCount);
+  const expected = parseSortPrint(mutatePostCount);
+  const actualAST = createMutationFromQuery(queryAST, 'createPost', {}, clientSchema);
+  const actual = sortPrint(actualAST);
+  t.is(actual, expected);
+});
+
+test('creates payload mutation including a scalar matched by name', t => {
+  const queryAST = parse(queryPostCountAliased);
+  const expected = parseSortPrint(mutatePostCount);
+  const actualAST = createMutationFromQuery(queryAST, 'createPost', {}, clientSchema);
+  const actual = sortPrint(actualAST);
+  t.is(actual, expected);
+});
+
+test('creates payload mutation including an object with args', t => {
+  const queryAST = parse(queryPostWithFieldVars);
+  const expected = parseSortPrint(mutatePostWithFieldVars);
   const actualAST = createMutationFromQuery(queryAST, 'createPost', {}, clientSchema);
   const actual = sortPrint(actualAST);
   t.is(actual, expected);

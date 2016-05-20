@@ -8,7 +8,6 @@ export const ensureTypeFromNonNull = type => type.kind === NON_NULL ? type.ofTyp
 
 //const ensureTypeFromList = type => type.kind === LIST ? ensureTypeFromNonNull(type.ofType) : type;
 export const ensureRootType = type => {
-  if (!type) debugger
   while (type.ofType) type = type.ofType;
   return type;
 };

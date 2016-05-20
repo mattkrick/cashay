@@ -96,6 +96,16 @@ class TypeCondition {
   }
 }
 
+export class Field {
+  constructor({alias, args, directives, name, selections}) {
+    this.kind = FIELD;
+    this.alias = alias;
+    this.arguments = args;
+    this.directives = directives;
+    this.name = new Name(name);
+    this.selectionSet = selections ? new SelectionSet(selections) : null;
+  }
+}
 export class MutationShell {
   constructor(mutationName, mutationArgs, variableDefinitions = []) {
     this.kind = DOCUMENT;
@@ -104,15 +114,7 @@ export class MutationShell {
       operation: 'mutation',
       variableDefinitions,
       directives: [],
-      selectionSet: new SelectionSet([{
-        alias: null,
-        arguments: mutationArgs,
-        // TODO add directives support
-        directives: [],
-        kind: FIELD,
-        name: new Name(mutationName),
-        selectionSet: new SelectionSet()
-      }])
+      selectionSet: new SelectionSet([new Field({args: mutationArgs, name: mutationName, selections: []})])
     }]
   }
 }
