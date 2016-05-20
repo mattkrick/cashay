@@ -1,5 +1,4 @@
 import 'babel-register';
-import 'babel-polyfill';
 import test from 'ava';
 import clientSchema from '../../../__tests__/clientSchema.json';
 import namespaceMutation from '../namespaceMutation';

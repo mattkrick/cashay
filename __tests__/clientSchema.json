@@ -87,6 +87,28 @@
           "kind": "OBJECT",
           "name": "Group"
         }
+      },
+      "getCommentsByPostId": {
+        "name": "getCommentsByPostId",
+        "args": {
+          "postId": {
+            "name": "postId",
+            "type": {
+              "kind": "NON_NULL",
+              "ofType": {
+                "kind": "SCALAR",
+                "name": "String"
+              }
+            }
+          }
+        },
+        "type": {
+          "kind": "LIST",
+          "ofType": {
+            "kind": "OBJECT",
+            "name": "CommentType"
+          }
+        }
       }
     }
   },

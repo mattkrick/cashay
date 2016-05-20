@@ -1,3 +1,18 @@
+import {ensureTypeFromNonNull} from '../utils';
+import {
+  OPERATION_DEFINITION,
+  DOCUMENT,
+  SELECTION_SET,
+  NAME,
+  ARGUMENT,
+  VARIABLE,
+  NAMED_TYPE,
+  FIELD,
+  INLINE_FRAGMENT,
+  VARIABLE_DEFINITION,
+  LIST_TYPE
+} from 'graphql/language/kinds';
+import {RequestArgument} from '../helperClasses';
 
 export const makeComponentsToUpdate = (mutationName, possibleComponentIds, denormalizedResults, mutationHandlers) => {
   const componentIds = [];
@@ -26,15 +41,15 @@ export const makeComponentsToUpdate = (mutationName, possibleComponentIds, denor
   return componentIds.length && componentIds;
 };
 
-export const makeArgsAndDefs = (mutationFieldSchema, variables) => {
-  const mutationArgs = [];
-  const variableDefinitions = [];
-  for (let schemaArg of mutationFieldSchema.args) {
-    if (variables[schemaArg.name]) {
-      const argType = ensureTypeFromNonNull(schemaArg.type);
-      variableDefinitions.push(new VariableDefinition(argType.name, schemaArg.name));
-      mutationArgs.push(new RequestArgument(schemaArg.name, VARIABLE, schemaArg.name));
-    }
-  }
-  return {mutationArgs, variableDefinitions};
-};
+// export const makeArgsAndDefs = (mutationFieldSchema, variables) => {
+//   const mutationArgs = [];
+//   const variableDefinitions = [];
+//   for (let schemaArg of mutationFieldSchema.args) {
+//     if (variables[schemaArg.name]) {
+//       const argType = ensureTypeFromNonNull(schemaArg.type);
+//       variableDefinitions.push(new VariableDefinition(argType.name, schemaArg.name));
+//       mutationArgs.push(new RequestArgument(schemaArg.name, VARIABLE, schemaArg.name));
+//     }
+//   }
+//   return {mutationArgs, variableDefinitions};
+// };

@@ -9,13 +9,13 @@ import {isObject, checkMutationInSchema} from './utils';
 import {deepAssign} from './deepAssign';
 import {createMutationString} from './mutate/createMutationString';
 import {parseAndAlias} from './mutate/mergeMutations';
-import {CachedMutation, CachedQuery, MutationShell} from './helperClasses'
+import {CachedMutation, CachedQuery, MutationShell} from './helperClasses';
 import flushDependencies from './query/flushDependencies';
 import {makeComponentsToUpdate} from './mutate/mutationHelpers';
 import {parse, arraysShallowEqual} from './utils';
 import namespaceMutation from './mutate/namespaceMutation';
 import mergeMutations from './mutate/mergeMutations';
-
+import createMutationFromQuery from './mutate/createMutationFromQuery';
 const defaultGetToState = store => store.getState().cashay;
 const defaultPaginationWords = {
   before: 'before',
@@ -353,9 +353,9 @@ export default class Cashay {
         throw new Error(`Mutation has no queries to update: ${mutationName}`);
       }
       //TODO
-      const cachedSingles = {};
       this._createMutationsFromQueries(componentIdsToUpdate, mutationName, variables);
 
+      const cachedSingles = {};
       for (let componentId of componentIdsToUpdate) {
         const {ast, variableEnhancers} = singles[componentId];
         cachedSingles[componentId] = ast;
@@ -386,9 +386,13 @@ export default class Cashay {
     for (let componentId of componentIds) {
       if (!cachedSingles[componentId]) {
         const {ast} = this.cachedQueries[componentId];
-        const mutationShell = new MutationShell(mutationName, mutationFieldSchema, variables);
         // TODO where to handle parseAndAlias? Inside i think
-        cachedSingles[componentId] = createMutationASTFromQuery(ast, mutationShell, this.schema);
+        const mutationAST = createMutationFromQuery(ast, mutationName, this.schema);
+        const {namespaceAST, variableEnhancers} = namespaceMutation(mutationAST, componentId, this.state.variables, this.schema);
+        cachedSingles[componentId] = {
+          ast: namespaceAST,
+          variableEnhancers
+        }
       }
     }
   };
@@ -477,8 +481,3 @@ export default class Cashay {
     }
   }
 }
-
-const createMutationASTFromQuery = (queryAST, mutationAST, schema) => {
-  // Assume the mutation returns a useful type instead of a mutationPayload (an object of useful types)
-
-};

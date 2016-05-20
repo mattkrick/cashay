@@ -1,5 +1,4 @@
 import 'babel-register';
-import 'babel-polyfill';
 import test from 'ava';
 import mergeMutations from '../mergeMutations';
 import {parseSortPrint} from '../../../__tests__/parseSortPrint';

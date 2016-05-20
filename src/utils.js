@@ -1,4 +1,4 @@
-import {INLINE_FRAGMENT} from 'graphql/language/kinds';
+import {INLINE_FRAGMENT, FRAGMENT_SPREAD} from 'graphql/language/kinds';
 import {TypeKind} from 'graphql/type/introspection';
 import {parse as gqlParse} from 'graphql/language/parser';
 
@@ -8,6 +8,7 @@ export const ensureTypeFromNonNull = type => type.kind === NON_NULL ? type.ofTyp
 
 //const ensureTypeFromList = type => type.kind === LIST ? ensureTypeFromNonNull(type.ofType) : type;
 export const ensureRootType = type => {
+  if (!type) debugger
   while (type.ofType) type = type.ofType;
   return type;
 };
@@ -42,4 +43,17 @@ export const arraysShallowEqual = (arr1, arr2) => {
     if (!set2.has(val)) return false;
   }
   return true;
+};
+
+export const inlineAllFragments = (operationSelections, fragments) => {
+  for (let i = 0; i < operationSelections.length; i++) {
+    const selection = operationSelections[i];
+    if (selection.kind === FRAGMENT_SPREAD) {
+      const fragment = clone(fragments[selection.name.value]);
+      operationSelections[i] = convertFragmentToInline(fragment);
+    }
+    if (selection.selectionSet) {
+      inlineAllFragments(selection.selectionSet.selections, fragments);
+    }
+  }
 };

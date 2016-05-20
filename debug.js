@@ -1,4 +1,5 @@
 import fs from 'fs';
+import 'babel-polyfill'
 import clientSchema from './__tests__/clientSchema.json';
 // import {mergeMutationASTs} from './src/mutate/mergeMutations';
 import namespaceMutation from './src/mutate/namespaceMutation';
@@ -6,35 +7,24 @@ import mergeMutations from './src/mutate/mergeMutations'
 import {parseSortPrint, sortPrint} from './__tests__/parseSortPrint';
 import {parse} from './src/utils';
 import {print} from 'graphql/language/printer';
+import createMutationFromQuery from './src/mutate/createMutationFromQuery';
 
 import {
-  nestedFragmentSpreads
-} from './src/mutate/__tests__/namespaceMutation-data';
+  mutationForCommentQuery,
+  mutationForCommentQueryNoVars,
+  mutationForMultipleComments,
+  queryCommentsForPostId,
+  queryMultipleComments,
+} from './src/mutate/__tests__/createMutationFromQuery-data';
+const queryAST = parse(queryMultipleComments);
+const expected = parseSortPrint(mutationForMultipleComments);
+const variables = {
+  _id: 'a321',
+  postId: 'p123',
+  content: 'X'
+};
+const actualAST = createMutationFromQuery(queryAST, 'createComment', variables, clientSchema);
+const actual = print(actualAST);
 
-const expectedRaw = `
-  mutation {
-    createPost(newPost: {_id: "129"}) {
-      post {
-        ... on PostType {
-          ... on PostType {
-            createdAt
-          }
-        }
-      }
-    }
-  }`;
-const expected = parseSortPrint(expectedRaw);
-const mutationAST = parse(nestedFragmentSpreads);
-const {namespaceAST} = namespaceMutation(mutationAST, 'component1', {}, clientSchema);
-const actual = sortPrint(namespaceAST);
-
-
-fs.writeFileSync('./debugResults.js', `
-Actual:
- ${JSON.stringify(actual, null, 2).split("\n").join("\n    ")}
-
- Expected:
- ${JSON.stringify(expected, null, 2).split("\n").join("\n    ")}
-
-`)
-// console.log(foo)
+// fs.writeFileSync('./actualResult.json', JSON.stringify(actualAST, null, 2).split("\n").join("\n    "));
+// fs.writeFileSync('./expectedResult.json', JSON.stringify(expectedAST, null, 2).split("\n").join("\n    "));

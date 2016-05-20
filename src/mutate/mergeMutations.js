@@ -45,7 +45,7 @@ const mergeNewAST = (target, src) => {
 };
 
 
-const mergeSelections = (targetSelections, srcSelections) => {
+export const mergeSelections = (targetSelections, srcSelections) => {
   for (let selection of srcSelections) {
     mergeSingleProp(targetSelections, selection)
   }

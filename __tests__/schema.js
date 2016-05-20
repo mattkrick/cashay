@@ -272,7 +272,19 @@ const Query = new GraphQLObjectType({
       resolve(source, {_id}) {
         return GroupDB[_id]
       }
-    }
+    },
+    getCommentsByPostId: {
+      type: new GraphQLList(CommentType),
+      description: "Comments for a specific post",
+      args: {
+        postId: {type: new GraphQLNonNull(GraphQLString)}
+      },
+      resolve: function ({postId}, args) {
+        const commentKeys = Object.keys(CommentDB);
+        const filteredCommentKeys = commentKeys.filter(key => CommentDB[key].postId === postId);
+        return filteredCommentKeys.map(key => CommentDB[key]);
+      }
+    },
   })
 });
 

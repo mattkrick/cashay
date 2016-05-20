@@ -14,8 +14,8 @@ import {
 import {TypeKind} from 'graphql/type/introspection';
 import {SET_VARIABLES} from './duck';
 import {denormalizeStore} from './denormalize/denormalizeStore';
-import {makeArgsAndDefs} from './mutate/mutationHelpers';
-import {parse, ensureRootType, ensureTypeFromNonNull} from './utils';
+import {parse, ensureRootType, ensureTypeFromNonNull, inlineAllFragments} from './utils';
+import {teardownDocumentAST} from './buildExecutionContext';
 
 const {LIST} = TypeKind;
 
@@ -30,7 +30,11 @@ export class CachedMutation {
 
 export class CachedQuery {
   constructor(queryFunction, queryString, options, response) {
-    this.ast = parse(queryString);
+    const ast = parse(queryString);
+    const {operation, fragments} = teardownDocumentAST(ast);
+    inlineAllFragments(operation.selectionSet.selections, fragments);
+    ast.definitions = [operation];
+    this.ast = ast;
     this.refetch = () => queryFunction(queryString, options);
     this.response = response;
   }
@@ -93,13 +97,13 @@ class TypeCondition {
 }
 
 export class MutationShell {
-  constructor(mutationName, mutationFieldSchema, variables) {
-    const {mutationArgs, variableDefinitions} = makeArgsAndDefs(mutationFieldSchema, variables);
+  constructor(mutationName, mutationArgs, variableDefinitions = []) {
     this.kind = DOCUMENT;
-    this.definitions = {
+    this.definitions = [{
       kind: OPERATION_DEFINITION,
       operation: 'mutation',
       variableDefinitions,
+      directives: [],
       selectionSet: new SelectionSet([{
         alias: null,
         arguments: mutationArgs,
@@ -109,7 +113,7 @@ export class MutationShell {
         name: new Name(mutationName),
         selectionSet: new SelectionSet()
       }])
-    }
+    }]
   }
 }
 
