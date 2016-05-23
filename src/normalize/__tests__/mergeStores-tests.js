@@ -1,10 +1,5 @@
 import test from 'ava';
 import 'babel-register';
-import clientSchema from '../../../__tests__/clientSchema.json';
-import normalizeResponse from '../normalizeResponse';
-import {buildExecutionContext} from '../../buildExecutionContext';
-import {unionQueryString, unionStoreFull, unionResponse} from './data-union';
-import {clone} from '../../utils';
 import mergeStores from '../mergeStores';
 
 import {
@@ -14,16 +9,7 @@ import {
   front1After4StoreFn
 } from './data-pagination-front';
 import {
-  back3Query,
-  back3Response,
   back3Store,
-  back2After3Query,
-  back1After3Response,
-  back2After3StoreFn,
-  back1After3Query,
-  back1After3Store,
-  back1After4Query,
-  back1After4Response,
   back1After4StoreFn
 } from './data-pagination-back';
 

@@ -14,7 +14,7 @@ import {
 import {TypeKind} from 'graphql/type/introspection';
 import {SET_VARIABLES} from './normalize/duck';
 import {denormalizeStore} from './normalize/denormalizeStore';
-import {parse, ensureRootType, ensureTypeFromNonNull, inlineAllFragments, parseAndInline} from './utils';
+import {parse, ensureRootType, ensureTypeFromNonNull, inlineAllFragments, parseAndInitializeQuery} from './utils';
 import {teardownDocumentAST} from './buildExecutionContext';
 
 const {LIST} = TypeKind;
@@ -30,7 +30,7 @@ export class CachedMutation {
 
 export class CachedQuery {
   constructor(queryFunction, queryString, options, response) {
-    this.ast = parseAndInline(queryString);
+    this.ast = parseAndInitializeQuery(queryString);
     this.refetch = () => queryFunction(queryString, options);
     this.response = response;
   }

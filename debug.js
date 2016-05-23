@@ -1,5 +1,6 @@
 import fs from 'fs';
 import clientSchema from './__tests__/clientSchema.json';
+import {parseSortPrint, sortPrint} from './__tests__/parseSortPrint';
 import normalizeResponse from './src/normalize/normalizeResponse';
 import {buildExecutionContext} from './src/buildExecutionContext';
 import namespaceMutation from './src/mutate/namespaceMutation';
@@ -10,7 +11,6 @@ import {parse, clone} from './src/utils';
 // import createMutationFromQuery from './src/mutate/createMutationFromQuery';
 
 import {
-  unionQueryString,
   unionStoreFull,
   unionResponse
 } from './src/normalize/__tests__/data-union';
@@ -42,11 +42,18 @@ import {
   back1Store,
   front3Back1Store,
 } from './src/normalize/__tests__/data-pagination';
+import parseAndInitializeQuery from './src/query/parseAndInitializeQuery';
+import {
+  fragmentQueryString,
+  inlineQueryString,
+  inlineQueryStringWithoutId,
+  unionQueryString,
+  unionQueryStringWithoutTypename
+} from './src/query/__tests__/parseAndInitializeQuery-data';
 
-const firstDocs = front3Store;
-const lastDoc = front2After3StoreFn();
-const actual = mergeStores(firstDocs, lastDoc);
-const expected = fullPostStore;
+const initializedAST = parseAndInitializeQuery(unionQueryStringWithoutTypename, clientSchema, '_id');
+const actual = sortPrint(initializedAST);
+const expected = parseSortPrint(unionQueryString);
 
 debugger
 fs.writeFileSync('./actualResult.json', JSON.stringify(actual, null, 2));

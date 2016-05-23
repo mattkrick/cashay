@@ -5,6 +5,8 @@ import {teardownDocumentAST} from './buildExecutionContext';
 
 const {NON_NULL} = TypeKind;
 
+export const TYPENAME = '__typename';
+
 export const ensureTypeFromNonNull = type => type.kind === NON_NULL ? type.ofType : type;
 
 //const ensureTypeFromList = type => type.kind === LIST ? ensureTypeFromNonNull(type.ofType) : type;
@@ -44,25 +46,3 @@ export const arraysShallowEqual = (arr1, arr2) => {
   }
   return true;
 };
-
-export const inlineAllFragments = (operationSelections, fragments) => {
-  for (let i = 0; i < operationSelections.length; i++) {
-    const selection = operationSelections[i];
-    if (selection.kind === FRAGMENT_SPREAD) {
-      const fragment = clone(fragments[selection.name.value]);
-      operationSelections[i] = convertFragmentToInline(fragment);
-    }
-    if (selection.selectionSet) {
-      inlineAllFragments(selection.selectionSet.selections, fragments);
-    }
-  }
-};
-
-export const parseAndInline = queryString => {
-  const ast = parse(queryString);
-  const {operation, fragments} = teardownDocumentAST(ast);
-  inlineAllFragments(operation.selectionSet.selections, fragments);
-  // TODO also need to add "id" and "__typename" and sort all args
-  ast.definitions = [operation];
-  return ast;
-}

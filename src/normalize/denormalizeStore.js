@@ -1,6 +1,6 @@
 import {TypeKind} from 'graphql/type/introspection';
 import {FRAGMENT_SPREAD, INLINE_FRAGMENT} from 'graphql/language/kinds';
-import {isObject, ensureRootType, ensureTypeFromNonNull, clone, convertFragmentToInline} from '../utils';
+import {isObject, ensureRootType, ensureTypeFromNonNull, clone, convertFragmentToInline, TYPENAME} from '../utils';
 import {
   calculateSendToServer,
   sendChildrenToServer,
@@ -23,8 +23,8 @@ const visitObject = (subState = {}, reqAST, subSchema, context, baseReduction = 
         // only follow through if it's the correct union subtype
         visitObject(subState, field, subSchema, context, reduction);
       }
-    } else if (field.name.value === '__typename') {
-      reduction.__typename = subSchema.name;
+    } else if (field.name.value === TYPENAME) {
+      reduction[TYPENAME] = subSchema.name;
     } else {
       const fieldName = field.name.value;
       const aliasOrFieldName = field.alias && field.alias.value || fieldName;

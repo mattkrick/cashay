@@ -351,7 +351,6 @@ export default class Cashay {
       if (!componentIdsToUpdate) {
         throw new Error(`Mutation has no queries to update: ${mutationName}`);
       }
-      //TODO
       this._createMutationsFromQueries(componentIdsToUpdate, mutationName, variables);
 
       const cachedSingles = {};
@@ -385,7 +384,6 @@ export default class Cashay {
     for (let componentId of componentIds) {
       if (!cachedSingles[componentId]) {
         const {ast} = this.cachedQueries[componentId];
-        // TODO where to handle parseAndAlias? Inside i think
         const mutationAST = createMutationFromQuery(ast, mutationName, this.schema);
         const {namespaceAST, variableEnhancers} = namespaceMutation(mutationAST, componentId, this.state.variables, this.schema);
         cachedSingles[componentId] = {
@@ -451,7 +449,6 @@ export default class Cashay {
       // create a new object to make sure react-redux's updateStatePropsIfNeeded returns true
       this.cachedQueries[componentId].response = Object.assign({}, this.cachedQueries[componentId].response);
 
-      // TODO: normalizing requires context, requires the queryAST, but we don't wanna parse that over & over!
       // let's parse for alpha, then figure out whether to store it or do something intelligent
       // like store the AST for hot queries
       // if a mutation was made, normalize it & send it off to the store
