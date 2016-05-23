@@ -36,14 +36,12 @@ const visitObject = (subState = {}, reqAST, subSchema, context, baseReduction = 
         if (fieldSchema.args && fieldSchema.args.length) {
           fieldState = getFieldState(fieldState, fieldSchema, field, context);
         }
-        // const typeSchema = context.schema.types.find(type => type.name === fieldSchema.type.name);
         reduction[aliasOrFieldName] = visit(fieldState, field, fieldSchema, context);
         if (field.selectionSet) {
           calculateSendToServer(field, context.idFieldName)
         }
       } else {
         reduction[aliasOrFieldName] = handleMissingData(visit, aliasOrFieldName, field, fieldSchema, context);
-        field.sendToServer = true;
       }
     }
     return reduction
@@ -68,8 +66,12 @@ const visitIterable = (subState, reqAST, subSchema, context) => {
 
     // for each value in the array, get the denormalized item
     const mappedState = subState.map(res => visit(res, reqAST, fieldSchema, context));
-    mappedState.BOF = subState.BOF;
-    mappedState.EOF = subState.EOF;
+    if (subState.BOF) {
+      mappedState.BOF = subState.BOF;
+    }
+    if (subState.EOF) {
+      mappedState.EOF = subState.EOF;
+    }
     return mappedState;
   }
   // recursively climb down the tree, flagging each branch with sendToServer
@@ -98,7 +100,7 @@ const visit = (subState, reqAST, subSchema, context) => {
   }
 };
 
-export default context => {
+export default function denormalizeStore(context) {
   // if we have nothing in the local state for this query, send it right to the server
   let firstRun = true;
 

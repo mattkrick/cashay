@@ -8,8 +8,6 @@ const getSuppliedArgs = (args, variables = {}, paginationWords) => {
   const paginationWordKeys = Object.keys(paginationWords);
   let hasPagination = false;
   args
-    // TODO do the sort during the inital AST creation
-    .sort((a, b) => a.name.value < b.name.value)
     .forEach(arg => {
       const argName = arg.name.value;
       let argValue = arg.value.value || variables[argName];

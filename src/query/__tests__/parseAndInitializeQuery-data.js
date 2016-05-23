@@ -83,3 +83,19 @@ query {
     }
   }
 }`;
+
+export const queryWithSortedArgs = `
+query {
+  getLatestPost {
+    _id
+		title(inReverse: true, language: "english")
+  }
+}`;
+
+export const queryWithUnsortedArgs = `
+query {
+  getLatestPost {
+    _id
+		title(language: "english", inReverse: true)
+  }
+}`;

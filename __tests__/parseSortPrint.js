@@ -16,6 +16,12 @@ export const sortPrint = ast => {
   return print(ast);
 };
 
+export const sortAST = ast => {
+  const {operation} = teardownDocumentAST(ast);
+  recurse(operation.selectionSet.selections);
+  return ast;
+};
+
 const recurse = astSelections => {
   for (let selection of astSelections) {
     if (selection.selectionSet) {

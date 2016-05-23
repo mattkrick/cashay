@@ -12,9 +12,10 @@ import {parse, clone} from './src/utils';
 
 import {
   unionStoreFull,
-  unionResponse
+  unionResponse,
+  unionQueryString,
+  unionStoreMissingOwner
 } from './src/normalize/__tests__/data-union';
-import {paginationWords} from './src/normalize/__tests__/data';
 import mergeStores from './src/normalize/mergeStores';
 import {
   back3Query,
@@ -41,19 +42,25 @@ import {
   back4PostStore,
   back1Store,
   front3Back1Store,
+  back1Query,
+  back1StoreNoCursor
 } from './src/normalize/__tests__/data-pagination';
 import parseAndInitializeQuery from './src/query/parseAndInitializeQuery';
 import {
   fragmentQueryString,
   inlineQueryString,
   inlineQueryStringWithoutId,
-  unionQueryString,
-  unionQueryStringWithoutTypename
+  unionQueryStringWithoutTypename,
+  queryWithUnsortedArgs,
+  queryWithSortedArgs
 } from './src/query/__tests__/parseAndInitializeQuery-data';
+import denormalizeStore from './src/normalize/denormalizeStore';
+import {paginationWords} from './src/normalize/__tests__/data';
 
-const initializedAST = parseAndInitializeQuery(unionQueryStringWithoutTypename, clientSchema, '_id');
+
+const initializedAST = parseAndInitializeQuery(queryWithUnsortedArgs, clientSchema, '_id');
 const actual = sortPrint(initializedAST);
-const expected = parseSortPrint(unionQueryString);
+const expected = parseSortPrint(queryWithSortedArgs);
 
 debugger
 fs.writeFileSync('./actualResult.json', JSON.stringify(actual, null, 2));

@@ -88,6 +88,41 @@ export const unionStoreFull = {
   }
 };
 
+export const unionStoreMissingOwnerMembers = {
+  "entities": {
+    "Group": {
+      "g123": {
+        "_id": "g123"
+      }
+    },
+    "AuthorType": {
+      "a124": {
+        "_id": "a124",
+        "name": "Joe J"
+      }
+    }
+  },
+  "result": {
+    "getGroup": {
+      "{\"_id\":\"g123\"}": "Group:g123"
+    }
+  }
+};
+
+export const unionMissingOwnerMembersDenormalized = {
+  "getGroup": {
+    "_id": "g123",
+    "owner": {
+      "__typename": null,
+      "_id": null,
+      "name": null,
+      "twitterHandle": null
+    },
+    "members": []
+  }
+};
+
+
 export const initialState = {
   entities: {},
   result: {}

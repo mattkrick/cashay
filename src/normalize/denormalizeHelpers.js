@@ -5,6 +5,7 @@ import {ensureTypeFromNonNull} from '../utils';
 const {UNION, LIST, OBJECT, SCALAR} = TypeKind;
 
 export const handleMissingData = (visit, aliasOrFieldName, field, fieldSchema, context) => {
+  field.sendToServer = true;
   const fieldType = ensureTypeFromNonNull(fieldSchema.type);
   if (fieldType.kind === SCALAR) {
     return null;
@@ -14,11 +15,16 @@ export const handleMissingData = (visit, aliasOrFieldName, field, fieldSchema, c
     const newFieldSchema = context.schema.types[fieldType.name];
     if (fieldType.kind === UNION) {
       // since we don't know what the shape will look like, make it look like everything
-      return newFieldSchema.possibleTypes.reduce((reduction, objType) => {
+      // that way, we don't have to code defensively in the view layer
+      const {possibleTypes} = newFieldSchema;
+      const possibleTypesKeys = Object.keys(possibleTypes);
+      const unionResponse = {};
+      for (let possibleTypeKey of possibleTypesKeys) {
+        const objType = possibleTypes[possibleTypeKey];
         const newFieldSchema = context.schema.types[objType.name];
-        // take the old, add the new, keep typename null
-        return Object.assign(reduction, visit(reduction, field, newFieldSchema, context), {__typename: null});
-      }, {});
+        Object.assign(unionResponse, visit(unionResponse, field, newFieldSchema, context), {__typename: null});
+      }
+      return unionResponse;
     }
     return visit({}, field, newFieldSchema, context);
   }

@@ -2,90 +2,61 @@ import test from 'ava';
 import 'babel-register';
 import {buildExecutionContext} from '../../buildExecutionContext';
 import denormalizeStore from '../denormalizeStore';
-import {unionQueryString, unionStoreFull, unionResponse} from './data-union';
+import {
+  unionQueryString,
+  unionStoreFull,
+  unionResponse,
+  unionStoreMissingOwnerMembers,
+  unionMissingOwnerMembersDenormalized
+} from './data-union';
+import {paginationWords} from './data';
+import clientSchema from '../../../__tests__/clientSchema.json';
+import {back1Query, back1StoreNoCursor, back1NoCursorDenormalizedFn} from './data-pagination';
+
 import {parse} from '../../utils';
+import parseAndInitializeQuery from '../../query/parseAndInitializeQuery';
+
+const idFieldName = '_id';
 
 test('normalize store from recursive union request', t => {
-  const queryAST = parse(unionQueryString);
-  const context = buildExecutionContext(queryAST, unionStoreFull, {idFieldName: '_id'});
-  const denormalizedResponse = denormalizeStore(context);
-  t.deepEqual(denormalizedResponse.data, unionResponse.data);
+  const queryAST = parseAndInitializeQuery(unionQueryString, clientSchema, idFieldName);
+  const context = buildExecutionContext(queryAST, {
+    cashayDataState: unionStoreFull,
+    idFieldName,
+    schema: clientSchema,
+    paginationWords
+  });
+  const {data: actual} = denormalizeStore(context);
+  const {data: expected} = unionResponse;
+  t.deepEqual(actual, expected);
 });
 
-// test('normalize store with missing scalar data', t => {
-//   const unionOptions = {
-//     variables: nestedVariableValues,
-//     paginationWords: nestedPaginationWords,
-//     idFieldName: '_id',
-//     store: unionNormalized
-//   };
-//   const context = buildExecutionContext(clientSchema, unionQueryStringExtraTwitter, unionOptions);
-//   const denormalizedResponse = denormalizeStore(context);
-//   same(t, denormalizedResponse.data, unionResponsePartialTwitter.data);
-// });
-//
-// test('normalize store with initial state', t => {
-//   const unionOptions = {
-//     variables: nestedVariableValues,
-//     paginationWords: nestedPaginationWords,
-//     idFieldName: '_id',
-//     store: initialState
-//   };
-//   const context = buildExecutionContext(clientSchema, unionQueryStringExtraTwitter, unionOptions);
-//   const denormalizedResponse = denormalizeStore(context);
-//   same(t, denormalizedResponse.data, initialStateResponse.data);
-// });
-//
-// test('normalize store with missing entity', t => {
-//   const unionOptions = {
-//     variables: nestedVariableValues,
-//     paginationWords: nestedPaginationWords,
-//     idFieldName: '_id',
-//     store: nestedNormalizedNoFirstAuthor
-//   };
-//   const context = buildExecutionContext(clientSchema, nestedQueryString, unionOptions);
-//   const denormalizedResponse = denormalizeStore(context);
-//   same(t, denormalizedResponse.data, nestedResponseNoFirstAuthor);
-// });
-//
-// test('normalize store with missing array', t => {
-//   const unionOptions = {
-//     variables: nestedVariableValues,
-//     paginationWords: nestedPaginationWords,
-//     idFieldName: '_id',
-//     store: nestedNormalizedNoFirstComments
-//   };
-//   const context = buildExecutionContext(clientSchema, nestedQueryString, unionOptions);
-//   const denormalizedResponse = denormalizeStore(context);
-//   same(t, denormalizedResponse.data, nestedResponseNoFirstComments);
-// });
-//
-// test('normalize store with missing union', t => {
-//   const unionOptions = {
-//     variables: nestedVariableValues,
-//     paginationWords: nestedPaginationWords,
-//     idFieldName: '_id',
-//     store: unionNormalizedMissingOwner
-//   };
-//   const context = buildExecutionContext(clientSchema, unionQueryStringExtraOwner, unionOptions);
-//   const denormalizedResponse = denormalizeStore(context);
-//   same(t, denormalizedResponse.data, unionResponseMissingOwner.data);
-// });
-//
-// test('normalize store from nested request', t => {
-//   const nestedOptions = {
-//     variables: nestedVariableValues,
-//     paginationWords: nestedPaginationWords,
-//     idFieldName: '_id',
-//     store: nestedNormalized
-//   };
-//   const context = buildExecutionContext(clientSchema, nestedQueryString, nestedOptions);
-//   const denormalizedResponse = denormalizeStore(context);
-//   same(t, denormalizedResponse.data, nestedResponse);
-// });
+test('normalize store with missing scalar data', t => {
+  const queryAST = parseAndInitializeQuery(back1Query, clientSchema, idFieldName);
+  const context = buildExecutionContext(queryAST, {
+    cashayDataState: back1StoreNoCursor,
+    idFieldName,
+    schema: clientSchema,
+    paginationWords
+  });
+  const {data: actual} = denormalizeStore(context);
+  const expected = back1NoCursorDenormalizedFn();
+  t.deepEqual(actual, expected);
+});
+
+test('normalize store with missing entity and array', t => {
+  const queryAST = parseAndInitializeQuery(unionQueryString, clientSchema, idFieldName);
+  const context = buildExecutionContext(queryAST, {
+    cashayDataState: unionStoreMissingOwnerMembers,
+    idFieldName,
+    schema: clientSchema,
+    paginationWords
+  });
+  const {data: actual} = denormalizeStore(context);
+  const expected = unionMissingOwnerMembersDenormalized;
+  t.deepEqual(actual, expected);
+});
 
 // get subset of pagination docs saved
 
 // get 3 pagination results when only 2 are local
-
-//test adding __typename and idField to query auto

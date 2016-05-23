@@ -86,11 +86,7 @@ const visit = (bag, subResponse, reqAST, subSchema, context) => {
   const {idFieldName} = context;
   if (subSchema.fields[idFieldName]) {
     const id = subResponse[idFieldName];
-    if (id) {
-      return visitEntity(bag, subResponse, reqAST, subSchema, context, id);
-    }
-    throw new Error(`Cannot normalize ${subSchema.name}. 
-    Try requesting '${idFieldName}' in your query '${context.operation.selectionSet.selections[0].name}.`);
+    return visitEntity(bag, subResponse, reqAST, subSchema, context, id);
   }
   return visitObject(bag, subResponse, reqAST, subSchema, context);
   

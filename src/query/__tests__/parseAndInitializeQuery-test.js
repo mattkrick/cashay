@@ -9,7 +9,9 @@ import {
   inlineQueryStringWithoutId,
   unionQueryString,
   unionQueryStringWithoutTypename,
-  unionQueryStringWithExtraTypenameId
+  unionQueryStringWithExtraTypenameId,
+  queryWithUnsortedArgs,
+  queryWithSortedArgs
 } from './parseAndInitializeQuery-data';
 
 test('inline a fragment spread', t => {
@@ -37,5 +39,12 @@ test('remove extra __typename and id fields from fragments', t => {
   const initializedAST = parseAndInitializeQuery(unionQueryStringWithExtraTypenameId, clientSchema, '_id');
   const actual = sortPrint(initializedAST);
   const expected = parseSortPrint(unionQueryString);
+  t.deepEqual(actual, expected);
+});
+
+test('sort arguments by name', t => {
+  const initializedAST = parseAndInitializeQuery(queryWithUnsortedArgs, clientSchema, '_id');
+  const actual = sortPrint(initializedAST);
+  const expected = parseSortPrint(queryWithSortedArgs);
   t.deepEqual(actual, expected);
 });

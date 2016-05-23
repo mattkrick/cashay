@@ -146,6 +146,37 @@ export const back1Store = {
   }
 };
 
+export const back1StoreNoCursor = {
+  entities: {
+    PostType: {
+      p123: {
+        _id: "p123"
+      }
+    }
+  },
+  result: {
+    getRecentPosts: {
+      back: [
+        "PostType:p123"
+      ]
+    }
+  }
+};
+
+export const back1NoCursorDenormalizedFn = () => {
+  const base = {
+    "getRecentPosts": [
+      {
+        "_id": "p123",
+        "cursor": null
+      }
+    ]
+  };
+  base.getRecentPosts.BOF = true;
+  base.getRecentPosts.EOF = true;
+  return base;
+};
+
 export const front3Back1Store = {
   "entities": {
     "PostType": {
