@@ -1,5 +1,3 @@
-import {parseAndAlias} from '../mergeMutations';
-
 export const createCommentWithId = `
   mutation {
     createComment(postId: $postId, content: "foo") {

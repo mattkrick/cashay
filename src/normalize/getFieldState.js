@@ -2,6 +2,8 @@ import {STRING, INT, VARIABLE} from 'graphql/language/kinds';
 import {isObject, getRegularArgsKey} from '../utils';
 import {separateArgs} from './separateArgs';
 import {getDocFromNormalString, sendChildrenToServer} from './denormalizeHelpers';
+import {RequestArgument} from '../helperClasses';
+
 /**
  * given a parent field state & some args, drill down to the data using the args as a map
  *
@@ -161,7 +163,7 @@ const flagUsefulArgs = (fieldArgs, context) => {
       const argInOperation = context.operation.variableDefinitions.find(varDef => {
         return varDef.variable.name.value === arg.value.name.value
       });
-      // if calling denormalize from the queryServer, it's possible we already nuked the arg from the operation
+      // if calling normalize from the queryServer, it's possible we already nuked the arg from the operation
       if (argInOperation) {
         argInOperation._inUse = true;
       }

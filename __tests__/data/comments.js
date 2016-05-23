@@ -1,6 +1,7 @@
 export default {
   c123: {
     _id: 'c123',
+    cursor: 'c123',
     content: 'This is great!',
     author: 'a125',
     postId: 'p123',
@@ -9,6 +10,7 @@ export default {
   },
   c124: {
     _id: 'c124',
+    cursor: 'c124',
     content: 'Do you want to make $67,000/hr working from home? This single mom can do it!',
     author: 'a124',
     postId: 'p123',

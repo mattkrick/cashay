@@ -1,7 +1,7 @@
 export const INSERT_NORMALIZED = '@@cashay/INSERT_NORMALIZED';
 export const SET_VARIABLES = '@@cashay/SET_VARIABLES';
 
-import {deepAssign} from './deepAssign';
+import mergeStores from './mergeStores';
 
 const initialState = {
   // TODO simplify. isFetching is the same as !cachedResponse._isComplete
@@ -17,7 +17,7 @@ export const reducer = (state = initialState, action) => {
   switch (action.type) {
     case INSERT_NORMALIZED:
       return Object.assign({}, state, {
-        data: Object.assign(deepAssign(state.data, action.payload.response), {
+        data: Object.assign(mergeStores(state.data, action.payload.response), {
           variables: Object.assign({}, state.data.variables, {
             [action.payload.componentId]: Object.assign({},
               state.data.variables[action.payload.componentId],
@@ -34,8 +34,7 @@ export const reducer = (state = initialState, action) => {
               action.payload.variables)
           })
         })
-      })
-
+      });
     default:
       return state;
   }

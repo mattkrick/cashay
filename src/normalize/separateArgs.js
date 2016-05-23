@@ -5,14 +5,16 @@ import {ensureTypeFromNonNull} from '../utils';
 const getSuppliedArgs = (args, variables = {}, paginationWords) => {
   const regularArgs = {};
   const paginationArgs = {};
+  const paginationWordKeys = Object.keys(paginationWords);
   let hasPagination = false;
   args
+    // TODO do the sort during the inital AST creation
     .sort((a, b) => a.name.value < b.name.value)
     .forEach(arg => {
       const argName = arg.name.value;
       let argValue = arg.value.value || variables[argName];
       if (!argValue) return;
-      let paginationMeaning = Object.keys(paginationWords).find(pageWord => paginationWords[pageWord] === argName);
+      let paginationMeaning = paginationWordKeys.find(pageWord => paginationWords[pageWord] === argName);
       if (paginationMeaning) {
         if (paginationMeaning === 'first' || paginationMeaning === 'last') {
           argValue = parseInt(argValue);
@@ -32,30 +34,34 @@ const getSuppliedArgs = (args, variables = {}, paginationWords) => {
   if (hasPagination) {
     const {before, after, first, last} = paginationArgs;
     if (before && !last || after && !first || before && first || after && last || before && after || first && last) {
-      console.error('Pagination options are: `before, last` `after, first`, `first`, and `last`');
+      throw new Error('Pagination options are: `before, last` `after, first`, `first`, and `last`');
     }
   }
   return {regularArgs, paginationArgs};
 };
 
 const getPossibleArgs = (schema, paginationWords) => {
-  if (!schema.args) return {};
-  let acceptsRegularArgs = false;
-  let acceptsPaginationArgs = false;
-  const paginationWordSet = Object.keys(paginationWords)
-    .reduce((reduction, key) => reduction.add(paginationWords[key]), new Set());
-  schema.args.forEach(arg => {
-    if (paginationWordSet.has(arg.name)) {
-      acceptsPaginationArgs = true;
-    } else {
-      acceptsRegularArgs = true;
+    if (!schema.args) return {};
+    let acceptsRegularArgs = false;
+    let acceptsPaginationArgs = false;
+    const paginationWordSet = Object.keys(paginationWords)
+      .reduce((reduction, key) => reduction.add(paginationWords[key]), new Set());
+    const argKeys = Object.keys(schema.args);
+    for (let argKey of argKeys) {
+      const arg = schema.args[argKey];
+      if (paginationWordSet.has(arg.name)) {
+        acceptsPaginationArgs = true;
+      } else {
+        acceptsRegularArgs = true;
+      }
     }
-  });
-  return {acceptsRegularArgs, acceptsPaginationArgs};
-};
+    return {acceptsRegularArgs, acceptsPaginationArgs};
+  }
+  ;
 
 export const separateArgs = (fieldSchema, reqASTArgs, {paginationWords, variables}) => {
   const responseType = ensureTypeFromNonNull(fieldSchema.type);
+  // TODO for a speed boost, we could just return the result of getSuppliedArgs
   const {acceptsRegularArgs, acceptsPaginationArgs} = getPossibleArgs(fieldSchema, paginationWords);
   let {regularArgs, paginationArgs} = getSuppliedArgs(reqASTArgs, variables, paginationWords);
   regularArgs = acceptsRegularArgs && regularArgs;

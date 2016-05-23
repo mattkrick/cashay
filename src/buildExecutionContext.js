@@ -1,6 +1,7 @@
 import {OPERATION_DEFINITION, FRAGMENT_DEFINITION} from 'graphql/language/kinds';
+import {clone} from './utils';
 
-export const buildExecutionContext = (queryAST, cashayDataState, variables, paginationWords, idFieldName) => {
+export const buildExecutionContext = (queryAST, {cashayDataState, variables, paginationWords, idFieldName, schema}) => {
   const clonedAST = clone(queryAST);
   const {operation, fragments} = teardownDocumentAST(clonedAST);
   return {
@@ -9,14 +10,13 @@ export const buildExecutionContext = (queryAST, cashayDataState, variables, pagi
     fragments,
     variables,
     paginationWords,
-    idFieldName
+    idFieldName,
+    schema
   };
-  // TODO: Open to PR for defaultValue. Useful if someone called the same query with & without it delcaring it
 };
 
 export const teardownDocumentAST = queryAST => {
   let operation;
-  // console.log(queryAST);
   const fragments = queryAST.definitions.reduce((reduction, definition) => {
     if (definition.kind === OPERATION_DEFINITION) {
       if (operation) {

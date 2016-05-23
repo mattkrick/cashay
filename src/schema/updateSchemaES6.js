@@ -115,4 +115,5 @@ const objArrayToHashMap = arr => {
     hashMap[field.name] = field;
   }
   return hashMap;
-}
+};
+

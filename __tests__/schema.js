@@ -17,19 +17,20 @@ import {
   GraphQLBoolean
 } from 'graphql';
 
-const handlePaginationArgs = ({beforeCursor, afterCursor, first, last}, keys) => {
+const handlePaginationArgs = ({beforeCursor, afterCursor, first, last}, objs) => {
   let arrayPartial;
   if (first) {
-    const startingIdx = keys.indexOf(afterCursor) + 1;
-    arrayPartial = keys.slice(startingIdx, startingIdx + first);
+    const startingIdx = objs.findIndex(obj => obj.cursor === afterCursor) + 1;
+    arrayPartial = objs.slice(startingIdx, startingIdx + first);
   } else if (last) {
-    let endingIdx = keys.indexOf(beforeCursor) - 1;
-    endingIdx = endingIdx === -2 ? keys.length : endingIdx;
-    arrayPartial = keys.slice(endingIdx - last, endingIdx);
+    let endingIdx = objs.findIndex(obj => obj.cursor === beforeCursor);
+    endingIdx = endingIdx === -1 ? objs.length : endingIdx;
+    const start = Math.max(0, endingIdx - last);
+    arrayPartial = objs.slice(start, endingIdx);
   } else {
-    arrayPartial = keys;
+    arrayPartial = objs;
   }
-  return arrayPartial.map(key => CommentDB[key]);
+  return arrayPartial;
 };
 
 const CategoryType = new GraphQLEnumType({
@@ -80,12 +81,7 @@ const CommentType = new GraphQLObjectType({
       }
     },
     createdAt: {type: GraphQLInt},
-    cursor: {
-      type: GraphQLString,
-      resolve(source) {
-        return source._id
-      }
-    }
+    cursor: {type: GraphQLString}
   })
 });
 
@@ -166,7 +162,8 @@ const PostType = new GraphQLObjectType({
       },
       resolve: function(post, args) {
         const keys = Object.keys(CommentDB);
-        return handlePaginationArgs(args, keys)
+        const objs = keys.map(key => CommentDB[key]);
+        return handlePaginationArgs(args, objs)
       }
     },
     author: {
@@ -175,12 +172,7 @@ const PostType = new GraphQLObjectType({
         return AuthorDB[author];
       }
     },
-    cursor: {
-      type: GraphQLString,
-      resolve(source) {
-        return source.createdAt + 'chikachikow'
-      }
-    }
+    cursor: {type: GraphQLString}
   })
 });
 
@@ -255,10 +247,12 @@ const Query = new GraphQLObjectType({
         first: {type: GraphQLInt, description: "Limit the comments from the front"},
         last: {type: GraphQLInt, description: "Limit the comments from the back"}
       },
-      resolve(source, args) {
+      resolve(source, args, ref) {
+        debugger
         const postKeys = Object.keys(PostDB);
         const sortedKeys = postKeys.sort((a, b) => PostDB[b].createdAt - PostDB[a].createdAt);
-        return handlePaginationArgs(args, sortedKeys);
+        const objs = sortedKeys.map(key => PostDB[key]);
+        return handlePaginationArgs(args, objs);
       }
     },
     getPostById: {

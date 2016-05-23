@@ -1,2 +1,2 @@
 require('babel-register');
-require('./updateSchemaES6');
+require('./schema/updateSchemaES6');

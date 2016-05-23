@@ -12,9 +12,9 @@ import {
   LIST_TYPE
 } from 'graphql/language/kinds';
 import {TypeKind} from 'graphql/type/introspection';
-import {SET_VARIABLES} from './duck';
-import {denormalizeStore} from './denormalize/denormalizeStore';
-import {parse, ensureRootType, ensureTypeFromNonNull, inlineAllFragments} from './utils';
+import {SET_VARIABLES} from './normalize/duck';
+import {denormalizeStore} from './normalize/denormalizeStore';
+import {parse, ensureRootType, ensureTypeFromNonNull, inlineAllFragments, parseAndInline} from './utils';
 import {teardownDocumentAST} from './buildExecutionContext';
 
 const {LIST} = TypeKind;
@@ -30,11 +30,7 @@ export class CachedMutation {
 
 export class CachedQuery {
   constructor(queryFunction, queryString, options, response) {
-    const ast = parse(queryString);
-    const {operation, fragments} = teardownDocumentAST(ast);
-    inlineAllFragments(operation.selectionSet.selections, fragments);
-    ast.definitions = [operation];
-    this.ast = ast;
+    this.ast = parseAndInline(queryString);
     this.refetch = () => queryFunction(queryString, options);
     this.response = response;
   }

@@ -1,4 +1,28 @@
 import {INLINE_FRAGMENT} from 'graphql/language/kinds';
+import {TypeKind} from 'graphql/type/introspection';
+import {ensureTypeFromNonNull} from '../utils';
+
+const {UNION, LIST, OBJECT, SCALAR} = TypeKind;
+
+export const handleMissingData = (visit, aliasOrFieldName, field, fieldSchema, context) => {
+  const fieldType = ensureTypeFromNonNull(fieldSchema.type);
+  if (fieldType.kind === SCALAR) {
+    return null;
+  } else if (fieldType.kind === LIST) {
+    return [];
+  } else {
+    const newFieldSchema = context.schema.types[fieldType.name];
+    if (fieldType.kind === UNION) {
+      // since we don't know what the shape will look like, make it look like everything
+      return newFieldSchema.possibleTypes.reduce((reduction, objType) => {
+        const newFieldSchema = context.schema.types[objType.name];
+        // take the old, add the new, keep typename null
+        return Object.assign(reduction, visit(reduction, field, newFieldSchema, context), {__typename: null});
+      }, {});
+    }
+    return visit({}, field, newFieldSchema, context);
+  }
+};
 
 export const calculateSendToServer = (field, idFieldName) => {
   const {selections} = field.selectionSet;

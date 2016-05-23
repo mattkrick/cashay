@@ -1,21 +1,20 @@
-import {INSERT_NORMALIZED} from './duck';
-import {denormalizeStore} from './denormalize/denormalizeStore';
-import {rebuildOriginalArgs} from './denormalize/denormalizeHelpers';
-import {normalizeResponse} from './normalize/normalizeResponse';
+import {INSERT_NORMALIZED} from './normalize/duck';
+import denormalizeStore from './normalize/denormalizeStore';
+import {rebuildOriginalArgs} from './normalize/denormalizeHelpers';
+import normalizeResponse from './normalize/normalizeResponse';
 import {printMinimalQuery} from './query/printMinimalQuery';
 import {buildExecutionContext} from './buildExecutionContext';
 import {makeNormalizedDeps, shortenNormalizedResponse} from './query/queryHelpers';
 import {isObject, checkMutationInSchema} from './utils';
-import {deepAssign} from './deepAssign';
-import {createMutationString} from './mutate/createMutationString';
-import {parseAndAlias} from './mutate/mergeMutations';
-import {CachedMutation, CachedQuery, MutationShell} from './helperClasses';
+import mergeStores from './normalize/mergeStores';
+import {CachedMutation, CachedQuery} from './helperClasses';
 import flushDependencies from './query/flushDependencies';
 import {makeComponentsToUpdate} from './mutate/mutationHelpers';
 import {parse, arraysShallowEqual} from './utils';
 import namespaceMutation from './mutate/namespaceMutation';
 import mergeMutations from './mutate/mergeMutations';
 import createMutationFromQuery from './mutate/createMutationFromQuery';
+
 const defaultGetToState = store => store.getState().cashay;
 const defaultPaginationWords = {
   before: 'before',
@@ -156,7 +155,7 @@ export default class Cashay {
 
     // create an AST that we can mutate
     const {paginationWords, idFieldName, state: {data: cashayDataState}} = this;
-    const context = buildExecutionContext(cachedQuery.ast, cashayDataState, variables, paginationWords, idFieldName)
+    const context = buildExecutionContext(cachedQuery.ast, cashayDataState, {variables, paginationWords, idFieldName})
 
     cachedQuery.createResponse(context, componentId, this.store.dispatch, forceFetch);
 
@@ -231,7 +230,7 @@ export default class Cashay {
     // if the server didn't give us any new stuff, we already set the vars, so we're done here
     if (!normalizedResponseForStore) return;
     // combine the partial response with the server response to fully respond to the query
-    const fullNormalizedResponse = deepAssign(normalizedPartialResponse, normalizedMinimizedQueryResponse);
+    const fullNormalizedResponse = mergeStores(normalizedPartialResponse, normalizedMinimizedQueryResponse);
 
     // it's possible that we adjusted the arguments for the operation we sent to server
     // for example, instead of asking for 20 docs, we asked for 5 at index 15.
@@ -464,7 +463,7 @@ export default class Cashay {
       });
 
       const normalizedModifiedResponse = normalizeResponse(modifiedResponse, context);
-      allNormalizedChanges = deepAssign(allNormalizedChanges, normalizedModifiedResponse);
+      allNormalizedChanges = mergeStores(allNormalizedChanges, normalizedModifiedResponse);
     }
 
     const normalizedResponseForStore = shortenNormalizedResponse(allNormalizedChanges, cashayDataState);

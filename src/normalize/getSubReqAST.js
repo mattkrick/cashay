@@ -14,6 +14,6 @@ export const getSubReqAST = (key, reqAST, fragments) => {
       return subReqAST;
     }
   }
-  console.warn(`${key} was found in the query response, but not the request.
+  throw new Error(`${key} was found in the query response, but not the request.
     Did you optimistically add more fields than you originally requested?`)
 };

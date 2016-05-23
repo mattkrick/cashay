@@ -1,6 +1,7 @@
 import {INLINE_FRAGMENT, FRAGMENT_SPREAD} from 'graphql/language/kinds';
 import {TypeKind} from 'graphql/type/introspection';
 import {parse as gqlParse} from 'graphql/language/parser';
+import {teardownDocumentAST} from './buildExecutionContext';
 
 const {NON_NULL} = TypeKind;
 
@@ -56,3 +57,12 @@ export const inlineAllFragments = (operationSelections, fragments) => {
     }
   }
 };
+
+export const parseAndInline = queryString => {
+  const ast = parse(queryString);
+  const {operation, fragments} = teardownDocumentAST(ast);
+  inlineAllFragments(operation.selectionSet.selections, fragments);
+  // TODO also need to add "id" and "__typename" and sort all args
+  ast.definitions = [operation];
+  return ast;
+}

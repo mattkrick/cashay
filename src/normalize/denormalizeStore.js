@@ -3,34 +3,13 @@ import {FRAGMENT_SPREAD, INLINE_FRAGMENT} from 'graphql/language/kinds';
 import {isObject, ensureRootType, ensureTypeFromNonNull, clone, convertFragmentToInline} from '../utils';
 import {
   calculateSendToServer,
-  sendChildrenToServer
+  sendChildrenToServer,
+  handleMissingData
 } from './denormalizeHelpers';
 import getFieldState from './getFieldState';
 
 
 const {UNION, LIST, OBJECT, SCALAR} = TypeKind;
-
-//TODO instead of mutating the context, create a new operation
-
-const handleMissingData = (aliasOrFieldName, field, fieldSchema, context) => {
-  const fieldType = ensureTypeFromNonNull(fieldSchema.type);
-  if (fieldType.kind === SCALAR) {
-    return null;
-  } else if (fieldType.kind === LIST) {
-    return [];
-  } else {
-    const newFieldSchema = context.schema.types[fieldType.name];
-    if (fieldType.kind === UNION) {
-      // since we don't know what the shape will look like, make it look like everything
-      return newFieldSchema.possibleTypes.reduce((reduction, objType) => {
-        const newFieldSchema = context.schema.types[objType.name];
-        // take the old, add the new, keep typename null
-        return Object.assign(reduction, visit(reduction, field, newFieldSchema, context), {__typename: null});
-      }, {});
-    }
-    return visit({}, field, newFieldSchema, context);
-  }
-};
 
 const visitObject = (subState = {}, reqAST, subSchema, context, baseReduction = {}) => {
   return reqAST.selectionSet.selections.reduce((reduction, field, idx, selectionArr) => {
@@ -63,7 +42,7 @@ const visitObject = (subState = {}, reqAST, subSchema, context, baseReduction = 
           calculateSendToServer(field, context.idFieldName)
         }
       } else {
-        reduction[aliasOrFieldName] = handleMissingData(aliasOrFieldName, field, fieldSchema, context);
+        reduction[aliasOrFieldName] = handleMissingData(visit, aliasOrFieldName, field, fieldSchema, context);
         field.sendToServer = true;
       }
     }
@@ -119,7 +98,7 @@ const visit = (subState, reqAST, subSchema, context) => {
   }
 };
 
-export const denormalizeStore = context => {
+export default context => {
   // if we have nothing in the local state for this query, send it right to the server
   let firstRun = true;
 

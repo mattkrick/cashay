@@ -1,4 +1,4 @@
-import {SET_VARIABLES} from '../duck';
+import {SET_VARIABLES} from '../normalize/duck';
 
 /**
  * Creates a function to allow for the user to change the variables without mutating the old
