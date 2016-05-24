@@ -147,6 +147,13 @@
                 "kind": "SCALAR",
                 "name": "String"
               }
+            },
+            "inReverse": {
+              "name": "inReverse",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Boolean"
+              }
             }
           },
           "type": {
@@ -300,6 +307,10 @@
       "kind": "SCALAR",
       "name": "String"
     },
+    "Boolean": {
+      "kind": "SCALAR",
+      "name": "Boolean"
+    },
     "CategoryType": {
       "kind": "ENUM",
       "name": "CategoryType",
@@ -338,10 +349,6 @@
           }
         }
       }
-    },
-    "Boolean": {
-      "kind": "SCALAR",
-      "name": "Boolean"
     },
     "CommentType": {
       "kind": "OBJECT",

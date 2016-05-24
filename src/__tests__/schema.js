@@ -133,7 +133,7 @@ const PostType = new GraphQLObjectType({
       type: GraphQLString,
       args: {
         language: {type: GraphQLString, description: "Language of the title"},
-        inReverse: {type: GraphQLBoolean, 'give the title in reverse'}
+        inReverse: {type: GraphQLBoolean, description: 'give the title in reverse'}
       },
       resolve(source, args) {
         if (args.language === 'spanish') {

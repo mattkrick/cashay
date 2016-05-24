@@ -1,8 +1,8 @@
 import 'babel-register';
 import test from 'ava';
-import clientSchema from '../../../__tests__/clientSchema.json';
+import clientSchema from '../../__tests__/clientSchema.json';
 import createMutationFromQuery from '../createMutationFromQuery';
-import {parseSortPrint, sortPrint} from '../../../__tests__/parseSortPrint';
+import {parseSortPrint, sortPrint} from '../../__tests__/parseSortPrint';
 import {parse} from '../../utils';
 
 import {

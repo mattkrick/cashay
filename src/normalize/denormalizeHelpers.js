@@ -60,9 +60,9 @@ export const rebuildOriginalArgs = reqAST => {
   if (!reqAST.selectionSet) {
     return;
   }
-  reqAST.selectionSet.selections.forEach(child => {
+  for (let child of reqAST.selectionSet.selections) {
     rebuildOriginalArgs(child);
-  })
+  }
 };
 
 export const getDocFromNormalString = (normalString, entities) => {

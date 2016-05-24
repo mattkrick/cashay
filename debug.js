@@ -1,6 +1,6 @@
 import fs from 'fs';
-import clientSchema from './__tests__/clientSchema.json';
-import {parseSortPrint, sortPrint} from './__tests__/parseSortPrint';
+import clientSchema from './src/__tests__/clientSchema.json';
+import {parseSortPrint, sortPrint} from './src/__tests__/parseSortPrint';
 import normalizeResponse from './src/normalize/normalizeResponse';
 import {buildExecutionContext} from './src/buildExecutionContext';
 import namespaceMutation from './src/mutate/namespaceMutation';
@@ -28,7 +28,8 @@ import {
   back1After3Store,
   back1After4Query,
   back1After4Response,
-  back1After4StoreFn
+  back1After4StoreFn,
+  back1After3ResponseFn,
 } from './src/normalize/__tests__/data-pagination-back';
 
 import {
@@ -43,7 +44,10 @@ import {
   back1Store,
   front3Back1Store,
   back1Query,
-  back1StoreNoCursor
+  back1StoreNoCursor,
+  back1QueryBadArgs,
+  front4PostStoreNoCursors,
+  back4PostStoreNoLastCursor
 } from './src/normalize/__tests__/data-pagination';
 import parseAndInitializeQuery from './src/query/parseAndInitializeQuery';
 import {
@@ -52,15 +56,29 @@ import {
   inlineQueryStringWithoutId,
   unionQueryStringWithoutTypename,
   queryWithUnsortedArgs,
-  queryWithSortedArgs
 } from './src/query/__tests__/parseAndInitializeQuery-data';
 import denormalizeStore from './src/normalize/denormalizeStore';
-import {paginationWords} from './src/normalize/__tests__/data';
+import {
+  paginationWords,
+  emptyInitialState,
+  queryWithSortedArgs,
+  responseFromSortedArgs,
+  storeFromSortedArgs
+} from './src/normalize/__tests__/data';
+import {front2After3Query, front4Query, front3Response} from './src/normalize/__tests__/data-pagination-front';
+const idFieldName = '_id';
 
+const queryAST = parseAndInitializeQuery(back1Query, clientSchema, idFieldName);
+const context = buildExecutionContext(queryAST, {
+  cashayDataState: emptyInitialState,
+  idFieldName,
+  schema: clientSchema,
+  paginationWords,
+  variables: {reverse: true, lang: "spanish"}
+});
+const {data: actual} = denormalizeStore(context);
+const expected = {"getRecentPosts": []};
 
-const initializedAST = parseAndInitializeQuery(queryWithUnsortedArgs, clientSchema, '_id');
-const actual = sortPrint(initializedAST);
-const expected = parseSortPrint(queryWithSortedArgs);
 
 debugger
 fs.writeFileSync('./actualResult.json', JSON.stringify(actual, null, 2));

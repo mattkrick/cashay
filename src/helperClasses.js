@@ -149,12 +149,3 @@ export class VariableDefinition {
     }
   }
 }
-
-export class InlineFragment {
-  constructor(condition) {
-    this.directives = [];
-    this.kind = INLINE_FRAGMENT;
-    this.selectionSet = new SelectionSet();
-    this.typeCondition = new TypeCondition(condition);
-  }
-}

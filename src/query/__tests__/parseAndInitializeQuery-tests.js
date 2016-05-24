@@ -1,8 +1,8 @@
 import test from 'ava';
 import 'babel-register';
 import parseAndInitializeQuery from '../parseAndInitializeQuery';
-import clientSchema from '../../../__tests__/clientSchema.json';
-import {parseSortPrint, sortPrint} from '../../../__tests__/parseSortPrint';
+import clientSchema from '../../__tests__/clientSchema.json';
+import {parseSortPrint, sortPrint} from '../../__tests__/parseSortPrint';
 import {
   fragmentQueryString,
   inlineQueryString,

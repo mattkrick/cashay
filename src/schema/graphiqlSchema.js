@@ -1,5 +1,11 @@
-module.exports = `
-query ReducedIntrospectionQuery {
+require('babel-register');
+
+const path = require('path');
+const rootSchema = require('../__tests__/schema').default;
+const fs = require('fs');
+const graphql = require('graphql').graphql;
+const introspectionQuery = `
+query IntrospectionQuery {
   __schema {
     queryType { name }
     mutationType { name }
@@ -64,3 +70,16 @@ fragment TypeRef on __Type {
     }
   }
 }`;
+
+// console.log(rootSchema)
+graphql(rootSchema, introspectionQuery).then(result => {
+  if (result.errors) {
+    console.log(result.errors)
+  } else {
+    try {
+      fs.writeFileSync(path.join(__dirname, '../__tests__/graphiqlSchema.json'), JSON.stringify(result.data.__schema, null, 2));
+    }catch(e) {
+      console.log(e)
+    }
+  }
+});

@@ -1,34 +1,37 @@
+import {VARIABLE} from 'graphql/language/kinds';
 import {TypeKind} from 'graphql/type/introspection';
 const {LIST} = TypeKind;
 import {ensureTypeFromNonNull} from '../utils';
+
+const FIRST = 'first';
+const LAST = 'last';
 
 const getSuppliedArgs = (args, variables = {}, paginationWords) => {
   const regularArgs = {};
   const paginationArgs = {};
   const paginationWordKeys = Object.keys(paginationWords);
   let hasPagination = false;
-  args
-    .forEach(arg => {
-      const argName = arg.name.value;
-      let argValue = arg.value.value || variables[argName];
-      if (!argValue) return;
-      let paginationMeaning = paginationWordKeys.find(pageWord => paginationWords[pageWord] === argName);
-      if (paginationMeaning) {
-        if (paginationMeaning === 'first' || paginationMeaning === 'last') {
-          argValue = parseInt(argValue);
-          // in rare cases a "count" might be used to go forward & back. this helps determine what count means.
-          if (paginationMeaning === 'first') {
-            if (paginationWords.first === paginationWords.last && args.find(arg => arg.name.value === 'before')) {
-              paginationMeaning = 'last';
-            }
+  for (let arg of args) {
+    const argName = arg.name.value;
+    let argValue = arg.value.kind === VARIABLE ? variables[arg.value.name.value] : arg.value.value;
+    if (argValue === undefined) return;
+    let paginationMeaning = paginationWordKeys.find(pageWord => paginationWords[pageWord] === argName);
+    if (paginationMeaning) {
+      if (paginationMeaning === FIRST || paginationMeaning === LAST) {
+        argValue = parseInt(argValue);
+        // in rare cases a "count" might be used to go forward & back. this helps determine what count means.
+        if (paginationMeaning === FIRST) {
+          if (paginationWords.first === paginationWords.last && args.find(arg => arg.name.value === 'before')) {
+            paginationMeaning = LAST;
           }
         }
-        paginationArgs[paginationMeaning] = argValue;
-        hasPagination = true;
-      } else {
-        regularArgs[argName] = argValue;
       }
-    });
+      paginationArgs[paginationMeaning] = argValue;
+      hasPagination = true;
+    } else {
+      regularArgs[argName] = argValue;
+    }
+  }
   if (hasPagination) {
     const {before, after, first, last} = paginationArgs;
     if (before && !last || after && !first || before && first || after && last || before && after || first && last) {
@@ -59,7 +62,7 @@ const getPossibleArgs = (schema, paginationWords) => {
 
 export const separateArgs = (fieldSchema, reqASTArgs, {paginationWords, variables}) => {
   const responseType = ensureTypeFromNonNull(fieldSchema.type);
-  // TODO for a speed boost, we could just return the result of getSuppliedArgs
+  // TODO for a speed boost, we could just return the result of getSuppliedArgs, the rest is for safety
   const {acceptsRegularArgs, acceptsPaginationArgs} = getPossibleArgs(fieldSchema, paginationWords);
   let {regularArgs, paginationArgs} = getSuppliedArgs(reqASTArgs, variables, paginationWords);
   regularArgs = acceptsRegularArgs && regularArgs;

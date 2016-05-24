@@ -6,6 +6,14 @@ query {
   }
 }`;
 
+export const front4Query = `
+query {
+  getRecentPosts(first:4) {
+    _id,
+    cursor
+  }
+}`;
+
 export const front3Response = {
   "data": {
     "getRecentPosts": [
@@ -23,6 +31,31 @@ export const front3Response = {
       }
     ]
   }
+};
+
+export const front3LocalResponseFn = () => {
+  const base = {
+
+    "data": {
+      "getRecentPosts": [
+        {
+          "_id": "p126",
+          "cursor": "1444444444444chikachikow"
+        },
+        {
+          "_id": "p125",
+          "cursor": "1433333333333chikachikow"
+        },
+        {
+          "_id": "p124",
+          "cursor": "1422222222222chikachikow"
+        }
+      ]
+    }
+  };
+  base.data.getRecentPosts.BOF = true;
+  base.data.getRecentPosts.EOF = true;
+  return base;
 };
 
 export const front3Store = {

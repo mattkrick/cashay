@@ -12,9 +12,9 @@ import {RequestArgument} from '../helperClasses';
  * @param {object} selection the original query that holds the arguments
  * @param {object} context
  *
- * @returns {*} the an object, or array, or scalar from the normalized store
+ * @returns {*} an object, or array, or scalar from the normalized store
  * */
-export default (fieldState, fieldSchema, selection, context) => {
+export default function getFieldState(fieldState, fieldSchema, selection, context) {
   if (!isObject(fieldState)) {
     return fieldState
   }
@@ -38,10 +38,11 @@ const handlePaginationArgs = (paginationArgs, fieldState, fieldSchema, selection
   const usefulArray = fieldState.full || (last ? fieldState.back : fieldState.front);
   const isFull = usefulArray === fieldState.full;
 
-  if (!usefulArray) {
-    console.log('no local data')
-    return;
-  }
+  // TODO dead code? i think we always guarantee an empty array
+  // if (!usefulArray) {
+  //   console.log('no local data')
+  //   return;
+  // }
   const cursor = before || after;
   const count = last || first;
   const cursorIdx = getCursorIdx(cursor, last, usefulArray, context.cashayDataState.entities);
@@ -59,7 +60,6 @@ const handlePaginationArgs = (paginationArgs, fieldState, fieldSchema, selection
     normalStringWithNewCursor = usefulArrayNonNull[0];
     countWord = context.paginationWords.last;
     cursorWord = context.paginationWords.before;
-    // TODO copy working example from else statement
   } else {
     const maxIdx = cursorIdx + first;
     const usefulArrayNonNull = removeRightPadding(usefulArray);
@@ -80,14 +80,14 @@ const handlePaginationArgs = (paginationArgs, fieldState, fieldSchema, selection
 
     // if we have a partial response & the backend accepts a cursor, only ask for the missing pieces
     if (missingDocCount < count && fieldSchema.args[cursorWord]) {
-
       // flag all AST children with sendToServer = true
       sendChildrenToServer(selection);
 
       // given something like `Post:123`, return the document from the store
       const storedDoc = getDocFromNormalString(normalStringWithNewCursor, context.cashayDataState.entities);
       if (!storedDoc.cursor) {
-        console.error(`No cursor was included for ${normalStringWithNewCursor}. Please include the cursor field for the ${fieldSchema.name} query`)
+        throw new Error(`No cursor was included for ${normalStringWithNewCursor}. 
+        Please include the cursor field for the ${fieldSchema.name} query`)
       }
 
       // save the original arguments, we'll overwrite them with efficient ones for the server,
@@ -107,7 +107,7 @@ const handlePaginationArgs = (paginationArgs, fieldState, fieldSchema, selection
       const newCursorArg = makeCursorArg(cursorWord, storedDoc.cursor);
 
       // if the cursor arg exists, overwrite it. otherwise, just put it anywhere
-      if (cursorArgIdx > -1) {
+      if (cursorArgIdx !== -1) {
         fieldArgs[cursorArgIdx] = newCursorArg;
       } else {
         fieldArgs.push(newCursorArg);
@@ -126,7 +126,7 @@ const removeLeftPadding = array => {
 };
 
 const removeRightPadding = array => {
-  for (let i = array.length-1; i >= 0; i--) {
+  for (let i = array.length - 1; i >= 0; i--) {
     if (array[i]) {
       return array.slice(0, i + 1);
     }
@@ -140,15 +140,15 @@ const assignFieldStateMeta = (fieldState, usefulArray) => {
   });
 };
 
-const getCursorIdx =  (cursor, last, usefulArray, entities) => {
+const getCursorIdx = (cursor, last, usefulArray, entities) => {
   let cursorIdx = last ? 1 : -1;
   if (cursor) {
-    cursorIdx = usefulArray.find(doc => {
+    cursorIdx = usefulArray.findIndex(doc => {
       const storedDoc = getDocFromNormalString(doc, entities);
       return storedDoc.cursor === cursor
     });
-    if (cursorIdx === undefined) {
-      console.error(`Invalid cursor: ${cursor}`);
+    if (cursorIdx === -1) {
+      throw new Error(`Invalid cursor: ${cursor}`);
     }
   }
   return cursorIdx;
@@ -158,7 +158,7 @@ const makeCursorArg = (cursorName, cursorValue) => new RequestArgument(cursorNam
 const makeCountArg = (countName, countValue) => new RequestArgument(countName, INT, countValue);
 
 const flagUsefulArgs = (fieldArgs, context) => {
-  fieldArgs.forEach(arg => {
+  for (let arg of fieldArgs) {
     if (arg.value.kind === VARIABLE) {
       const argInOperation = context.operation.variableDefinitions.find(varDef => {
         return varDef.variable.name.value === arg.value.name.value
@@ -168,5 +168,5 @@ const flagUsefulArgs = (fieldArgs, context) => {
         argInOperation._inUse = true;
       }
     }
-  });
+  }
 };

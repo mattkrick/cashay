@@ -146,3 +146,19 @@ export const back1After4StoreFn = () => {
   base.result.getRecentPosts.back.EOF = true;
   return base;
 };
+
+export const back1After3ResponseFn = () => {
+  const base = {
+    data: {
+      "getRecentPosts": [
+        {
+          "_id": "p126",
+          "cursor": "1444444444444chikachikow"
+        }
+      ]
+    }
+  };
+  base.data.getRecentPosts.BOF = true;
+  return base;
+};
+

@@ -1,7 +1,7 @@
 import 'babel-register';
 import test from 'ava';
 import mergeMutations from '../mergeMutations';
-import {parseSortPrint} from '../../../__tests__/parseSortPrint';
+import {parseSortPrint} from '../../__tests__/parseSortPrint';
 
 import {
   parseAndNamespace,

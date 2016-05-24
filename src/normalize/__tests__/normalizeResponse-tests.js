@@ -1,6 +1,6 @@
 import test from 'ava';
 import 'babel-register';
-import clientSchema from '../../../__tests__/clientSchema.json';
+import clientSchema from '../../__tests__/clientSchema.json';
 import normalizeResponse from '../normalizeResponse';
 import {buildExecutionContext} from '../../buildExecutionContext';
 import {unionQueryString, unionStoreFull, unionResponse} from './data-union';

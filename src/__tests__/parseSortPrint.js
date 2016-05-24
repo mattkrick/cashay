@@ -1,6 +1,6 @@
 import {parse} from 'graphql/language/parser';
 import {print} from 'graphql/language/printer';
-import {teardownDocumentAST} from '../src/buildExecutionContext';
+import {teardownDocumentAST} from '../buildExecutionContext';
 /**
  * This is a stupid little function that sorts fields by alias & then by name
  * That way, testing equality is easy

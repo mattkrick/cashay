@@ -128,6 +128,14 @@ query {
   }
 }`;
 
+export const back1Skip1Query = `
+query {
+  getRecentPosts(last:1, beforeCursor:"1411111111111chikachikow") {
+    _id,
+    cursor
+  }
+}`;
+
 export const back1Store = {
   entities: {
     PostType: {
@@ -207,6 +215,90 @@ export const front3Back1Store = {
         "PostType:p126",
         "PostType:p125",
         "PostType:p124"
+      ]
+    }
+  }
+};
+
+export const back1QueryBadArgs = `
+query {
+  getRecentPosts(last:1, afterCursor:"foo") {
+    _id,
+    cursor
+  }
+}`;
+
+export const front1After3DenormalizedFn = () => {
+  const base = {
+    data: {
+      "getRecentPosts": [
+        {
+          "_id": "p123",
+          "cursor": "1411111111111chikachikow"
+        }
+      ]
+    }
+  };
+  base.data.getRecentPosts.EOF = true;
+  return base;
+};
+
+export const front4PostStoreNoCursors = {
+  "entities": {
+    "PostType": {
+      "p126": {
+        "_id": "p126"
+      },
+      "p125": {
+        "_id": "p125"
+      },
+      "p124": {
+        "_id": "p124"
+      },
+      "p123": {
+        "_id": "p123"
+      }
+    }
+  },
+  "result": {
+    "getRecentPosts": {
+      "front": [
+        "PostType:p126",
+        "PostType:p125",
+        "PostType:p124",
+        "PostType:p123"
+      ]
+    }
+  }
+};
+
+export const back4PostStoreNoLastCursor = {
+  "entities": {
+    "PostType": {
+      "p126": {
+        "_id": "p126"
+      },
+      "p125": {
+        "_id": "p125",
+        "cursor": "1433333333333chikachikow"
+      },
+      "p124": {
+        "_id": "p124",
+        "cursor": "1422222222222chikachikow"
+      },
+      "p123": {
+        "_id": "p123",
+        "cursor": "1411111111111chikachikow"
+      }
+    }
+  },
+  "result": {
+    "getRecentPosts": {
+      "back": [
+        "PostType:p126",
+        "PostType:p125",
+        "PostType:p124",
+        "PostType:p123"
       ]
     }
   }

@@ -1,6 +1,6 @@
 import {parse} from '../../utils';
 import namespaceMutation from '../namespaceMutation';
-import clientSchema from '../../../__tests__/clientSchema.json';
+import clientSchema from '../../__tests__/clientSchema.json';
 
 export const parseAndNamespace = cachedSingles => {
   return cachedSingles.map((single, idx) => {

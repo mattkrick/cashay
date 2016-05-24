@@ -13,10 +13,6 @@ const {UNION, LIST, OBJECT, SCALAR} = TypeKind;
 
 const visitObject = (subState = {}, reqAST, subSchema, context, baseReduction = {}) => {
   return reqAST.selectionSet.selections.reduce((reduction, field, idx, selectionArr) => {
-    if (field.kind === FRAGMENT_SPREAD) {
-      const fragment = clone(context.fragments[field.name.value]);
-      selectionArr[idx] = field = convertFragmentToInline(fragment);
-    }
     if (field.kind === INLINE_FRAGMENT) {
       // TODO handle null typeCondition
       if (field.typeCondition.name.value === subSchema.name) {
@@ -33,7 +29,8 @@ const visitObject = (subState = {}, reqAST, subSchema, context, baseReduction = 
 
       if (hasData) {
         let fieldState = subState[fieldName];
-        if (fieldSchema.args && fieldSchema.args.length) {
+        if (fieldSchema.args) {
+          debugger
           fieldState = getFieldState(fieldState, fieldSchema, field, context);
         }
         reduction[aliasOrFieldName] = visit(fieldState, field, fieldSchema, context);
@@ -74,6 +71,7 @@ const visitIterable = (subState, reqAST, subSchema, context) => {
     }
     return mappedState;
   }
+  // TODO dead code?
   // recursively climb down the tree, flagging each branch with sendToServer
   sendChildrenToServer(reqAST);
 
@@ -84,7 +82,6 @@ const visitIterable = (subState, reqAST, subSchema, context) => {
 const visit = (subState, reqAST, subSchema, context) => {
   // By implementing a ternary here, we can get rid of a pointless O(n) find in visitObject
   const objectType = subSchema.kind ? subSchema.kind : subSchema.type.kind;
-
   switch (objectType) {
     case OBJECT:
       if (typeof subState === 'string') {
