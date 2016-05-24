@@ -43,7 +43,6 @@ export class CachedQuery {
    * firstRun is true if the none of the queries within the request have been executed before
    */
   createResponse(context, componentId, dispatch, forceFetch) {
-    this.response = denormalizeStore(context);
     const {data, firstRun} = denormalizeStore(context);
     this.response = {
       data,

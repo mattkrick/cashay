@@ -6,6 +6,7 @@ import {teardownDocumentAST} from './buildExecutionContext';
 const {NON_NULL} = TypeKind;
 
 export const TYPENAME = '__typename';
+export const CASHAY = 'CASHAY';
 
 export const ensureTypeFromNonNull = type => type.kind === NON_NULL ? type.ofType : type;
 
@@ -26,7 +27,8 @@ export const clone = obj => JSON.parse(JSON.stringify(obj));
 export const checkMutationInSchema = (rootMutation, mutationName) => {
   const mutationSchema = rootMutation.fields[mutationName];
   if (!mutationSchema) {
-    throw new Error(`Invalid mutation: ${mutationName}.\nDid you make a typo?`);
+    throw new Error(`Invalid mutation: ${mutationName}.
+    Did you make a typo or forget to update your schema?`);
   }
 };
 
