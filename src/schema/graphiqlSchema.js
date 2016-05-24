@@ -71,7 +71,6 @@ fragment TypeRef on __Type {
   }
 }`;
 
-// console.log(rootSchema)
 graphql(rootSchema, introspectionQuery).then(result => {
   if (result.errors) {
     console.log(result.errors)

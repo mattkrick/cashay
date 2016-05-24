@@ -1,6 +1,6 @@
 import test from 'ava';
 import 'babel-register';
-import {buildExecutionContext} from '../../buildExecutionContext';
+import {buildExecutionContext} from '../../utils';
 import denormalizeStore from '../denormalizeStore';
 import {
   unionQueryString,

@@ -66,25 +66,31 @@ import {
   storeFromSortedArgs
 } from './src/normalize/__tests__/data';
 import {front2After3Query, front4Query, front3Response} from './src/normalize/__tests__/data-pagination-front';
-const idFieldName = '_id';
+import removeNamespacing from './src/mutate/removeNamespacing';
 
-const queryAST = parseAndInitializeQuery(back1Query, clientSchema, idFieldName);
-const context = buildExecutionContext(queryAST, {
-  cashayDataState: emptyInitialState,
-  idFieldName,
-  schema: clientSchema,
-  paginationWords,
-  variables: {reverse: true, lang: "spanish"}
-});
-const {data: actual} = denormalizeStore(context);
-const expected = {"getRecentPosts": []};
-
+const input = {
+  "data": {
+    "createPost": {
+      "post": {
+        "CASHAY_component1_title": "FOOIE EN ESPANOL!",
+        "CASHAY_component1_reverseTitle": "EIOOF",
+        "title": "FOOIE"
+      }
+    }
+  }
+};
+const expected = {
+  "data": {
+    "createPost": {
+      "post": {
+        "title": "FOOIE EN ESPANOL!",
+        "reverseTitle": "EIOOF"
+      }
+    }
+  }
+};
+const actual = removeNamespacing(input, 'component1');
 
 debugger
 fs.writeFileSync('./actualResult.json', JSON.stringify(actual, null, 2));
 fs.writeFileSync('./expectedResult.json', JSON.stringify(expected, null, 2));
-// console.log('string(actual) == string(expected):', JSON.stringify(actual, null, 2) === JSON.stringify(expected, null, 2))
-// console.log(actual.result.getRecentPosts.front, expected.result.getRecentPosts.front)
-// console.log('clone(actual) == clone(expected):', clone(actual) === clone(expected))
-// console.log('actual == clone(expected):', actual === clone(expected))
-// console.log('clone(actual) == expected:', clone(actual) === expected)

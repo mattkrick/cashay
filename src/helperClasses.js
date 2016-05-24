@@ -7,22 +7,21 @@ import {
   VARIABLE,
   NAMED_TYPE,
   FIELD,
-  INLINE_FRAGMENT,
   VARIABLE_DEFINITION,
   LIST_TYPE
 } from 'graphql/language/kinds';
 import {TypeKind} from 'graphql/type/introspection';
 import {SET_VARIABLES} from './normalize/duck';
 import {denormalizeStore} from './normalize/denormalizeStore';
-import {parse, ensureRootType, ensureTypeFromNonNull, inlineAllFragments, parseAndInitializeQuery} from './utils';
-import {teardownDocumentAST} from './buildExecutionContext';
+import {ensureRootType, ensureTypeFromNonNull} from './utils';
+import parseAndInitializeQuery from './query/parseAndInitializeQuery';
 
 const {LIST} = TypeKind;
 
 export class CachedMutation {
   constructor() {
-    // this.setKey = undefined;
     this.fullMutation = undefined;
+    this.activeComponentIds = [];
     this.singles = {};
     this.variableEnhancers = [];
   }

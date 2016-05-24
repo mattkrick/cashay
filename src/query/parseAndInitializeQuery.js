@@ -1,6 +1,5 @@
-import {teardownDocumentAST} from '../buildExecutionContext';
 import {FRAGMENT_SPREAD, INLINE_FRAGMENT} from 'graphql/language/kinds';
-import {convertFragmentToInline, parse, clone, ensureRootType, TYPENAME} from '../utils';
+import {convertFragmentToInline, parse, clone, ensureRootType, TYPENAME, teardownDocumentAST} from '../utils';
 import {TypeKind} from 'graphql/type/introspection';
 import {Field} from '../helperClasses';
 

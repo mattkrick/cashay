@@ -3,14 +3,13 @@ import denormalizeStore from './normalize/denormalizeStore';
 import {rebuildOriginalArgs} from './normalize/denormalizeHelpers';
 import normalizeResponse from './normalize/normalizeResponse';
 import {printMinimalQuery} from './query/printMinimalQuery';
-import {buildExecutionContext} from './buildExecutionContext';
 import {makeNormalizedDeps, shortenNormalizedResponse} from './query/queryHelpers';
 import {isObject, checkMutationInSchema} from './utils';
 import mergeStores from './normalize/mergeStores';
 import {CachedMutation, CachedQuery} from './helperClasses';
 import flushDependencies from './query/flushDependencies';
 import {makeComponentsToUpdate} from './mutate/mutationHelpers';
-import {parse, arraysShallowEqual} from './utils';
+import {parse, arraysShallowEqual, buildExecutionContext} from './utils';
 import namespaceMutation from './mutate/namespaceMutation';
 import mergeMutations from './mutate/mergeMutations';
 import createMutationFromQuery from './mutate/createMutationFromQuery';
@@ -48,13 +47,13 @@ export default class Cashay {
     // we can assume that a mutationName + the components it affects = a unique, reproduceable fullMutation
     // const example = {
     //   [mutationName]: {
-    //     activeComponents: [],
+    //     activeComponentIds: [],
     //     fullMutation: MutationString,
     //     variableEnhancers: []
     //     singles: {
     //       [componentId]: {
     //          ast: MutationAST,
-    //          variableEnhancers: null || []
+    //          variableEnhancers: []
     //       }
     //     }
     //   }
@@ -144,13 +143,27 @@ export default class Cashay {
 
     // override singleton defaults with query-specific values
     const variables = this.state.data.variables[componentId] || options.variables;
-    
+
     const transport = options.transport || this.transport;
 
     // save the query so we can call it from anywhere
-    this.cachedQueries[componentId] = this.cachedQueries[componentId] || new CachedQuery(this.query, queryString, {transport, forceFetch: true});
+    if (!fastResult) {
+      this.cachedQueries[componentId] = new CachedQuery(this.query, queryString, {
+        transport,
+        forceFetch: true
+      });
+      // invalidate the mutation query string
+      const activeMutations = Object.keys(this.cachedMutations);
+      for (let mutationName of activeMutations) {
+        const mutation = this.cachedMutations[mutationName];
+        if (mutation.activeComponentIds.includes(componentId)) {
+          mutation.fullMutation = '';
+          mutation.variableEnhancers = [];
+        }
+      }
+    }
     const cachedQuery = this.cachedQueries[componentId];
-    
+
     // create an AST that we can mutate
     const {paginationWords, idFieldName, state: {data: cashayDataState}} = this;
     const context = buildExecutionContext(cachedQuery.ast, {cashayDataState, variables, paginationWords, idFieldName})
@@ -199,7 +212,7 @@ export default class Cashay {
     const {variables} = context;
 
     // send minimizedQueryString to server and await minimizedQueryResponse
-    const serverResponse= await transport(minimizedQueryString, variables);
+    const serverResponse = await transport(minimizedQueryString, variables);
 
     const cachedQuery = this.cachedQueries[componentId];
     // handle errors coming back from the server
@@ -345,7 +358,7 @@ export default class Cashay {
         // TODO just create a mutation shell with no selections, this shouldn't be an error
         throw new Error(`Mutation has no queries to update: ${mutationName}`);
       }
-      
+
       // load the cachedMutation.singles with a bespoke (or user-defined) namespaced mutation for each query
       this._createMutationsFromQueries(componentIdsToUpdate, mutationName, variables);
 
@@ -355,19 +368,20 @@ export default class Cashay {
         cachedSingles.push(ast);
         cachedMutation.variableEnhancers.push(...variableEnhancers);
       }
-      
+
       cachedMutation.activeComponentIds = componentIdsToUpdate;
       mutationString = cachedMutation.fullMutation = mergeMutations(cachedSingles);
       // TODO handle performance boost if only 1 componentIdToUpdate
     }
     const namespacedVariables = cachedMutation.variableEnhancers.reduce((enhancer, reduction) => enhancer(reduction), variables);
+    const newOptions = Object.assign({}, options, {variables: namespacedVariables});
     const {activeComponentIds} = cachedMutation;
-    
+
     // optimistcally update
     this._processMutationHandlers(mutationName, activeComponentIds, null, variables);
 
     // async call the server
-    this._mutateServer(mutationName, activeComponentIds, mutationString, options);
+    this._mutateServer(mutationName, activeComponentIds, mutationString, newOptions);
   }
 
   _createMutationsFromQueries(componentIds, mutationName, variables) {
@@ -401,10 +415,10 @@ export default class Cashay {
     // for every component that listens the the mutationName
     for (let componentId of componentIdsToUpdate) {
       const componentHandler = componentHandlers[componentId];
-      
+
       // find current cached result for this particular componentId
       const cachedResult = this.cachedQueries[componentId];
-      
+
       const {ast, refetch, response} = cachedResult;
       let modifiedResponse;
       // for the denormalized response, mutate it in place or return undefined if no mutation was made

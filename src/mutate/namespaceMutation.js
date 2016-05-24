@@ -5,12 +5,11 @@ import {
   INLINE_FRAGMENT,
   OBJECT
 } from 'graphql/language/kinds';
-import {clone, convertFragmentToInline} from '../utils';
-import {teardownDocumentAST} from '../buildExecutionContext';
+import {clone, convertFragmentToInline, teardownDocumentAST} from '../utils';
 import {Name, VariableDefinition} from '../helperClasses';
-import {CASHAY} from '../utils';
+import {CASHAY, DELIMITER} from '../utils';
 
-const makeNamespaceString = (componentId, name, delim = '_') => `${CASHAY}${delim}${componentId}${delim}${name}`;
+const makeNamespaceString = (componentId, name, d = DELIMITER) => `${CASHAY}${d}${componentId}${d}${name}`;
 
 export default (namespaceAST, componentId, stateVars, schema) => {
   const variableEnhancers = [];
