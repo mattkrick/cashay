@@ -25,7 +25,6 @@ const mergeVariableDefinitions = (mainVarDefs, nextVarDefs) => {
   for (let varDef of nextVarDefs) {
     const nextName = varDef.variable.name.value;
     const varDefInMain = mainVarDefs.find(def => def.variable.name.value === nextName);
-    debugger
     if (!varDefInMain) {
       mainVarDefs.push(varDef);
     }
@@ -52,7 +51,6 @@ export const mergeSelections = (targetSelections, srcSelections) => {
 };
 
 const mergeSingleProp = (targetSelections, srcProp) => {
-  debugger
   if (srcProp.kind === INLINE_FRAGMENT) {
     // typeCondition is guaranteed to exist thanks to namespaceMutation
     const srcTypeCondition = srcProp.typeCondition.name.value;

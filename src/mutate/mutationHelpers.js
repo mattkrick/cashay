@@ -38,7 +38,7 @@ export const makeComponentsToUpdate = (mutationName, possibleComponentIds, denor
       }
     }
   }
-  return componentIds.length && componentIds;
+  return componentIds;
 };
 
 // export const makeArgsAndDefs = (mutationFieldSchema, variables) => {

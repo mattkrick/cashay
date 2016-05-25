@@ -12,7 +12,7 @@ import {
 } from 'graphql/language/kinds';
 import {TypeKind} from 'graphql/type/introspection';
 import {SET_VARIABLES} from './normalize/duck';
-import {denormalizeStore} from './normalize/denormalizeStore';
+import denormalizeStore from './normalize/denormalizeStore';
 import {ensureRootType, ensureTypeFromNonNull} from './utils';
 import parseAndInitializeQuery from './query/parseAndInitializeQuery';
 
@@ -28,10 +28,10 @@ export class CachedMutation {
 }
 
 export class CachedQuery {
-  constructor(queryFunction, queryString, options, response) {
-    this.ast = parseAndInitializeQuery(queryString);
+  constructor(queryFunction, queryString, options, schema, idFieldName) {
+    this.ast = parseAndInitializeQuery(queryString, schema, idFieldName);
     this.refetch = () => queryFunction(queryString, options);
-    this.response = response;
+    this.response = undefined;
   }
 
   /**

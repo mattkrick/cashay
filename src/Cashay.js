@@ -29,7 +29,7 @@ export default class Cashay {
     this.store = store;
 
     //the cashay state
-    this.state = getToState(store);
+    this.getState = () => getToState(store);
 
     // the reserved arguments for cusor-based pagination
     this.paginationWords = Object.assign({}, defaultPaginationWords, paginationWords);
@@ -127,7 +127,7 @@ export default class Cashay {
    */
   query(queryString, options = {}) {
     //if you call forceFetch in a mapStateToProps, you're gonna have a bad time (it'll refresh on EVERY dispatch)
-    const {forceFetch} = options;
+    const forceFetch = Boolean(options.forceFetch);
 
     // Each component can have only 1 unique queryString/variable combo. This keeps memory use minimal.
     // if 2 components have the same queryString/variable but a different componentId, it'll fetch twice
@@ -135,23 +135,21 @@ export default class Cashay {
 
     // get the result, containing a response, queryString, and options to re-call the query
     const fastResult = this.cachedQueries[componentId];
-
     // if we got local data cached already, send it back fast
     if (!forceFetch && fastResult && fastResult.response) {
       return fastResult.response;
     }
-
+    const cashayDataState = this.getState().data;
     // override singleton defaults with query-specific values
-    const variables = this.state.data.variables[componentId] || options.variables;
+    const variables = cashayDataState.variables[componentId] || options.variables;
 
     const transport = options.transport || this.transport;
-
     // save the query so we can call it from anywhere
     if (!fastResult) {
       this.cachedQueries[componentId] = new CachedQuery(this.query, queryString, {
         transport,
         forceFetch: true
-      });
+      }, this.schema, this.idFieldName);
       // invalidate the mutation query string
       const activeMutations = Object.keys(this.cachedMutations);
       for (let mutationName of activeMutations) {
@@ -165,8 +163,14 @@ export default class Cashay {
     const cachedQuery = this.cachedQueries[componentId];
 
     // create an AST that we can mutate
-    const {paginationWords, idFieldName, state: {data: cashayDataState}} = this;
-    const context = buildExecutionContext(cachedQuery.ast, {cashayDataState, variables, paginationWords, idFieldName})
+    const {paginationWords, idFieldName, schema} = this;
+    const context = buildExecutionContext(cachedQuery.ast, {
+      cashayDataState,
+      variables,
+      paginationWords,
+      idFieldName,
+      schema
+    });
 
     // create a response with a denormalized response and a function to set the variables
     cachedQuery.createResponse(context, componentId, this.store.dispatch, forceFetch);
@@ -190,8 +194,7 @@ export default class Cashay {
       //  async query the server (no need to track the promise it returns, as it will change the redux state)
       this.queryServer(transport, context, serverQueryString, componentId);
     }
-
-    this._prepareMutations(componentId, options);
+    this._prepareMutations(componentId, cashayDataState.variables[componentId], options);
     return cachedQuery.response;
   }
 
@@ -216,24 +219,23 @@ export default class Cashay {
 
     const cachedQuery = this.cachedQueries[componentId];
     // handle errors coming back from the server
-    if (!serverResponse.data) {
+    if (serverResponse.errors) {
       console.log(JSON.stringify(serverResponse.errors));
       cachedQuery.error = JSON.stringify(serverResponse.errors);
       // TODO put error in redux state
       return;
     }
-
     //re-create the denormalizedPartialResponse because it went stale when we called the server
+    rebuildOriginalArgs(context.operation);
     const {data} = denormalizeStore(context);
     const normalizedLocalResponse = normalizeResponse(data, context);
-
     // normalize response to get ready to dispatch it into the state tree
     const normalizedServerResponse = normalizeResponse(serverResponse.data, context);
 
     // now, remove the objects that look identical to the ones already in the state
     // if the incoming entity (eg Person.123) looks exactly like the one already in the store, then
     // we don't have to invalidate and rerender
-    const normalizedServerResponseForStore = shortenNormalizedResponse(normalizedServerResponse, this.state.data);
+    const normalizedServerResponseForStore = shortenNormalizedResponse(normalizedServerResponse, this.getState().data);
 
     // if the server didn't give us any new stuff, we already set the vars, so we're done here
     if (!normalizedServerResponseForStore) return;
@@ -307,7 +309,7 @@ export default class Cashay {
     }
   }
 
-  _prepareMutations(componentId, {mutationHandlers, customMutations}) {
+  _prepareMutations(componentId, componentStateVars, {mutationHandlers, customMutations}) {
     const {mutationSchema} = this.schema;
     if (isObject(mutationHandlers)) {
       const mutationHandlerNames = Object.keys(mutationHandlers);
@@ -325,7 +327,7 @@ export default class Cashay {
         const cachedSingles = this.cachedMutations[mutationName].singles;
         if (!cachedSingles[componentId]) {
           const mutationAST = parse(customMutations[mutationName]);
-          const {namespaceAST, variableEnhancers} = namespaceMutation(mutationAST, componentId, this.state, this.schema);
+          const {namespaceAST, variableEnhancers} = namespaceMutation(mutationAST, componentId, componentStateVars, this.schema);
           cachedSingles[componentId] = {
             ast: namespaceAST,
             variableEnhancers
@@ -341,7 +343,8 @@ export default class Cashay {
    *
    */
   mutate(mutationName, options = {}) {
-    const {variables, possibleComponentIds} = options;
+    const {variables, componentIds: possibleComponentIds} = options;
+    this.cachedMutations[mutationName] = this.cachedMutations[mutationName] || new CachedMutation();
     const cachedMutation = this.cachedMutations[mutationName];
     const {fullMutation, activeCompoentIds, singles} = cachedMutation;
     let mutationString;
@@ -354,7 +357,7 @@ export default class Cashay {
     }
     if (!mutationString) {
       const componentIdsToUpdate = makeComponentsToUpdate(mutationName, possibleComponentIds, this.cachedQueries, this.mutationHandlers);
-      if (!componentIdsToUpdate) {
+      if (!componentIdsToUpdate.length) {
         // TODO just create a mutation shell with no selections, this shouldn't be an error
         throw new Error(`Mutation has no queries to update: ${mutationName}`);
       }
@@ -385,13 +388,14 @@ export default class Cashay {
   }
 
   _createMutationsFromQueries(componentIds, mutationName, variables) {
-    this.cachedMutations[mutationName] = this.cachedMutations[mutationName] || new CachedMutation();
+    debugger
     const cachedSingles = this.cachedMutations[mutationName].singles;
     for (let componentId of componentIds) {
       if (!cachedSingles[componentId]) {
         const {ast} = this.cachedQueries[componentId];
         const mutationAST = createMutationFromQuery(ast, mutationName, variables, this.schema);
-        const {namespaceAST, variableEnhancers} = namespaceMutation(mutationAST, componentId, this.state.data.variables, this.schema);
+        const componentStateVars = this.getState().data.variables[componentId];
+        const {namespaceAST, variableEnhancers} = namespaceMutation(mutationAST, componentId, componentStateVars, this.schema);
         cachedSingles[componentId] = {
           ast: namespaceAST,
           variableEnhancers
@@ -410,7 +414,7 @@ export default class Cashay {
 
   _processMutationHandlers(mutationName, componentIdsToUpdate, dataFromServer, variables) {
     const componentHandlers = this.mutationHandlers[mutationName];
-    const cashayDataState = this.state.data;
+    const cashayDataState = this.getState().data;
     let allNormalizedChanges = {};
     // for every component that listens the the mutationName
     for (let componentId of componentIdsToUpdate) {
@@ -444,11 +448,12 @@ export default class Cashay {
 
       // create a new object to make sure react-redux's updateStatePropsIfNeeded returns true
       this.cachedQueries[componentId].response = {...this.cachedQueries[componentId].response};
-
+      const {schema, paginationWords, idFieldName} = this;
       const context = buildExecutionContext(ast, {
         variables: cashayDataState.variables[componentId],
-        paginationWords: this.paginationWords,
-        idFieldName: this.idFieldName,
+        paginationWords,
+        idFieldName,
+        schema,
         cashayDataState
       });
 

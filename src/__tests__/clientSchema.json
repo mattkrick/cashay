@@ -388,6 +388,20 @@
             "kind": "SCALAR",
             "name": "String"
           }
+        },
+        "karma": {
+          "name": "karma",
+          "type": {
+            "kind": "SCALAR",
+            "name": "Int"
+          }
+        },
+        "postId": {
+          "name": "postId",
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
         }
       },
       "interfaces": {

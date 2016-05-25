@@ -11,7 +11,7 @@ import {CASHAY, DELIMITER} from '../utils';
 
 const makeNamespaceString = (componentId, name, d = DELIMITER) => `${CASHAY}${d}${componentId}${d}${name}`;
 
-export default (namespaceAST, componentId, stateVars, schema) => {
+export default (namespaceAST, componentId, componentStateVars, schema) => {
   const variableEnhancers = [];
   const {operation, fragments} = teardownDocumentAST(namespaceAST);
   const variableDefinitions = operation.variableDefinitions || [];
@@ -19,7 +19,7 @@ export default (namespaceAST, componentId, stateVars, schema) => {
   const fieldSchema = schema.mutationSchema.fields[mainMutation.name.value];
   const context = {
     variableDefinitions,
-    stateVars,
+    componentStateVars,
     componentId,
     fragments,
     schema,
@@ -42,7 +42,6 @@ const namespaceAndInlineFrags = (fieldSelections, typeSchema, context) => {
       fieldSelections[i] = selection = convertFragmentToInline(fragment);
     }
     if (selection.kind === INLINE_FRAGMENT) {
-      debugger
       // if the fragment is unnecessary, remove it
       if (selection.typeCondition === null) {
         fieldSelections.push(...selection.selectionSet.selections);
@@ -75,11 +74,11 @@ const namespaceAndInlineFrags = (fieldSelections, typeSchema, context) => {
   }
 };
 
-const enhancerFactory = (stateVars, componentId, variableName, namespaceKey) => {
+const enhancerFactory = (componentStateVars, variableName, namespaceKey) => {
   return variablesObj => {
     return {
       ...variablesObj,
-      [namespaceKey]: stateVars[componentId][variableName]
+      [namespaceKey]: componentStateVars[variableName]
     }
   }
 };
@@ -98,8 +97,8 @@ const bagArgs = (argsToDefine, fieldSchema, isMain, context) => {
         variableDefinitions.push(newVariableDef);
       }
       if (!isMain) {
-        const {stateVars, variableEnhancers} = context;
-        const variableEnhancer = enhancerFactory(stateVars, componentId, variableName, namespaceKey);
+        const {componentStateVars, variableEnhancers} = context;
+        const variableEnhancer = enhancerFactory(componentStateVars, variableName, namespaceKey);
         variableEnhancers.push(variableEnhancer);
       }
     } else if (arg.value.kind === OBJECT) {

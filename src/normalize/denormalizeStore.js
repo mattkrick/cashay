@@ -1,6 +1,6 @@
 import {TypeKind} from 'graphql/type/introspection';
-import {FRAGMENT_SPREAD, INLINE_FRAGMENT} from 'graphql/language/kinds';
-import {isObject, ensureRootType, ensureTypeFromNonNull, clone, convertFragmentToInline, TYPENAME} from '../utils';
+import {INLINE_FRAGMENT} from 'graphql/language/kinds';
+import {ensureRootType, ensureTypeFromNonNull, TYPENAME} from '../utils';
 import {
   calculateSendToServer,
   sendChildrenToServer,
@@ -9,12 +9,12 @@ import {
 import getFieldState from './getFieldState';
 
 
-const {UNION, LIST, OBJECT, SCALAR} = TypeKind;
+const {UNION, LIST, OBJECT} = TypeKind;
 
 const visitObject = (subState = {}, reqAST, subSchema, context, baseReduction = {}) => {
-  return reqAST.selectionSet.selections.reduce((reduction, field, idx, selectionArr) => {
+  return reqAST.selectionSet.selections.reduce((reduction, field) => {
     if (field.kind === INLINE_FRAGMENT) {
-      // TODO handle null typeCondition
+      // TODO handle null typeCondition?
       if (field.typeCondition.name.value === subSchema.name) {
         // only follow through if it's the correct union subtype
         visitObject(subState, field, subSchema, context, reduction);
@@ -30,7 +30,6 @@ const visitObject = (subState = {}, reqAST, subSchema, context, baseReduction = 
       if (hasData) {
         let fieldState = subState[fieldName];
         if (fieldSchema.args) {
-          debugger
           fieldState = getFieldState(fieldState, fieldSchema, field, context);
         }
         reduction[aliasOrFieldName] = visit(fieldState, field, fieldSchema, context);

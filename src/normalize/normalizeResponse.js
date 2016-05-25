@@ -27,6 +27,9 @@ const visitObject = (bag, subResponse, reqAST, subSchema, context) => {
     let subReqAST = getSubReqAST(key, reqAST, context.fragments);
     const name = subReqAST.name.value;
     const field = subSchema.fields[name];
+    if (!field) {
+      throw new Error(`No field exists for ${field}. Did you update your schema?`)
+    }
     let fieldType = ensureRootType(field.type);
     let fieldSchema = context.schema.types[fieldType.name];
     // handle first recursion where things are stored in the query

@@ -130,10 +130,8 @@ test('augments the variables object with required fields from state', t => {
   const expected = parseSortPrint(expectedRaw);
   const mutationAST = parse(postSpanishTitleVars);
   const stateVars = {
-    component1: {
-      defaultLanguage: 'spanish',
-      secondaryLanguage: 'english'
-    }
+    defaultLanguage: 'spanish',
+    secondaryLanguage: 'english'
   };
   const {namespaceAST, variableEnhancers} = namespaceMutation(mutationAST, 'component1', stateVars, clientSchema);
   const actual = sortPrint(namespaceAST);

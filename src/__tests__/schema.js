@@ -20,12 +20,14 @@ import {
 const handlePaginationArgs = ({beforeCursor, afterCursor, first, last}, objs) => {
   let arrayPartial;
   if (first) {
+    const docsToSend = first + 1;
     const startingIdx = objs.findIndex(obj => obj.cursor === afterCursor) + 1;
-    arrayPartial = objs.slice(startingIdx, startingIdx + first);
+    arrayPartial = objs.slice(startingIdx, startingIdx + docsToSend);
   } else if (last) {
+    const docsToSend = last + 1;
     let endingIdx = objs.findIndex(obj => obj.cursor === beforeCursor);
     endingIdx = endingIdx === -1 ? objs.length : endingIdx;
-    const start = Math.max(0, endingIdx - last);
+    const start = Math.max(0, endingIdx - docsToSend);
     arrayPartial = objs.slice(start, endingIdx);
   } else {
     arrayPartial = objs;
@@ -81,7 +83,9 @@ const CommentType = new GraphQLObjectType({
       }
     },
     createdAt: {type: GraphQLInt},
-    cursor: {type: GraphQLString}
+    cursor: {type: GraphQLString},
+    karma: {type: GraphQLInt},
+    postId: {type: GraphQLString}
   })
 });
 
@@ -255,7 +259,6 @@ const Query = new GraphQLObjectType({
         last: {type: GraphQLInt, description: "Limit the comments from the back"}
       },
       resolve(source, args, ref) {
-        debugger
         const postKeys = Object.keys(PostDB);
         const sortedKeys = postKeys.sort((a, b) => PostDB[b].createdAt - PostDB[a].createdAt);
         const objs = sortedKeys.map(key => PostDB[key]);
@@ -287,7 +290,7 @@ const Query = new GraphQLObjectType({
       args: {
         postId: {type: new GraphQLNonNull(GraphQLString)}
       },
-      resolve: function ({postId}, args) {
+      resolve: function(source, {postId}) {
         const commentKeys = Object.keys(CommentDB);
         const filteredCommentKeys = commentKeys.filter(key => CommentDB[key].postId === postId);
         return filteredCommentKeys.map(key => CommentDB[key]);
