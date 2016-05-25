@@ -220,8 +220,8 @@ export default class Cashay {
     const cachedQuery = this.cachedQueries[componentId];
     // handle errors coming back from the server
     if (serverResponse.errors) {
-      console.log(JSON.stringify(serverResponse.errors));
-      cachedQuery.error = JSON.stringify(serverResponse.errors);
+      console.log(serverResponse.errors);
+      cachedQuery.error = serverResponse.errors;
       // TODO put error in redux state
       return;
     }
@@ -395,7 +395,6 @@ export default class Cashay {
         const mutationAST = createMutationFromQuery(ast, mutationName, variables, this.schema);
         const componentStateVars = this.getState().data.variables[componentId];
         const {namespaceAST, variableEnhancers} = namespaceMutation(mutationAST, componentId, componentStateVars, this.schema);
-        debugger
         cachedSingles[componentId] = {
           ast: namespaceAST,
           variableEnhancers
@@ -408,7 +407,6 @@ export default class Cashay {
     const {variables} = options;
     const transport = options.transport || this.transport;
     const docFromServer = await transport(mutationString, variables);
-    debugger
     // update state with new doc from server
     this._processMutationHandlers(mutationName, componentIdsToUpdate, docFromServer.data);
   }
