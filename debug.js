@@ -68,28 +68,14 @@ import {
 import {front2After3Query, front4Query, front3Response} from './src/normalize/__tests__/data-pagination-front';
 import removeNamespacing from './src/mutate/removeNamespacing';
 
-const input = {
-  "data": {
-    "createPost": {
-      "post": {
-        "CASHAY_component1_title": "FOOIE EN ESPANOL!",
-        "CASHAY_component1_reverseTitle": "EIOOF",
-        "title": "FOOIE"
-      }
+export const queryPost = `
+  query($first: Int!) {
+    getRecentPosts(count: $first) {
+      _id,
     }
-  }
-};
-const expected = {
-  "data": {
-    "createPost": {
-      "post": {
-        "title": "FOOIE EN ESPANOL!",
-        "reverseTitle": "EIOOF"
-      }
-    }
-  }
-};
-const actual = removeNamespacing(input, 'component1');
+  }`;
+
+const foo = parse(queryPost)
 
 debugger
 fs.writeFileSync('./actualResult.json', JSON.stringify(actual, null, 2));

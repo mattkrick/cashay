@@ -8,7 +8,8 @@ import {
   NAMED_TYPE,
   FIELD,
   VARIABLE_DEFINITION,
-  LIST_TYPE
+  LIST_TYPE,
+  NON_NULL_TYPE
 } from 'graphql/language/kinds';
 import {TypeKind} from 'graphql/type/introspection';
 import {SET_VARIABLES} from './normalize/duck';
@@ -16,7 +17,7 @@ import denormalizeStore from './normalize/denormalizeStore';
 import {ensureRootType, ensureTypeFromNonNull} from './utils';
 import parseAndInitializeQuery from './query/parseAndInitializeQuery';
 
-const {LIST} = TypeKind;
+const {LIST, NON_NULL} = TypeKind;
 
 export class CachedMutation {
   constructor() {
@@ -130,20 +131,37 @@ export class RequestArgument {
 
 export class VariableDefinition {
   constructor(variableName, argType) {
-    let argTypeNN = ensureTypeFromNonNull(argType);
-    const rootType = ensureRootType(argTypeNN);
-    const varDefType = {
-      kind: NAMED_TYPE,
-      name: new Name(rootType.name)
-    };
+    // let argTypeNN = ensureTypeFromNonNull(argType);
+    // const rootType = ensureRootType(argTypeNN);
+    // const rootVarDefType = {
+    //   kind: NAMED_TYPE,
+    //   name: new Name(rootType.name)
+    // };
+
     this.kind = VARIABLE_DEFINITION;
-    this.type = argTypeNN.kind !== LIST ? varDefType : {
-      kind: LIST_TYPE,
-      type: varDefType
-    };
+    this.type = processArgType(argType);
+    // this.type = argTypeNN.kind !== LIST ? varDefType : {
+    //   kind: LIST_TYPE,
+    //   type: varDefType
+    // };
     this.variable = {
       kind: VARIABLE,
       name: new Name(variableName)
     }
   }
+}
+
+const processArgType = argType => {
+  const vardefType = {};
+  if (argType.kind === NON_NULL) {
+    vardefType.kind = NON_NULL_TYPE;
+    vardefType.type = processArgType(argType.ofType);
+  } else if (argType.kind === LIST) {
+    vardefType.kind = LIST_TYPE;
+    vardefType.type = processArgType(argType.ofType);
+  } else {
+    vardefType.kind = NAMED_TYPE;
+    vardefType.name = new Name(argType.name)
+  }
+  return vardefType;
 }

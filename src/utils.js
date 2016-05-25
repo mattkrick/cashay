@@ -2,13 +2,14 @@ import {INLINE_FRAGMENT, OPERATION_DEFINITION, FRAGMENT_DEFINITION} from 'graphq
 import {TypeKind} from 'graphql/type/introspection';
 import {parse as gqlParse} from 'graphql/language/parser';
 
-const {NON_NULL} = TypeKind;
+const {NON_NULL, LIST} = TypeKind;
 
 export const TYPENAME = '__typename';
 export const CASHAY = 'CASHAY';
 export const DELIMITER = '_';
 
 export const ensureTypeFromNonNull = type => type.kind === NON_NULL ? type.ofType : type;
+// const ensureTypeFromList = type => type.kind === LIST ? ensureTypeFromNonNull(type.ofType) : type;
 
 export const ensureRootType = type => {
   while (type.ofType) type = type.ofType;

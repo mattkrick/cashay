@@ -388,7 +388,6 @@ export default class Cashay {
   }
 
   _createMutationsFromQueries(componentIds, mutationName, variables) {
-    debugger
     const cachedSingles = this.cachedMutations[mutationName].singles;
     for (let componentId of componentIds) {
       if (!cachedSingles[componentId]) {
@@ -396,6 +395,7 @@ export default class Cashay {
         const mutationAST = createMutationFromQuery(ast, mutationName, variables, this.schema);
         const componentStateVars = this.getState().data.variables[componentId];
         const {namespaceAST, variableEnhancers} = namespaceMutation(mutationAST, componentId, componentStateVars, this.schema);
+        debugger
         cachedSingles[componentId] = {
           ast: namespaceAST,
           variableEnhancers
@@ -408,6 +408,7 @@ export default class Cashay {
     const {variables} = options;
     const transport = options.transport || this.transport;
     const docFromServer = await transport(mutationString, variables);
+    debugger
     // update state with new doc from server
     this._processMutationHandlers(mutationName, componentIdsToUpdate, docFromServer.data);
   }
@@ -428,11 +429,11 @@ export default class Cashay {
       // for the denormalized response, mutate it in place or return undefined if no mutation was made
       if (dataFromServer) {
         // if it's from the server, send the doc we got back
-        const normalizedDataFromServer = removeNamespacing(dataFromServer.data, componentId);
-        modifiedResponse = componentHandler(null, normalizedDataFromServer, response, cashayDataState, this._invalidate);
+        const normalizedDataFromServer = removeNamespacing(dataFromServer, componentId);
+        modifiedResponse = componentHandler(null, normalizedDataFromServer, response.data, cashayDataState, this._invalidate);
       } else {
         // otherwise, treat it as an optimistic update
-        modifiedResponse = componentHandler(variables, null, response, cashayDataState, this._invalidate);
+        modifiedResponse = componentHandler(variables, null, response.data, cashayDataState, this._invalidate);
       }
 
       // there's a possible 3 updates: optimistic, doc from server, full array from server (invalidated)

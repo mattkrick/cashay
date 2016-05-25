@@ -14,7 +14,8 @@ import {
   GraphQLInterfaceType,
   GraphQLUnionType,
   GraphQLInputObjectType,
-  GraphQLBoolean
+  GraphQLBoolean,
+  GraphQLFloat
 } from 'graphql';
 
 const handlePaginationArgs = ({beforeCursor, afterCursor, first, last}, objs) => {
@@ -82,7 +83,7 @@ const CommentType = new GraphQLObjectType({
         return AuthorDB[author];
       }
     },
-    createdAt: {type: GraphQLInt},
+    createdAt: {type: GraphQLFloat},
     cursor: {type: GraphQLString},
     karma: {type: GraphQLInt},
     postId: {type: GraphQLString}
