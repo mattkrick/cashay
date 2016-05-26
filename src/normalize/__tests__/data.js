@@ -42,3 +42,14 @@ export const storeFromSortedArgs = {
     "getLatestPost": "PostType:p126"
   }
 };
+
+export const queryPostCount = `
+  query {
+    postCount: getPostCount
+  }`;
+
+export const storedPostCount = {
+  "result": {
+    "getPostCount": 4
+  }
+};

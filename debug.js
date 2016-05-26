@@ -2,10 +2,10 @@ import fs from 'fs';
 import clientSchema from './src/__tests__/clientSchema.json';
 import {parseSortPrint, sortPrint} from './src/__tests__/parseSortPrint';
 import normalizeResponse from './src/normalize/normalizeResponse';
-import {buildExecutionContext} from './src/buildExecutionContext';
 import namespaceMutation from './src/mutate/namespaceMutation';
 import mergeMutations from './src/mutate/mergeMutations'
-import {parse, clone} from './src/utils';
+import {parse, clone, buildExecutionContext} from './src/utils';
+import {queryPostCount, storedPostCount} from './src/normalize/__tests__/data';
 // import {parseSortPrint, sortPrint} from './__tests__/parseSortPrint';
 // import {print} from 'graphql/language/printer';
 // import createMutationFromQuery from './src/mutate/createMutationFromQuery';
@@ -68,14 +68,18 @@ import {
 import {front2After3Query, front4Query, front3Response} from './src/normalize/__tests__/data-pagination-front';
 import removeNamespacing from './src/mutate/removeNamespacing';
 
-export const queryPost = `
-  query($first: Int!) {
-    getRecentPosts(count: $first) {
-      _id,
-    }
-  }`;
+const idFieldName = '_id';
 
-const foo = parse(queryPost)
+
+const queryAST = parseAndInitializeQuery(queryPostCount, clientSchema, idFieldName);
+const context = buildExecutionContext(queryAST, {
+  cashayDataState: storedPostCount,
+  idFieldName,
+  schema: clientSchema,
+  paginationWords
+});
+const {data: actual} = denormalizeStore(context);
+const {data: expected} = unionResponse;
 
 debugger
 fs.writeFileSync('./actualResult.json', JSON.stringify(actual, null, 2));

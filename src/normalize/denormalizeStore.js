@@ -126,14 +126,17 @@ export default function denormalizeStore(context) {
     }
     // const query
     // get the expected return value, devs can be silly, so if the had the return value in a nonnull, remove it.
-    const subSchema = queryFieldSchema.type.kind === LIST ?
-      queryFieldSchema : ensureTypeFromNonNull(context.schema.types[queryFieldSchema.type.name]);
+    const nonNullQueryFieldSchemaType = ensureTypeFromNonNull(queryFieldSchema.type);
+    const subSchema= nonNullQueryFieldSchemaType.kind === LIST ? queryFieldSchema :
+      ensureTypeFromNonNull(context.schema.types[nonNullQueryFieldSchemaType.name]);
 
     // recursively visit each branch, flag missing branches with a sendToServer flag
     reduction[aliasOrName] = visit(fieldState, selection, subSchema, context);
 
     //shallowly climb the tree checking for the sendToServer flag. if it's present on a child, add it to the parent.
-    calculateSendToServer(selection, context.idFieldName);
+    if (selection.selectionSet) {
+      calculateSendToServer(selection, context.idFieldName);
+    }
     return reduction
   }, {});
 

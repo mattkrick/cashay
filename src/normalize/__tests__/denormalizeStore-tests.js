@@ -14,7 +14,9 @@ import {
   emptyInitialState,
   queryWithSortedArgs,
   responseFromSortedArgs,
-  storeFromSortedArgs
+  storeFromSortedArgs,
+  queryPostCount,
+  storedPostCount
 } from './data';
 import clientSchema from '../../__tests__/clientSchema.json';
 import {
@@ -48,6 +50,19 @@ test('denormalize store from recursive union request', t => {
   });
   const {data: actual} = denormalizeStore(context);
   const {data: expected} = unionResponse;
+  t.deepEqual(actual, expected);
+});
+
+test('denormalize store when the query returns a scalar (String)', t => {
+  const queryAST = parseAndInitializeQuery(queryPostCount, clientSchema, idFieldName);
+  const context = buildExecutionContext(queryAST, {
+    cashayDataState: storedPostCount,
+    idFieldName,
+    schema: clientSchema,
+    paginationWords
+  });
+  const {data: actual} = denormalizeStore(context);
+  const expected = {"postCount": 4};
   t.deepEqual(actual, expected);
 });
 
