@@ -20,7 +20,7 @@ import {
 /* variableDefinitions Tests */
 test('creates simple variableDefinitions from mutation arguments, ignore hardcoded args', t => {
   const expectedRaw = `
-  mutation($postId: String) {
+  mutation($postId: String!) {
     createComment(postId: $postId, content: "foo") {
       _id,
     }
@@ -39,7 +39,7 @@ test('throws when trying to pass in a bogus argument', t => {
 
 test('creates variableDefinitions with different names', t => {
   const expectedRaw = `
-  mutation($postIdz: String) {
+  mutation($postIdz: String!) {
     createComment(postId: $postIdz) {
       _id,
     }
@@ -53,7 +53,7 @@ test('creates variableDefinitions with different names', t => {
 
 test('allows for variables inside hardcoded object args', t => {
   const expectedRaw = `
-  mutation($postIdz: String) {
+  mutation($postIdz: String!) {
     createPost(newPost: {_id: $postIdz}) {
       _id,
     }
@@ -66,7 +66,7 @@ test('allows for variables inside hardcoded object args', t => {
 });
 
 test('creates required list variableDefinitions from mutation arguments', t => {
-  const expectedRaw = `mutation ($newMembers: [NewMember]) {
+  const expectedRaw = `mutation ($newMembers: [NewMember!]!) {
     createMembers(members: $newMembers) {
       __typename
     }
@@ -119,7 +119,7 @@ test('aliases all fields with arguments', t => {
 
 test('augments the variables object with required fields from state', t => {
   const expectedRaw = `
-  mutation ($newPostId: String, $CASHAY_component1_defaultLanguage: String, $CASHAY_component1_secondaryLanguage: String) {
+  mutation ($newPostId: String!, $CASHAY_component1_defaultLanguage: String, $CASHAY_component1_secondaryLanguage: String) {
     createPost(newPost: {_id: $newPostId}) {
       post {
         CASHAY_component1_title: title(language: $defaultLanguage),

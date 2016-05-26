@@ -23,37 +23,36 @@ export default (entities, component, key, denormalizedDeps, cachedQueries) => {
  *
  */
 const makeFlushSet = (entities, component, key, denormalizedDeps) => {
-    let componentFlushSet = new Set();
-    const keyFlush = {};
-    const typeKeys = Object.keys(entities);
-    for (let i = 0; i < typeKeys.length; i++) {
-      const typeName = typeKeys[i];
-      const typeInDependencyTree = denormalizedDeps[typeName];
-      const newEntity = entities[typeName];
-      const entityKeys = Object.keys(newEntity);
-      for (let j = 0; j < entityKeys.length; j++) {
-        const entityName = entityKeys[j];
-        const entityInDependencyTree = typeInDependencyTree[entityName];
-        if (key) {
-          const componentInDependencyTree = entityInDependencyTree[component];
-          keyFlush[component] = keyFlush[component] || new Set();
-          keyFlush[component] = new Set([...keyFlush[component], ...componentInDependencyTree]);
-        }
-        else {
-          // there's gotta be a more efficient way to merge sets. gross.
-          componentFlushSet = new Set([...componentFlushSet, ...entityInDependencyTree]);
-        }
+  let componentFlushSet = new Set();
+  const keyFlush = {};
+  const typeKeys = Object.keys(entities);
+  for (let i = 0; i < typeKeys.length; i++) {
+    const typeName = typeKeys[i];
+    const typeInDependencyTree = denormalizedDeps[typeName];
+    const newEntity = entities[typeName];
+    const entityKeys = Object.keys(newEntity);
+    for (let j = 0; j < entityKeys.length; j++) {
+      const entityName = entityKeys[j];
+      const entityInDependencyTree = typeInDependencyTree[entityName];
+      if (key) {
+        const componentInDependencyTree = entityInDependencyTree[component];
+        keyFlush[component] = keyFlush[component] || new Set();
+        keyFlush[component] = new Set([...keyFlush[component], ...componentInDependencyTree]);
+      }
+      else {
+        // there's gotta be a more efficient way to merge sets. gross.
+        componentFlushSet = new Set([...componentFlushSet, ...entityInDependencyTree]);
       }
     }
-
-    if (key) {
-      if (keyFlush[component]) {
-        keyFlush[component].delete(key);
-      }
-    } else {
-      componentFlushSet.delete(component);
-    }
-// no need to flush the callee
-    return {keyFlush, componentFlushSet};
   }
-  ;
+
+  // no need to flush the callee
+  if (key) {
+    if (keyFlush[component]) {
+      keyFlush[component].delete(key);
+    }
+  } else {
+    componentFlushSet.delete(component);
+  }
+  return {keyFlush, componentFlushSet};
+};
