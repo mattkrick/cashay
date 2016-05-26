@@ -1,12 +1,17 @@
-import path from 'path';
-import fs from 'fs';
-import introspectionQuery from './introspectionQuery';
-import {graphql} from 'graphql';
+"use strict";
+require('babel-register');
+const path = require('path');
+const fs = require('fs');
+const introspectionQuery = require('./introspectionQuery');
 
-const relativeInputPath = path.join(process.cwd(), process.argv[2]);
+// why instanceof is still a thing is beyond me...
+const graphql = require(path.join(process.cwd(), 'node_modules','graphql')).graphql;
+
+const inputArg = process.argv[2] || '';
+const relativeInputPath = path.join(process.cwd(), inputArg);
 const relativeOutputPath = process.argv[3] || './clientSchema.json';
 const outputPath = path.join(process.cwd(), relativeOutputPath);
-const rootSchema = require(relativeInputPath).default;
+const rootSchema = require(relativeInputPath);
 const spacing = Number(process.argv[4]) || 0;
 
 graphql(rootSchema, introspectionQuery).then(initialResult => {
