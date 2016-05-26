@@ -16,25 +16,53 @@ const initialState = {
 export const reducer = (state = initialState, action) => {
   switch (action.type) {
     case INSERT_NORMALIZED:
-      return Object.assign({}, state, {
-        data: Object.assign(mergeStores(state.data, action.payload.response), {
-          variables: Object.assign({}, state.data.variables, {
-            [action.payload.componentId]: Object.assign({},
-              state.data.variables[action.payload.componentId],
-              action.payload.variables)
+      if (!action.payload.key) {
+        return Object.assign({}, state, {
+          data: Object.assign(mergeStores(state.data, action.payload.response), {
+            variables: Object.assign({}, state.data.variables, {
+              [action.payload.component]: Object.assign({}, state.data.variables[action.payload.component],
+                action.payload.variables)
+            })
           })
-        })
-      });
+        });
+      } else {
+        const stateDataVarsComp = Object.assign({}, state.data.variables[action.payload.component]);
+        const stateDataVarsCompKey = Object.assign({}, stateDataVarsComp[action.payload.key], action.payload.variables);
+        return Object.assign({}, state, {
+          data: Object.assign(mergeStores(state.data, action.payload.response), {
+            variables: Object.assign({}, state.data.variables, {
+              [action.payload.component]: Object.assign(stateDataVarsComp, {
+                [action.payload.key]: stateDataVarsCompKey
+              })
+            })
+          })
+        });
+      }
     case SET_VARIABLES:
-      return Object.assign({}, state, {
-        data: Object.assign({}, state.data, {
-          variables: Object.assign({}, state.data.variables, {
-            [action.payload.componentId]: Object.assign({},
-              state.data.variables[action.payload.componentId],
-              action.payload.variables)
+      if (!action.payload.key) {
+        return Object.assign({}, state, {
+          data: Object.assign({}, state.data, {
+            variables: Object.assign({}, state.data.variables, {
+              [action.payload.component]: Object.assign({},
+                state.data.variables[action.payload.component],
+                action.payload.variables)
+            })
           })
-        })
-      });
+        });
+      } else {
+        const stateDataVarsComp = Object.assign({}, state.data.variables[action.payload.component]);
+        const stateDataVarsCompKey = Object.assign({}, stateDataVarsComp[action.payload.key], action.payload.variables);
+        return Object.assign({}, state, {
+          data: Object.assign({}, state.data, {
+            variables: Object.assign({}, state.data.variables, {
+              [action.payload.component]: Object.assign(stateDataVarsComp, {
+                [action.payload.key]: stateDataVarsCompKey
+              })
+            })
+          })
+        });
+      }
+
     default:
       return state;
   }

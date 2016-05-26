@@ -1,18 +1,3 @@
-export const makeNormalizedDeps = entities => {
-  const entityKeys = Object.keys(entities);
-  const normalizedDeps = new Set();
-  for (let i = 0; i < entityKeys.length; i++) {
-    const entityName = entityKeys[i];
-    const itemKeys = Object.keys(entities[entityName]);
-    for (let j = 0; j < itemKeys.length; j++) {
-      const itemName = itemKeys[j];
-      const dep = `${entityName}.${itemName}`;
-      normalizedDeps.add(dep);
-    }
-  }
-  return normalizedDeps;
-};
-
 /*
  * reduce the fields to merge into the state
  * doing this here means a smaller flushSet and fewer invalidations
@@ -92,6 +77,18 @@ const deepEqualAndReduce = (state, newItem, reducedNewItem = {}) => {
     } else {
       // they're non-equal scalars
       reducedNewItem[propName] = newItemProp;
+    }
+  }
+};
+
+export const invalidateMutationsOnNewQuery = (component, cachedMutations) => {
+  const activeMutations = Object.keys(cachedMutations);
+
+  for (let mutationName of activeMutations) {
+    const mutation = cachedMutations[mutationName];
+    if (mutation.activeComponents.includes(component)) {
+      mutation.fullMutation = '';
+      mutation.variableEnhancers = [];
     }
   }
 };

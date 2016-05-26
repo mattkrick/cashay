@@ -11,7 +11,8 @@ const getSuppliedArgs = (args, variables = {}, paginationWords) => {
   const paginationArgs = {};
   const paginationWordKeys = Object.keys(paginationWords);
   let hasPagination = false;
-  for (let arg of args) {
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
     const argName = arg.name.value;
     let argValue = arg.value.kind === VARIABLE ? variables[arg.value.name.value] : arg.value.value;
     if (argValue === undefined) return;
@@ -19,12 +20,6 @@ const getSuppliedArgs = (args, variables = {}, paginationWords) => {
     if (paginationMeaning) {
       if (paginationMeaning === FIRST || paginationMeaning === LAST) {
         argValue = parseInt(argValue);
-        // in rare cases a "count" might be used to go forward & back. this helps determine what count means.
-        if (paginationMeaning === FIRST) {
-          if (paginationWords.first === paginationWords.last && args.find(arg => arg.name.value === 'before')) {
-            paginationMeaning = LAST;
-          }
-        }
       }
       paginationArgs[paginationMeaning] = argValue;
       hasPagination = true;

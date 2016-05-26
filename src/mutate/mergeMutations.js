@@ -7,12 +7,16 @@ import {print} from 'graphql/language/printer';
 
 export default (cachedSingles) => {
   const firstSingle = cachedSingles.pop();
+  if (!firstSingle) {
+    
+  }
   // deep copy to create the base AST (slow, but faster than a parse!)
   const mergedAST = clone(firstSingle);
   const mainOperation = mergedAST.definitions[0];
   const mainMutation = mainOperation.selectionSet.selections[0];
   // now add the new ASTs one-by-one
-  for (let single of cachedSingles) {
+  for (let i = 0; i < cachedSingles.length; i++) {
+    const single = cachedSingles[i];
     const nextOperation = single.definitions[0];
     const nextMutation = nextOperation.selectionSet.selections[0];
     mergeVariableDefinitions(mainOperation.variableDefinitions, nextOperation.variableDefinitions);

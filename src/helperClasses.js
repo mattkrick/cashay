@@ -14,7 +14,6 @@ import {
 import {TypeKind} from 'graphql/type/introspection';
 import {SET_VARIABLES} from './normalize/duck';
 import denormalizeStore from './normalize/denormalizeStore';
-import {ensureRootType, ensureTypeFromNonNull} from './utils';
 import parseAndInitializeQuery from './query/parseAndInitializeQuery';
 
 const {LIST, NON_NULL} = TypeKind;
@@ -22,17 +21,20 @@ const {LIST, NON_NULL} = TypeKind;
 export class CachedMutation {
   constructor() {
     this.fullMutation = undefined;
-    this.activeComponentIds = [];
+    this.activeComponentsObj = {};
     this.singles = {};
     this.variableEnhancers = [];
   }
 }
 
 export class CachedQuery {
-  constructor(queryFunction, queryString, options, schema, idFieldName) {
+  constructor(queryFunction, queryString, schema, idFieldName, options) {
     this.ast = parseAndInitializeQuery(queryString, schema, idFieldName);
-    this.refetch = () => queryFunction(queryString, options);
-    this.response = undefined;
+    this.refetch = (key) => {
+      let newOptions = key ? Object.assign({}, options, {key}) : options;
+      queryFunction(queryString, newOptions);
+    };
+    this.response = {};
   }
 
   /**
@@ -42,17 +44,22 @@ export class CachedQuery {
    * isComplete is true if the request is resolved locally
    * firstRun is true if the none of the queries within the request have been executed before
    */
-  createResponse(context, componentId, dispatch, forceFetch) {
+  createResponse(context, component, key, dispatch, forceFetch) {
     const {data, firstRun} = denormalizeStore(context);
-    this.response = {
+    const response = {
       data,
       firstRun,
       isComplete: forceFetch === undefined ? true : !forceFetch && !context.operation.sendToServer,
-      setVariables: this.setVariablesFactory(componentId, context.variables, dispatch)
+      setVariables: this.setVariablesFactory(component, key, context.variables, dispatch)
     };
+    if (!key) {
+      this.response = response;
+    } else {
+      this.response[key] = response;
+    }
   }
 
-  setVariablesFactory(componentId, currentVariables, dispatch) {
+  setVariablesFactory(component, key, currentVariables, dispatch) {
     return cb => {
       const variables = Object.assign({}, currentVariables, cb(currentVariables));
       // invalidate the cache
@@ -62,7 +69,8 @@ export class CachedQuery {
       dispatch({
         type: SET_VARIABLES,
         payload: {
-          componentId,
+          component,
+          key,
           variables
         }
       });
@@ -102,14 +110,14 @@ export class Field {
   }
 }
 export class MutationShell {
-  constructor(mutationName, mutationArgs, variableDefinitions = []) {
+  constructor(mutationName, mutationArgs, variableDefinitions = [], isEmpty) {
     this.kind = DOCUMENT;
     this.definitions = [{
       kind: OPERATION_DEFINITION,
       operation: 'mutation',
       variableDefinitions,
       directives: [],
-      selectionSet: new SelectionSet([new Field({args: mutationArgs, name: mutationName, selections: []})])
+      selectionSet: isEmpty ? null : new SelectionSet([new Field({args: mutationArgs, name: mutationName, selections: []})])
     }]
   }
 }

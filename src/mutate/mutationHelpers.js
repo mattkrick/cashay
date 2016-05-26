@@ -1,55 +1,29 @@
-import {ensureTypeFromNonNull} from '../utils';
-import {
-  OPERATION_DEFINITION,
-  DOCUMENT,
-  SELECTION_SET,
-  NAME,
-  ARGUMENT,
-  VARIABLE,
-  NAMED_TYPE,
-  FIELD,
-  INLINE_FRAGMENT,
-  VARIABLE_DEFINITION,
-  LIST_TYPE
-} from 'graphql/language/kinds';
-import {RequestArgument} from '../helperClasses';
+import {isObject} from '../utils';
 
-export const makeComponentsToUpdate = (mutationName, possibleComponentIds, denormalizedResults, mutationHandlers) => {
-  const componentIds = [];
-  // if there are no provided queries to update, try updating them all
-  if (!possibleComponentIds) {
-    const mutationHandlerObj = mutationHandlers[mutationName];
-    const handlerComponents = Object.keys(mutationHandlerObj);
-    for (let componentId of handlerComponents) {
-      if (denormalizedResults[componentId]) {
-        componentIds.push(componentId);
+export const makeComponentsToUpdate = (mutationName, possibleComponentObj, cachedQueries, mutationHandlers) => {
+  const componentsToUpdateObj = {};
+  if (isObject(possibleComponentObj)) {
+    const possibleComponentKeys = Object.keys(possibleComponentObj);
+    for (let i = 0; i < possibleComponentKeys.length; i++) {
+      const component = possibleComponentKeys[i];
+      if (cachedQueries[component]) {
+        // remove falsy values, bring over the key or true
+        componentsToUpdateObj[component] = possibleComponentObj[component];
       }
     }
-    // if only 1 component is provided, add it if the query is currently in use
-  } else if (!Array.isArray(possibleComponentIds)) {
-    if (denormalizedResults[possibleComponentIds]) {
-      componentIds.push(possibleComponentIds);
-    }
-    // if a list of components is provided, only select those that have queries in use
   } else {
-    for (let componentId of possibleComponentIds) {
-      if (denormalizedResults[componentId]) {
-        componentIds.push(componentId);
+    const mutationHandlerObj = mutationHandlers[mutationName];
+    const handlerComponents = Object.keys(mutationHandlerObj);
+    for (let component of handlerComponents) {
+      if (cachedQueries[component]) {
+        if (!cachedQueries[component].response.hasOwnProperty('data')) {
+          throw new Error(`${component} has more than 1 instance.
+          For ${mutationName}, please include a components object in your options`)
+        }
+        // todo if key isn't mentioned, true should either mean all keys, or throw an error
+        componentsToUpdateObj[component] = true;
       }
     }
   }
-  return componentIds;
+  return componentsToUpdateObj;
 };
-
-// export const makeArgsAndDefs = (mutationFieldSchema, variables) => {
-//   const mutationArgs = [];
-//   const variableDefinitions = [];
-//   for (let schemaArg of mutationFieldSchema.args) {
-//     if (variables[schemaArg.name]) {
-//       const argType = ensureTypeFromNonNull(schemaArg.type);
-//       variableDefinitions.push(new VariableDefinition(argType.name, schemaArg.name));
-//       mutationArgs.push(new RequestArgument(schemaArg.name, VARIABLE, schemaArg.name));
-//     }
-//   }
-//   return {mutationArgs, variableDefinitions};
-// };

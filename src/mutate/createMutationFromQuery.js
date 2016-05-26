@@ -7,7 +7,7 @@ import {TypeKind} from 'graphql/type/introspection';
 
 const {SCALAR} = TypeKind;
 
-export default (queryAST, mutationName, mutationVariables = {}, schema) => {
+export default function createMutationFromQuery(queryAST, mutationName, mutationVariables = {}, schema) {
   const operation = queryAST.definitions[0];
   //createComment
   const mutationFieldSchema = schema.mutationSchema.fields[mutationName];

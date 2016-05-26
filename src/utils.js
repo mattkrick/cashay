@@ -49,6 +49,16 @@ export const arraysShallowEqual = (arr1, arr2) => {
   return true;
 };
 
+export const equalObjectKeys = (obj1, obj2) => {
+  const obj1Keys = Object.keys(obj1);
+  const obj2Keys = Object.keys(obj2);
+  if (obj1Keys.length !== obj2Keys.length) return false;
+  for (let val of obj1Keys) {
+    if (obj1[val] !== obj2[val]) return false
+  }
+  return true;
+};
+
 export const buildExecutionContext = (queryAST, {cashayDataState, variables, paginationWords, idFieldName, schema}) => {
   const clonedAST = clone(queryAST);
   const {operation, fragments} = teardownDocumentAST(clonedAST);
