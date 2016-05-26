@@ -9,7 +9,7 @@ Relay for the rest of us
 npm i -S cashay
 
 ## How's it different from Relay?
-| Cashay                                        | Relay |     |
+|                                               |Cashay |Relay|
 |-----------------------------------------------|-------|-----|
 | Uses redux                                    | Yes   | No  |
 | Local state & domain state in the same store  | Yes   | No  |
