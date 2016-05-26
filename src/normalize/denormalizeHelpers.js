@@ -31,7 +31,6 @@ export const handleMissingData = (visit, aliasOrFieldName, field, fieldSchema, c
 };
 
 export const calculateSendToServer = (field, idFieldName) => {
-  debugger
   const {selections} = field.selectionSet;
   for (let i = 0; i < selections.length; i++) {
     const selection = selections[i];

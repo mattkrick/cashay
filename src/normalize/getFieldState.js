@@ -76,7 +76,6 @@ const handlePaginationArgs = (paginationArgs, fieldState, fieldSchema, selection
 
   // if there's a document missing & we don't have all the documents yet, get more!
   if (missingDocCount > 0 && !isFull) {
-    console.log(`not enough data, need to fetch ${missingDocCount} more`);
 
     // if we have a partial response & the backend accepts a cursor, only ask for the missing pieces
     if (missingDocCount < count && fieldSchema.args[cursorWord]) {

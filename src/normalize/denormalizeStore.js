@@ -70,7 +70,6 @@ const visitIterable = (subState, reqAST, subSchema, context) => {
     }
     return mappedState;
   }
-  // TODO dead code?
   // recursively climb down the tree, flagging each branch with sendToServer
   sendChildrenToServer(reqAST);
 
@@ -133,9 +132,12 @@ export default function denormalizeStore(context) {
     // recursively visit each branch, flag missing branches with a sendToServer flag
     reduction[aliasOrName] = visit(fieldState, selection, subSchema, context);
 
-    //shallowly climb the tree checking for the sendToServer flag. if it's present on a child, add it to the parent.
+    // ugly code that's necessary in case the selection is a scalar. TODO clean!
     if (selection.selectionSet) {
+      //shallowly climb the tree checking for the sendToServer flag. if it's present on a child, add it to the parent.
       calculateSendToServer(selection, context.idFieldName);
+    } else if (reduction[aliasOrName] === undefined) {
+      selection.sendToServer = true;
     }
     return reduction
   }, {});

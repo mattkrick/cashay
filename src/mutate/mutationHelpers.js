@@ -13,6 +13,9 @@ export const makeComponentsToUpdate = (mutationName, possibleComponentObj, cache
     }
   } else {
     const mutationHandlerObj = mutationHandlers[mutationName];
+    if (!mutationHandlerObj) {
+      throw new Error(`Did you forget to add mutation handlers to your queries for ${mutationName}?`)
+    }
     const handlerComponents = Object.keys(mutationHandlerObj);
     for (let component of handlerComponents) {
       if (cachedQueries[component]) {

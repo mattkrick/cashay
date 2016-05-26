@@ -180,7 +180,6 @@ export default class Cashay {
       idFieldName,
       schema
     });
-
     // create a response with a denormalized response and a function to set the variables
     cachedQuery.createResponse(context, component, key, this.store.dispatch, forceFetch);
     const cachedResponse = key ? cachedQuery.response[key] : cachedQuery.response;
@@ -319,9 +318,10 @@ export default class Cashay {
     const {fullMutation, activeComponentsObj, singles} = cachedMutation;
     let mutationString;
     if (fullMutation) {
-      if (possibleComponentsObj === activeComponentsObj) {
+      const objToCheck = possibleComponentsObj || makeComponentsToUpdate(mutationName, possibleComponentsObj, this.cachedQueries, this.mutationHandlers);
+      if (objToCheck === activeComponentsObj) {
         mutationString = fullMutation;
-      } else if (equalObjectKeys(possibleComponentsObj, activeComponentsObj)) {
+      } else if (equalObjectKeys(objToCheck, activeComponentsObj)) {
         mutationString = fullMutation;
       }
     }
