@@ -1,6 +1,7 @@
 [![npm version](https://badge.fury.io/js/cashay.svg)](https://badge.fury.io/js/cashay)
-
 [![Build Status](https://travis-ci.org/mattkrick/cashay.svg?branch=master)](https://travis-ci.org/mattkrick/cashay)
+[![Coverage Status](https://coveralls.io/repos/github/mattkrick/cashay/badge.svg?branch=master)](https://coveralls.io/github/mattkrick/cashay?branch=master)
+[![Gitter](https://badges.gitter.im/mattkrick/cashay.svg)](https://gitter.im/mattkrick/cashay?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 
 # Cashay
 Relay for the rest of us
