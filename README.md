@@ -7,7 +7,7 @@
 Relay for the rest of us
 
 ## Installation
-npm i -S cashay
+`npm i -S cashay`
 
 ## How's it different from Relay?
 |                                               |Cashay |Relay|
@@ -132,7 +132,7 @@ cashay.mutate(mutationName, options)
 Cashay is smart. By default, it will go through all the `mutationHandlers` that are currently, active looking for any handlers for `mutationName`. Then, it intersects your mutation payload schema with the corresponding queries to automatically fetch all the fields you need. No fat queries, no mutation fragments in your queries, no problems. If two different queries need the same field but with different arguments (eg. `Query1` needs `profilePic(size:SMALL)` and `Query2` needs `profilePic(size:LARGE)`, it'll take care of that, too. For every field that has an argument, it assigns a namespaced alias to it, along with the corresponding variables from the state. Then when the result comes back, it de-namespaces it for the `mutationHandler`. 
 
 The options are as follows:
-- `variables`: The variables object to pass onto the GraphQL server.
+- `variables`: The variables object to pass onto the GraphQL server. Make sure the variables have the same names as what your schema expects so Cashay can automatically create the mutation for you. For maximum efficiency, be sure to pass in all variables that you will possibly use (even if that means passing it in as `undefined`). If you can't do these 2 things, you can write a `customMutation` (and tell me your usecase!).
 - `components`: An object the determine which `mutationHandlers` to call. If not provided, it'll call every `component` that has a `mutationHandler` for that `mutationName`. 
 
 In the example below, we just call the `comments` component where `key === postId`. Additionally, we call the `mutationHandler` for `post` if the value is true. This allows you to be super efficient and still write multiple mutations that have the same `mutationName`, but affect different queries. 
@@ -151,10 +151,10 @@ https://github.com/mattkrick/cashay-playground
 
 ## Contributing
 
-Cashay is a young project, so there are sure to be plenty of bugs to squash and edge cases to capture. Bugs will be fixes with the following priority:
+Cashay is a young project, so there are sure to be plenty of bugs to squash and edge cases to capture. Bugs will be fixed with the following priority:
 - Submit an issue: LOW
 - Submit a PR with a failing test case: MEDIUM
-- Submit a PR with a passing test case: SUPER HIGH HIGH FIVE!
+- Submit a PR with a passing test case (ie fix it yourself): SUPER HIGH HIGH FIVE!
 
 ##License
 
