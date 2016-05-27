@@ -26,7 +26,7 @@ npm i -S cashay
 
 ### Creating the client schema
 
-Cashay sends a subset of the introspection query to the client. Creating it is easy because cashay givces you the script.
+Cashay sends a subset of the introspection query to the client. Creating it is easy because cashay gives you the script.
 `updateSchema(pathToSchema = './', outputPath = './clientSchema.json', numberOfSpaces = 0)`
 
 To make it even easier, just add an npm script like so (assuming the schema is in your `src` folder):
