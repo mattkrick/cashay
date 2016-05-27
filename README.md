@@ -16,7 +16,7 @@ Relay for the rest of us
 | Local state & domain state in the same store  | Yes   | No  |
 | Babelfication-free                            | Yes   | No  |
 | Uses the introspection query on the client    | Yes   | No  |
-| No big changes to your server                 | Yes   | No  |
+| No big changes to your GraphQL server         | Yes   | No  |
 | Writes your mutations for you                 | Yes   | No  |
 | DRY optimistic updates                        | Yes   | No  |
 | Allows for more than append/prepend mutations | Yes   | No  |
