@@ -9,7 +9,7 @@
     "build": "babel --presets es2015,stage-0 -d lib/ src/",
     "watch": "babel -w --presets es2015,stage-0 -d lib/ src/",
     "prepublish": "npm run clean && npm run build",
-    "test": "nyc ./src/**/__tests__/**/*-tests.js",
+    "test": "nyc ava ./src/**/__tests__/**/*-tests.js",
     "quickTest": "ava ./src/**/__tests__/**/*-tests.js",
     "buildTestSchema": "node src/updateSchema.js src/__tests__/schema.js src/__tests__/clientSchema.json 2"
   },
