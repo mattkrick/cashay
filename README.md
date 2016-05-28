@@ -129,7 +129,7 @@ Cashay mutations are pretty darn simple, too:
 cashay.mutate(mutationName, options)
 ```
 
-Cashay is smart. By default, it will go through all the `mutationHandlers` that are currently active, looking for any handlers for `mutationName`. Then, it intersects your mutation payload schema with the corresponding queries to automatically fetch all the fields you need. No fat queries, no mutation fragments in your queries, no problems. If two different queries need the same field but with different arguments (eg. `Query1` needs `profilePic(size:SMALL)` and `Query2` needs `profilePic(size:LARGE)`, it'll take care of that, too. For every field that has an argument, it assigns a namespaced alias to it, along with the corresponding variables from the state. Then when the result comes back, it de-namespaces it for the `mutationHandler`. 
+Cashay is smart. By default, it will go through all the `mutationHandlers` that are currently active, looking for any handlers for `mutationName`. Then, it intersects your mutation payload schema with the corresponding queries to automatically fetch all the fields you need. No fat queries, no mutation fragments in your queries, no problems. If two different queries need the same field but with different arguments (eg. `Query1` needs `profilePic(size:SMALL)` and `Query2` needs `profilePic(size:LARGE)`, it'll take care of that, too. For the curious, it does this by assigning a namespaced alias to all fields with args, in addition to namespacing the variables you passed in. Then when the result comes back, it de-namespaces it for the `mutationHandler`. Note: if you return a scalar variable at the highest level of your mutation payload schema, make sure the name in the mutation payload schema matches the name in the query to give Cashay a hint to grab it. 
 
 The options are as follows:
 - `variables`: The variables object to pass onto the GraphQL server. Make sure the variables have the same names as what your schema expects so Cashay can automatically create the mutation for you. For maximum efficiency, be sure to pass in all variables that you will possibly use (even if that means passing it in as `undefined`). If you can't do these 2 things, you can write a `customMutation` (and tell me your usecase, I'm curious!).
@@ -145,7 +145,7 @@ const components = {
   comments: postId,
   post: mutationAffectsPostComponent
 }
-cashay.mutate('deletComment", {variables: {commentId: postId}, components})
+cashay.mutate('deletComment', {variables: {commentId: postId}, components})
 ```
 
 ## Example
