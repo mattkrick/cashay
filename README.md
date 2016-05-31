@@ -21,7 +21,7 @@ Relay for the rest of us
 | DRY optimistic updates                        | Yes   | No  |
 | Allows for more than append/prepend mutations | Yes   | No  |
 | Works with all frontends                      | Yes   | No  |
-| Allows for colocation                         | No    | Yes |
+| Aggregates queries from child routes          | No    | Yes |
 
 ## Usage
 
