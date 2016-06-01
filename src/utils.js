@@ -91,3 +91,11 @@ export const teardownDocumentAST = queryAST => {
   }
   return {operation, fragments};
 };
+
+export const getVariables = (variables, componentVars, key) => {
+  let stateVars;
+  if (componentVars) {
+    stateVars = key ? componentVars[key] : componentVars;
+  }
+  return stateVars || variables;
+}

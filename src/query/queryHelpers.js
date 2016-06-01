@@ -6,77 +6,80 @@
 export const shortenNormalizedResponse = (normalizedResponse, cashayDataStore) => {
   // TODO what if a forceFetched result is the same as what's already in the store? Need to handle results, too.
   const {entities} = normalizedResponse;
-  const entityKeys = Object.keys(entities);
-  for (let entityName of entityKeys) {
-    const storeEntity = cashayDataStore.entities[entityName];
-    if (!storeEntity) {
+  const typeKeys = Object.keys(entities);
+  for (let i = 0; i < typeKeys.length; i++) {
+    const typeName = typeKeys[i];
+    const storeType = cashayDataStore.entities[typeName];
+    if (!storeType) {
       continue;
     }
-    const newEntity = entities[entityName];
-    const itemKeys = Object.keys(newEntity);
-    for (let itemName of itemKeys) {
-      const storeItem = storeEntity[itemName];
-      if (!storeItem) {
+    const newType = entities[typeName];
+    const entityKeys = Object.keys(newType);
+    for (let j = 0; j < entityKeys.length; j++) {
+      const entityName = entityKeys[j];
+      const storeEntity = storeType[entityName];
+      if (!storeEntity) {
         continue;
       }
-      const newItem = newEntity[itemName];
-      // storeItem could be a superset of newItem and we'd still want to remove newItem
-      // so, we can't use a single stringify comparison, we have to walk each item in newItem
+      const newEntity = newType[entityName];
+      // storeEntity could be a superset of newEntity and we'd still want to remove newEntity
+      // so, we can't use a single stringify comparison, we have to walk each item in newEntity
       // and remove items that are deepEqual (since an entity can have a nested array or object)
-      deepEqualAndReduce(storeItem, newItem);
+      deepEqualAndReduce(storeEntity, newEntity);
     }
   }
   return Object.keys(normalizedResponse).length && normalizedResponse;
 };
 
 /*
- * Returns a copy of the newItem that does not include any props where the value of both are equal
+ * Returns a copy of the newEntity that does not include any props where the value of both are equal
  */
-const deepEqualAndReduce = (state, newItem, reducedNewItem = {}) => {
-  const propsToCheck = Object.keys(newItem);
-  for (let propName of propsToCheck) {
-    const newItemProp = newItem[propName];
+const deepEqualAndReduce = (state, newEntity, reducedNewItem = {}) => {
+  const propsToCheck = Object.keys(newEntity);
+  for (let i = 0; i < propsToCheck.length; i++) {
+    const propName = propsToCheck[i];
+    const newEntityProp = newEntity[propName];
 
     // it the prop doesn't exist in state, put it there
     if (!state.hasOwnProperty(propName)) {
-      reducedNewItem[propName] = newItemProp;
+      reducedNewItem[propName] = newEntityProp;
       continue;
     }
 
     // strict-equal must come after hasOwnProperty because the two could be null
     const stateProp = state[propName];
-    if (stateProp === newItemProp) {
+    if (stateProp === newEntityProp) {
       continue;
     }
 
     // if they're not equal, it could be an array, object, or scalar
-    if (Array.isArray(newItemProp)) {
-      if (Array.isArray(stateProp) && newItemProp.length === stateProp.length) {
+    if (Array.isArray(newEntityProp)) {
+      if (Array.isArray(stateProp) && newEntityProp.length === stateProp.length) {
         //  an array of objects here is wrong. Better to be performant for those who play by the rules
         let isShallowEqual = true;
-        for (let a = 0; a < newItemProp.length; a++) {
-          if (newItemProp[a] !== stateProp[a]) {
+        for (let a = 0; a < newEntityProp.length; a++) {
+          if (newEntityProp[a] !== stateProp[a]) {
             isShallowEqual = false;
             break;
           }
         }
         if (!isShallowEqual) {
-          reducedNewItem[propName] = newItemProp;
+          reducedNewItem[propName] = newEntityProp;
         }
       } else {
-        reducedNewItem[propName] = newItemProp;
+        reducedNewItem[propName] = newEntityProp;
       }
-    } else if (typeof newItemProp === 'object' && newItemProp !== null) {
+    } else if (typeof newEntityProp === 'object' && newEntityProp !== null) {
       if (typeof stateProp === 'object' && stateProp !== null) {
         // they're both objects, we must go deeper
         reducedNewItem[propName] = {};
-        deepEqualAndReduce(stateProp, newItemProp, reducedNewItem[propName]);
+        deepEqualAndReduce(stateProp, newEntityProp, reducedNewItem[propName]);
       } else {
-        reducedNewItem[propName] = newItemProp;
+        reducedNewItem[propName] = newEntityProp;
       }
     } else {
       // they're non-equal scalars
-      reducedNewItem[propName] = newItemProp;
+      reducedNewItem[propName] = newEntityProp;
     }
   }
 };

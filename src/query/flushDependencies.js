@@ -29,8 +29,8 @@ const makeFlushSet = (entities, component, key, denormalizedDeps) => {
   for (let i = 0; i < typeKeys.length; i++) {
     const typeName = typeKeys[i];
     const typeInDependencyTree = denormalizedDeps[typeName];
-    const newEntity = entities[typeName];
-    const entityKeys = Object.keys(newEntity);
+    const newType = entities[typeName];
+    const entityKeys = Object.keys(newType);
     for (let j = 0; j < entityKeys.length; j++) {
       const entityName = entityKeys[j];
       const entityInDependencyTree = typeInDependencyTree[entityName];

@@ -9,7 +9,7 @@ import mergeStores from './normalize/mergeStores';
 import {CachedMutation, CachedQuery, MutationShell} from './helperClasses';
 import flushDependencies from './query/flushDependencies';
 import {makeComponentsToUpdate} from './mutate/mutationHelpers';
-import {parse, equalObjectKeys, buildExecutionContext} from './utils';
+import {parse, equalObjectKeys, buildExecutionContext, getVariables} from './utils';
 import namespaceMutation from './mutate/namespaceMutation';
 import mergeMutations from './mutate/mergeMutations';
 import createMutationFromQuery from './mutate/createMutationFromQuery';
@@ -74,6 +74,15 @@ export default class Cashay {
     // }
     this.cachedQueries = {};
 
+    /*
+     const example = {
+     [subscriptionString]: {
+     ast: SubscriptionAST,
+     response: DenormalizedResponseWithUnsub
+     }
+     };
+     */
+    this.cachedSubscriptions = {};
     // a flag thrown by the invalidate function and reset when that query is added to the queue
     this._willInvalidateListener = false;
 
@@ -151,12 +160,7 @@ export default class Cashay {
     }
     const cashayDataState = this.getState().data;
     // override singleton defaults with query-specific values
-    const componentVars = cashayDataState.variables[component];
-    let stateVars;
-    if (componentVars) {
-      stateVars = key ? componentVars[key] : componentVars;
-    }
-    const variables = stateVars || options.variables;
+    const variables = getVariables(options.variables, cashayDataState.variables[component], key);
 
     const transport = options.transport || this.transport;
 
@@ -454,4 +458,85 @@ export default class Cashay {
       });
     }
   }
+
+  /**
+   *
+   */
+  subscribe(subscriptionString, subscriber, options) {
+    const component = options.component || subscriptionString;
+    if (!this.cachedSubscriptions[component]) {
+      this.cachedSubscriptions[component] = new CachedSubscription(subscriptionString);
+    }
+    const handlers = {
+      add: this.subscriptionAdd,
+      update: this.subscriptionUpdate,
+      remove: this.subscriptionRemove,
+      error: this.subscriptionError
+    };
+    const cashayDataState = this.getState().data;
+    const variables = getVariables(options.variables, cashayDataState.variables[component]);
+    return subscriber(subscriptionString, handlers, variables);
+  }
+
+  subscriptionAdd(document, fastMode = true) {
+    // normalize data
+    // compare the normalized data to the state data, removing anything that has the same data
+    // merge entities shortenedNormalizedData
+    // if cashayDataState.result[subscriptionName][?variables].full is an array
+    // then add the newState.result.... to the end of it
+    // also, add the new data to the end of the denormalizedResponse (so fast!) if fastMode = true
+    // make sure to recreate the response object so react-redux picks up the change
+    // call dispatch(insert_normalized)
+  }
+
+  subscriptionUpdate(document) {
+    // normalize data
+    // compare the normalized data to the state data, removing anything that has the same data
+    // merge entities shortenedNormalizedData
+    // update the new data in denormalizedResponse (so fast!)
+    // make sure to recreate the response object so react-redux picks up the change
+    // call dispatch(insert_normalized)
+  }
+  
+  subscriptionRemove(idToRemove) {
+    // 
+  }
+
 }
+
+
+// const subscriber = (subscriptionString, handlers, variables) => {
+//   let baseChannel;
+//   for (let [key, value] of channelLookupMap.entries()) {
+//     if (value === subscriptionString) {
+//       baseChannel = key;
+//       break;
+//     }
+//   }
+//   const channelName = `${baseChannel}/${variables.userId}`
+//   const socket = socketCluster.connect({authTokenName});
+//   const {add, update, remove, error} = handlers;
+//   socket.subscribe(channelName, {waitForAuth: true});
+//   socket.on(channelName, data => {
+//     if (!data.old_val) {
+//       add(data.new_val);
+//     } else if (!data.new_val) {
+//       remove(data.old_val.id);
+//     } else {
+//       update(data.new_val);
+//     }
+//   });
+//   socket.on('unsubscribe', unsubChannel => {
+//     if (unsubChannel === channelName) {
+//       console.log(`unsubbed from ${unsubChannel}`);
+//     }
+//   });
+//   return () => socket.unsubscribe(channelName)
+// };
+//
+// const channelLookupMap = new Map([['meeting',
+//   `subscription($meetingId: ID!) {
+//     subToPosts(meetingId: $meetingId) {
+//       id,
+//     }
+//   }`]]);

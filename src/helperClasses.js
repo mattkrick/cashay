@@ -15,6 +15,7 @@ import {TypeKind} from 'graphql/type/introspection';
 import {SET_VARIABLES} from './normalize/duck';
 import denormalizeStore from './normalize/denormalizeStore';
 import parseAndInitializeQuery from './query/parseAndInitializeQuery';
+import {parse} from './utils';
 
 const {LIST, NON_NULL} = TypeKind;
 
@@ -24,6 +25,13 @@ export class CachedMutation {
     this.activeComponentsObj = {};
     this.singles = {};
     this.variableEnhancers = [];
+  }
+}
+
+export class CachedSubscription {
+  constructor(subscriptionString) {
+    this.ast = parse(subscriptionString);
+    this.response = {};
   }
 }
 

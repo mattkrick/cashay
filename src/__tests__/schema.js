@@ -197,6 +197,15 @@ const CreatePostMutationPayload = new GraphQLObjectType({
   })
 });
 
+const RemovePostMutationPayload = new GraphQLObjectType({
+  name: "RemovePostMutationPayload",
+  description: "Payload for removing a post",
+  fields: () => ({
+    removedPostId: {type: GraphQLString},
+    postCount: {type: GraphQLInt}
+  })
+});
+
 const NewPost = new GraphQLInputObjectType({
   name: "NewPost",
   description: "input object for a new post",
@@ -325,6 +334,45 @@ const Mutation = new GraphQLObjectType({
         }
       }
     },
+    removePostById: {
+      type: RemovePostMutationPayload,
+      description: 'Remove a post',
+      args: {
+        postId: {type: new GraphQLNonNull(GraphQLString)}
+      },
+      resolve(source, {postId}) {
+        const removedPostId = PostDB[postId] && postId;
+        if (removedPostId) {
+          delete PostDB[postId];
+        }
+        return {
+          removedPostId,
+          postCount: Object.keys(PostDB).length
+        };
+      }
+    },
+    updatePost: {
+      type: PostType,
+      description: 'update a post',
+      args: {
+        post: {type: PostType}
+      },
+      resolve(source, {post}) {
+        const storedPost = PostDB[post.id];
+        if (storedPost) {
+          const updatedKeys = Object.keys(post);
+          updatedKeys.forEach(key => {
+            const value = post[key];
+            if (value === null) {
+              delete storedPost[key];
+            } else {
+              storedPost[key] = value
+            }
+          })
+        }
+        return PostDB[post.id];
+      }
+    },
     createComment: {
       type: CommentType,
       description: "Comment on a post",
@@ -353,15 +401,6 @@ const Mutation = new GraphQLObjectType({
         members: {type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(NewMember)))}
       },
       resolve(source, {members}) {
-        // const newPost = {
-        //   _id,
-        //   content,
-        //   postId,
-        //   karma: 0,
-        //   author: 'a125',
-        //   createdAt: Date.now()
-        // };
-        // CommentDB[_id] = newPost;
         return members;
       }
     }
