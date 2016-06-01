@@ -1,12 +1,13 @@
 [![npm version](https://badge.fury.io/js/cashay.svg)](https://badge.fury.io/js/cashay)
-
 [![Build Status](https://travis-ci.org/mattkrick/cashay.svg?branch=master)](https://travis-ci.org/mattkrick/cashay)
+[![Coverage Status](https://coveralls.io/repos/github/mattkrick/cashay/badge.svg?branch=master)](https://coveralls.io/github/mattkrick/cashay?branch=master)
+[![Gitter](https://badges.gitter.im/mattkrick/cashay.svg)](https://gitter.im/mattkrick/cashay?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 
 # Cashay
 Relay for the rest of us
 
 ## Installation
-npm i -S cashay
+`npm i -S cashay`
 
 ## How's it different from Relay?
 |                                               |Cashay |Relay|
@@ -15,12 +16,12 @@ npm i -S cashay
 | Local state & domain state in the same store  | Yes   | No  |
 | Babelfication-free                            | Yes   | No  |
 | Uses the introspection query on the client    | Yes   | No  |
-| No big changes to your server                 | Yes   | No  |
+| No big changes to your GraphQL server         | Yes   | No  |
 | Writes your mutations for you                 | Yes   | No  |
 | DRY optimistic updates                        | Yes   | No  |
 | Allows for more than append/prepend mutations | Yes   | No  |
 | Works with all frontends                      | Yes   | No  |
-| Allows for colocation                         | No    | Yes |
+| Aggregates queries from child routes          | No    | Yes |
 
 ## Usage
 
@@ -89,7 +90,7 @@ A mutation handler is called twice per mutation: once with `optimisticVariables`
 - `serverData`: The data that came back from the server. The shape is identical to whatever the `type` is in your GraphQL schema for that mutation. It is `null` when optimistically updating.
 - `currentResponse`: The response you receive from your query. The shape follows whatever you entered in `queryString`.
 - `entities`: The entities stored in your redux state. This is useful in case you want to e.g. replace a deleted document with the next-best one you have locally.
-- `invalidate`: A function that you can cfall to retrigger the query (with `forceFetch = true`). This is useful if you want to guarantee that a query has accurate data after each mutation.
+- `invalidate`: A function that you can call to retrigger the query (with `forceFetch = true`). This is useful if you want to guarantee that a query has accurate data after each mutation.
 
 
 For this example, we'll use React and `react-redux`:
@@ -104,7 +105,7 @@ const mapStateToProps = (state, props) => {
 Following the example above, `this.props.cashay` will be an object that has the following:
 - `isComplete`: A Boolean telling you if the query came back with all requested information. This is useful if you want to use a loading spinner, etc.
 - `firstRun`: A Boolean telling you if this is the first time that the query type was run with these particular arguments (but not necessarily exactly these same fields). Internally, it's useful because it saves a few CPU cycle. Externally, you might use it for notifications on new queries. I don't know. Get creative!
-- `data`: The data objet that you expect to get back when you call your GraphQL server.
+- `data`: The data object that you expect to get back when you call your GraphQL server.
 - `setVariables`: A callback to run when you want to change your query variables. See below.
 
 ### Setting variables
@@ -128,13 +129,15 @@ Cashay mutations are pretty darn simple, too:
 cashay.mutate(mutationName, options)
 ```
 
-Cashay is smart. By default, it will go through all the `mutationHandlers` that are currently, active looking for any handlers for `mutationName`. Then, it intersects your mutation payload schema with the corresponding queries to automatically fetch all the fields you need. No fat queries, no mutation fragments in your queries, no problems. If two different queries need the same field but with different arguments (eg. `Query1` needs `profilePic(size:SMALL)` and `Query2` needs `profilePic(size:LARGE)`, it'll take care of that, too. For every field that has an argument, it assigns a namespaced alias to it, along with the corresponding variables from the state. Then when the result comes back, it de-namespaces it for the `mutationHandler`. 
+Cashay is smart. By default, it will go through all the `mutationHandlers` that are currently active, looking for any handlers for `mutationName`. Then, it intersects your mutation payload schema with the corresponding queries to automatically fetch all the fields you need. No fat queries, no mutation fragments in your queries, no problems. If two different queries need the same field but with different arguments (eg. `Query1` needs `profilePic(size:SMALL)` and `Query2` needs `profilePic(size:LARGE)`, it'll take care of that, too. For the curious, it does this by assigning a namespaced alias to all fields with args, in addition to namespacing the variables you passed in. Then when the result comes back, it de-namespaces it for the `mutationHandler`. Note: if you return a scalar variable at the highest level of your mutation payload schema, make sure the name in the mutation payload schema matches the name in the query to give Cashay a hint to grab it. 
 
 The options are as follows:
-- `variables`: The variables object to pass onto the GraphQL server.
-- `components`: An object the determine which `mutationHandlers` to call. If not provided, it'll call every `component` that has a `mutationHandler` for that `mutationName`. 
+- `variables`: The variables object to pass onto the GraphQL server. Make sure the variables have the same names as what your schema expects so Cashay can automatically create the mutation for you. For maximum efficiency, be sure to pass in all variables that you will possibly use (even if that means passing it in as `undefined`). If you can't do these 2 things, you can write a `customMutation` (and tell me your usecase, I'm curious!).
+- `components`: An object the determines which `mutationHandlers` to call. If not provided, it'll call every `component` that has a `mutationHandler` for that `mutationName`. See below.
 
-In the example below, we just call the `comments` component where `key === postId`. Additionally, we call the `mutationHandler` for `post` if the value is true. This allows you to be super efficient and still write multiple mutations that have the same `mutationName`, but affect different queries. 
+In this example, we just want to call the `mutationHandler` for the `comments` component where `key === postId`. If you wanted to delete Comment #3 (where `key = 3`), you'd want to trigger the `mutationHandler` for `{comments: 3}` and not bother wasting CPU cycles checking `{comments: 1}` and `{comments: 2}`.
+Additionally, we call the `mutationHandler` for `post` if the value is true. This might be common if the `post` query includes a `commentCount` that should decrement when a comment is deleted. This logic makes Cashay super efficient by default, while still being flexible enough to write multiple mutations that have the same `mutationName`, but affect different queries. For example, you might have a mutation called `deleteSomething` that accepts a `tableName` and `id` variable. Then, a good practice to to hardcoe `tableName` to `Posts` that component. In doing so, you reduce the # of mutations in your schema (since `deleteSomething` can delete any doc in your db). Additionally, because you hardcoded in the tableName, you don't have to pass that variable down via `this.props`. 
+
 ```js
 const {postId} = this.props;
 const mutationAffectsPostComponent = true; // can be dynamic, but it's rare... but it happens
@@ -142,6 +145,7 @@ const components = {
   comments: postId,
   post: mutationAffectsPostComponent
 }
+cashay.mutate('deletComment', {variables: {commentId: postId}, components})
 ```
 
 ## Example
@@ -150,10 +154,10 @@ https://github.com/mattkrick/cashay-playground
 
 ## Contributing
 
-Cashay is a young project, so there are sure to be plenty of bugs to squash and edge cases to capture. Bugs will be fixes with the following priority:
+Cashay is a young project, so there are sure to be plenty of bugs to squash and edge cases to capture. Bugs will be fixed with the following priority:
 - Submit an issue: LOW
-- Submit a PR with a failing test case: MEDIUM
-- Submit a PR with a passing test case: SUPER HIGH HIGH FIVE!
+- Submit a PR with a failing test case: HIGH
+- Submit a PR with a passing test case (ie fix it yourself): SUPER HIGH HIGH FIVE!
 
 ##License
 
