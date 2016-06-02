@@ -49,7 +49,7 @@ const store = createStore(rootReducer, {});
 Cashay is front-end agnostic, so instead of passing it through React context or making you replace `react-redux` with something non-vanilla, you can just easily export your singleton from where you created it.
 ```js
 import clientSchema from './clientSchema.json';
-import {Cashay} from 'cashay';
+import {Cashay, HTTPTransport} from 'cashay';
 export const cashay = new Cashay(paramsObject);
 ```
 
@@ -58,12 +58,31 @@ The params that you can pass in are as follows:
 - `schema`: your client schema that cashay helped you make
 - `idFieldName`: Defaults to `id`, but you can call it whatever it is in your DB (eg Mongo uses `_id`)
 - `paginationWords`: The reserved words that you use for pagination. Defaults to an object with 4 properties: `first, last, after, before`. If, for example, your backend uses `count` instead of `first`, you'd send in `{first: 'count'}`.
-- `transport`: A function used to send off the query + variables to your GraphQL server.
 - `getToState`: A function to get to the cashay sub-state inside the redux state. Defaults to `store => store.getState().cashay`
+- `transport`: An instance of `HTTPTransport` used to send off the query + variables to your GraphQL server.
+
+
 
 Now, whenever you need to query or mutate some data, just import your shiny new singleton!
 
 ## API
+
+### HTTPTransport
+
+```js
+new HTTPTransport(uri, fetchOptions, errorHandler)
+```
+
+- `uri`: the location of your graphQL endpoint, defaults to '/graphql'
+- `fetchOptions`: Any details or headers used to pass into making the HTTP fetch
+- `errorHandler`: A custom function that takes any GraphQL `errors` and converts them into a single `error` for your Redux state
+
+Example:
+```js
+import {HTTPTransport} from 'cashay';
+const Authorization = `Bearer ${authToken}`;
+const transport = new HTTPTransport('/myEndpoint', {headers: {Authorization}});
+```
 
 ### Queries
 

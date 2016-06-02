@@ -41,6 +41,7 @@
     "xo": "0.15.1"
   },
   "dependencies": {
-    "graphql": "0.6.0"
+    "graphql": "0.6.0",
+    "isomorphic-fetch": "^2.2.1"
   }
 }

@@ -225,8 +225,8 @@ export default class Cashay {
   async queryServer(transport, context, minimizedQueryString, component, key) {
     const {variables} = context;
     // send minimizedQueryString to server and await minimizedQueryResponse
-    const serverResponse = await transport(minimizedQueryString, variables);
-
+    const serverResponse = await transport.handleQuery({query: minimizedQueryString, variables});
+    
     const cachedQuery = this.cachedQueries[component];
     // handle errors coming back from the server
     if (serverResponse.errors) {
@@ -382,7 +382,7 @@ export default class Cashay {
   async _mutateServer(mutationName, componentsToUpdateObj, mutationString, options) {
     const {variables} = options;
     const transport = options.transport || this.transport;
-    const docFromServer = await transport(mutationString, variables);
+    const docFromServer = await transport.handleQuery({query:mutationString, variables});
     // update state with new doc from server
     this._processMutationHandlers(mutationName, componentsToUpdateObj, docFromServer.data);
   }
