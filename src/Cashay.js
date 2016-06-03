@@ -219,6 +219,7 @@ export default class Cashay {
    * @param {object} context the context to normalize data, including the requestAST and schema
    * @param {string} minimizedQueryString the query string to send to the GraphQL endpoint
    * @param {string} component an ID specific to the queryString/variable combo (defaults to the queryString)
+   * @param {key} key A unique key to match the component instance, only used where you would use React's key (eg in a component that you called map on in the parent component).
    *
    * @return {undefined}
    */
@@ -383,6 +384,7 @@ export default class Cashay {
     const {variables} = options;
     const transport = options.transport || this.transport;
     const docFromServer = await transport.handleQuery({query:mutationString, variables});
+    debugger
     // update state with new doc from server
     this._processMutationHandlers(mutationName, componentsToUpdateObj, docFromServer.data);
   }

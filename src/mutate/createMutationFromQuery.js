@@ -85,7 +85,8 @@ const trySimpleObject = selectionsInQuery => {
 const tryPayloadObject = (mutationAST, operation, mutationReturnSchema, schema) => {
   let atLeastOne = false;
   const payloadFieldKeys = Object.keys(mutationReturnSchema.fields);
-  for (let payloadFieldKey of payloadFieldKeys) {
+  for (let i = 0; i < payloadFieldKeys.length; i++) {
+    const payloadFieldKey = payloadFieldKeys[i];
     const payloadField = mutationReturnSchema.fields[payloadFieldKey];
     const rootPayloadFieldType = ensureRootType(payloadField.type);
     // 2 strings probably don't refer to the same field, so for scalars the name has to match, too
@@ -98,7 +99,8 @@ const tryPayloadObject = (mutationAST, operation, mutationReturnSchema, schema) 
         mutationField = new Field({name: matchName});
       } else {
         const newSelections = selectionsInQuery.pop();
-        for (let srcSelections of selectionsInQuery) {
+        for (let j = 0; j < selectionsInQuery.length; j++) {
+          const srcSelections = selectionsInQuery[j];
           mergeSelections(newSelections, srcSelections);
         }
         // make a payload field into a mutation field

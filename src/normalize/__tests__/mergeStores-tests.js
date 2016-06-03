@@ -244,3 +244,35 @@ test('merge permutation: target: full, src: full', t => {
   const expected = {full: [1, 2, 3, 0, 4, 5]};
   t.deepEqual(actual, expected);
 });
+
+test('array mutation: delete a doc', t => {
+  const state = {full: [1, 2, 3]};
+  const src = {full: [1, 2]};
+  const actual = mergeStores(state, src, true);
+  const expected = {full: [1, 2]};
+  t.deepEqual(actual, expected);
+});
+
+test('array mutation: move a doc', t => {
+  const state = {full: [1, 2, 3]};
+  const src = {full: [1, 3, 2]};
+  const actual = mergeStores(state, src, true);
+  const expected = {full: [1, 3, 2]};
+  t.deepEqual(actual, expected);
+});
+
+test('array mutation: replace a doc', t => {
+  const state = {full: [1, 2, 3]};
+  const src = {full: [1, 4, 3]};
+  const actual = mergeStores(state, src, true);
+  const expected = {full: [1, 4, 3]};
+  t.deepEqual(actual, expected);
+});
+
+test('array mutation: replace 2 docs with 3 new docs', t => {
+  const state = {full: [1, 2, 3]};
+  const src = {full: [9, 2, 8, 6]};
+  const actual = mergeStores(state, src, true);
+  const expected = {full: [9, 2, 8, 6]};
+  t.deepEqual(actual, expected);
+});
