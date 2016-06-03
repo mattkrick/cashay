@@ -9,13 +9,13 @@ export default class HTTPTransport {
 
   async handleQuery(request) {
     const result = await this.sendToServer(request);
+    const {status, statusText} = result;
     if (status >= 200 && status < 300) {
       const resJSON = await result.json();
       const {data, errors} = resJSON;
       const error = this.handleErrors(request, errors);
       return {data, error};
     } else {
-      const {status, statusText} = result;
       return {error: {status, statusText}};
     }
   }
