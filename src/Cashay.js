@@ -206,6 +206,9 @@ export default class Cashay {
       //  async query the server (no need to track the promise it returns, as it will change the redux state)
       this.queryServer(transport, context, serverQueryString, component, key);
     }
+    if (options.mutationHandlers && component === queryString) {
+      throw new Error(`component name for ${queryString} is not optional when it includes mutationHandlers`);
+    }
     this._prepareMutations(component, cashayDataState.variables[component], options);
     return cachedResponse;
   }
