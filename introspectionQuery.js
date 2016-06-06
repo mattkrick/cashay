@@ -1,5 +1,5 @@
 module.exports = `
-query ReducedIntrospectionQuery {
+query {
   __schema {
     queryType { name }
     mutationType { name }

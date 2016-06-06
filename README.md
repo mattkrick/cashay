@@ -28,11 +28,28 @@ Relay for the rest of us
 ### Creating the client schema
 
 Cashay sends a subset of the introspection query to the client. Creating it is easy because cashay gives you the script.
-`updateSchema(pathToSchema = './', outputPath = './clientSchema.json', numberOfSpaces = 0)`
+`node node_modules/cashay/updateSchema.js`
 
-To make it even easier, just add an npm script like so (assuming the schema is in your `src` folder):
+The script takes an `input` and an `output`:
+`input`: The relative path to your server schema. Alternatively, you can also pass in the url to a GraphQL endpoint
+`output`: The relative path to your output file. Defaults to `./clientSchema.json`
 
-`"updateSchema": "node node_modules/cashay/updateSchema.js src/schema.js src/clientSchema.json"`
+Options:
+`--production`: Removes whitespaces from the generated `clientSchema.json`
+`exithook`: A relative path to a callback to run after generation is complete. 
+This is useful if you need to drain a DB connection pool:
+
+```js
+// drainPool.js
+import r from './rethinkDBDriver';
+export default () => {
+  r.getPoolMaster().drain();
+}
+```
+ 
+Pro tip: Make it an npm script:
+
+`"updateSchema": "node node_modules/cashay/updateSchema.js src/schema.js src/clientSchema.json --exithook src/exithook.js --production"`
 
 ### Adding the reducer
 
