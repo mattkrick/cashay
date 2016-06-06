@@ -185,7 +185,7 @@ export default class Cashay {
       schema
     });
     // create a response with a denormalized response and a function to set the variables
-    cachedQuery.createResponse(context, component, key, this.store.dispatch, forceFetch);
+    cachedQuery.createResponse(context, component, key, this.store.dispatch, this.getState, forceFetch);
     const cachedResponse = key ? cachedQuery.response[key] : cachedQuery.response;
 
     // if this is a different query string but the same base query
@@ -225,6 +225,7 @@ export default class Cashay {
    */
   async queryServer(transport, context, minimizedQueryString, component, key) {
     const {variables} = context;
+    const contextVariables = isObject(variables) ? clone(variables) : variables;
     // send minimizedQueryString to server and await minimizedQueryResponse
     const serverResponse = await transport.handleQuery({query: minimizedQueryString, variables});
 
@@ -243,7 +244,7 @@ export default class Cashay {
 
     // normalize response to get ready to dispatch it into the state tree
     const normalizedServerResponse = normalizeResponse(serverResponse.data, context);
-
+    context.variables = contextVariables;
     // now, remove the objects that look identical to the ones already in the state
     // if the incoming entity (eg Person.123) looks exactly like the one already in the store, then
     // we don't have to invalidate and rerender
@@ -263,7 +264,7 @@ export default class Cashay {
     // even if the requery wasn't expensive, doing it here means we don't have to keep track of the fetching status
     // eg if fetching is true, then we always return the cached result
     const reducedContext = Object.assign(context, {cashayDataState: fullNormalizedResponse});
-    cachedQuery.createResponse(reducedContext, component, key, this.store.dispatch);
+    cachedQuery.createResponse(reducedContext, component, key, this.store.dispatch, this.getState);
 
     // add denormalizedDeps so we can invalidate when other queries come in
     // add normalizedDeps to find those deps when a denormalizedReponse is mutated
@@ -272,7 +273,7 @@ export default class Cashay {
     // remove the responses from this.cachedQueries where necessary
     flushDependencies(normalizedServerResponseForStore.entities, component, key, this.denormalizedDeps, this.cachedQueries);
     // stick normalize data in store and recreate any invalidated denormalized structures
-    const stateVariables = key ? {[component]: {[key]: variables}} : {[component]: variables};
+    const stateVariables = key ? {[component]: {[key]: contextVariables}} : {[component]: contextVariables};
     
     this.store.dispatch({
       type: INSERT_QUERY,
@@ -439,12 +440,12 @@ export default class Cashay {
         const stateVars = cashayDataState.variables[component][key];
         if (stateVars) {
           allVariables[component] = allVariables[component] || {};
-          contextVars = allVariables[component][key] = stateVars;
+          contextVars = allVariables[component][key] = clone(stateVars);
         }
       } else {
         const stateVars = cashayDataState.variables[component];
         if (stateVars) {
-          contextVars = allVariables[component] = stateVars;
+          contextVars = allVariables[component] = clone(stateVars);
         }
       }
       const context = buildExecutionContext(ast, {
@@ -458,7 +459,7 @@ export default class Cashay {
       // create a new 
       const normalizedModifiedResponse = normalizeResponse(modifiedResponse, context);
       allNormalizedChanges = mergeStores(allNormalizedChanges, normalizedModifiedResponse);
-      allVariables = {...allVariables, contextVars};
+      allVariables = {...allVariables, ...contextVars};
       // for each paginated array in the pre-modifiedResponse, I need to know its start and end idx in the state
       // that way, i can merge the modfiedResponse into the normalized state tree
       // i'm guaranteed that the start idx is 0 because there's no way to get a cursor without starting there & that'd mess up the EOF

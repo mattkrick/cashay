@@ -52,13 +52,13 @@ export class CachedQuery {
    * isComplete is true if the request is resolved locally
    * firstRun is true if the none of the queries within the request have been executed before
    */
-  createResponse(context, component, key, dispatch, forceFetch) {
+  createResponse(context, component, key, dispatch, getState, forceFetch) {
     const {data, firstRun} = denormalizeStore(context);
     const response = {
       data,
       firstRun,
       isComplete: forceFetch === undefined ? true : !forceFetch && !context.operation.sendToServer,
-      setVariables: this.setVariablesFactory(component, key, context.variables, dispatch)
+      setVariables: this.setVariablesFactory(component, key, dispatch, getState)
     };
     if (!key) {
       this.response = response;
@@ -67,12 +67,22 @@ export class CachedQuery {
     }
   }
 
-  setVariablesFactory(component, key, currentVariables, dispatch) {
+  setVariablesFactory(component, key, dispatch, getState) {
     return cb => {
-      const variables = Object.assign({}, currentVariables, cb(currentVariables));
       // invalidate the cache
       this.response = undefined;
-      const stateVariables = key ? {[component]: {[key]: variables}} : {[component]: variables};
+
+      let stateVariables;
+      if (key) {
+        const currentVariables = getState().data.variables[component][key];
+        const variables = Object.assign({}, currentVariables, cb(currentVariables));
+        stateVariables = {[component]: {[key]: variables}};
+      } else {
+        const currentVariables = getState().data.variables[component];
+        const variables = Object.assign({}, currentVariables, cb(currentVariables));
+        stateVariables = {[component]: variables};
+      }
+
       // use dispatch to trigger a recompute.
       dispatch({
         type: SET_VARIABLES,

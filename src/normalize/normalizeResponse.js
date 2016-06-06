@@ -2,8 +2,10 @@ import mergeStores from './mergeStores';
 import {separateArgs} from './separateArgs';
 import {getSubReqAST} from './getSubReqAST';
 import {ensureRootType, getRegularArgsKey, isObject} from '../utils';
+import {VARIABLE} from 'graphql/language/kinds';
 import {TypeKind} from 'graphql/type/introspection';
-const {UNION, VARIABLE} = TypeKind;
+
+const {UNION} = TypeKind;
 
 const mapResponseToResult = (nestedResult, response, fieldSchema, reqASTArgs, context) => {
   const {regularArgs, paginationArgs} = separateArgs(fieldSchema, reqASTArgs, context);
@@ -64,13 +66,10 @@ const visitIterable = (bag, subResponse, reqAST, subSchema, context) => {
       const count = reqAST.arguments.find(arg => arg.name.value === word);
       debugger
       if (count !== undefined) {
-        const countVal = +count.value.value;
-        if (normalizedSubResponse.length < countVal) {
-          normalizedSubResponse[flag] = true;
-        }
+        let countVal;
         if (count.value.kind === VARIABLE) {
           const variableDefName = count.value.name.value;
-          // const currentVal = context.variables[variableDefName];
+          countVal = +context.variables[variableDefName];
 
           // update the difference in the variables (passed on to redux state)
           context.variables[variableDefName] = subResponse.length;
@@ -81,16 +80,21 @@ const visitIterable = (bag, subResponse, reqAST, subSchema, context) => {
           // mutates the original denormalized response. saves an entire tree walk, but kinda ugly.
           subResponse.count = subResponse.length;
 
+        } else {
+          countVal = +count.value.value;
+        }
+        if (normalizedSubResponse.length < countVal) {
+          normalizedSubResponse[flag] = true;
         }
         break;
       }
     }
-    if (subResponse.count) {
-      normalizedSubResponse.count = subResponse.count;
+    // if (subResponse.count) {
+    //   normalizedSubResponse.count = subResponse.count;
       // WARNING: mutates the original denormalized response. but saves an entire tree walk. but kinda ugly.
-      subResponse.count = subResponse.length;
+      // subResponse.count = subResponse.length;
 
-    }
+    // }
     return normalizedSubResponse
   }
 };
