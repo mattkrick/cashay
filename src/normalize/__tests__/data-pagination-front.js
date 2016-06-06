@@ -33,7 +33,7 @@ export const front3Response = {
   }
 };
 
-export const front3LocalResponseFn = () => {
+export const front3LocalResponseFn = (requestAmount) => {
   const base = {
 
     "data": {
@@ -55,6 +55,9 @@ export const front3LocalResponseFn = () => {
   };
   base.data.getRecentPosts.BOF = true;
   base.data.getRecentPosts.EOF = true;
+  if (requestAmount !== undefined) {
+    base.data.getRecentPosts.count = requestAmount;
+  }
   return base;
 };
 
@@ -124,6 +127,7 @@ export const front2After3StoreFn = () => {
     }
   };
   base.result.getRecentPosts.front.EOF = true;
+  // base.result.getRecentPosts.front.count = 1;
   return base;
 };
 

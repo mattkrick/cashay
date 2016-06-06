@@ -90,7 +90,7 @@ export const back2After3StoreFn = () => {
       }
     }
   }
-  base.result.getRecentPosts.back.EOF = true;
+  base.result.getRecentPosts.back.BOF = true;
   return base;
 };
 
@@ -143,11 +143,11 @@ export const back1After4StoreFn = () => {
       }
     }
   };
-  base.result.getRecentPosts.back.EOF = true;
+  base.result.getRecentPosts.back.BOF = true;
   return base;
 };
 
-export const back1After3ResponseFn = () => {
+export const back1After3ResponseFn = (requestAmount) => {
   const base = {
     data: {
       "getRecentPosts": [
@@ -159,6 +159,9 @@ export const back1After3ResponseFn = () => {
     }
   };
   base.data.getRecentPosts.BOF = true;
+  if (requestAmount !== undefined) {
+    base.data.getRecentPosts.count = requestAmount;
+  }
   return base;
 };
 

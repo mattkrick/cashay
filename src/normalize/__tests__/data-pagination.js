@@ -182,6 +182,7 @@ export const back1NoCursorDenormalizedFn = () => {
   };
   base.getRecentPosts.BOF = true;
   base.getRecentPosts.EOF = true;
+  base.getRecentPosts.count = 1;
   return base;
 };
 
@@ -228,7 +229,7 @@ query {
   }
 }`;
 
-export const front1After3DenormalizedFn = () => {
+export const front1After3DenormalizedFn = (requestAmount) => {
   const base = {
     data: {
       "getRecentPosts": [
@@ -240,6 +241,9 @@ export const front1After3DenormalizedFn = () => {
     }
   };
   base.data.getRecentPosts.EOF = true;
+  if (requestAmount !== undefined) {
+    base.data.getRecentPosts.count = requestAmount;
+  }
   return base;
 };
 

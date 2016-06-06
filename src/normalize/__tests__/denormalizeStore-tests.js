@@ -127,7 +127,7 @@ test('get a page from a full store (back)', t => {
     variables: {reverse: true, lang: "spanish"}
   });
   const {data: actual} = denormalizeStore(context);
-  const {data: expected} = back1After3ResponseFn();
+  const {data: expected} = back1After3ResponseFn(1);
   t.deepEqual(actual, expected);
 });
 
@@ -141,7 +141,7 @@ test('request next 2 docs when first 3 docs are in the store', t => {
     variables: {reverse: true, lang: "spanish"}
   });
   const {data: actual} = denormalizeStore(context);
-  const {data: expected} = front1After3DenormalizedFn();
+  const {data: expected} = front1After3DenormalizedFn(2);
   t.deepEqual(actual, expected);
 });
 
@@ -179,7 +179,7 @@ test('have 3, request 4, turn the request into 1 with a skip3 cursor', t => {
     variables: {reverse: true, lang: "spanish"}
   });
   const {data: actual} = denormalizeStore(context);
-  const {data: expected} = front3LocalResponseFn();
+  const {data: expected} = front3LocalResponseFn(4);
   t.deepEqual(actual, expected);
 });
 

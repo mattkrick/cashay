@@ -66,7 +66,7 @@ const handleArrays = (target, src) => {
         target[targetArr] = mergeSameArrays(target.front, src.front, true);
       }
       if (pageTarget.back && pageSrc.back) {
-        const targetArr = src.back.EOF ? 'full' : 'back';
+        const targetArr = src.back.BOF ? 'full' : 'back';
         target[targetArr] = mergeSameArrays(target.back, src.back, false);
       }
     }
@@ -94,7 +94,7 @@ const handleArrays = (target, src) => {
 
 const detectCashayArray = (src, allSrcKeys) => {
   // front & back (2) or full (1), any more than that & it's not cashay's
-  if (allSrcKeys.length > 2) return false;
+  if (allSrcKeys.length < 1 || allSrcKeys.length > 2) return false;
   let isCashayArray = true;
   for (let i = 0; i < allSrcKeys.length; i++) {
     const srcKey = allSrcKeys[i];
@@ -112,6 +112,7 @@ export default function mergeStores(state, src, isMutation) {
   const srcKeys = Object.keys(src);
   const isCashayArray = detectCashayArray(src, srcKeys);
   if (isCashayArray && !isMutation) {
+    debugger
     handleArrays(target, src)
   } else {
     for (let i = 0; i < srcKeys.length; i++) {

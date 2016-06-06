@@ -57,6 +57,7 @@ test('normalize pagination: request 2 after 3rd cursor, receive 1', t => {
   const context = buildExecutionContext(queryAST, {idFieldName: '_id', schema: clientSchema, paginationWords});
   const actual = normalizeResponse(clone(front1After3Response.data), context);
   const expected = front2After3StoreFn();
+  // t.deepEqual(actual.entities, expected.entities);
   t.deepEqual(actual, expected);
 });
 

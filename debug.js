@@ -35,7 +35,9 @@ import {
 import {
   front3Store,
   front2After3StoreFn,
-  front3LocalResponseFn
+  front1After3Response,
+  front3LocalResponseFn,
+  front1After4StoreFn
 } from './src/normalize/__tests__/data-pagination-front';
 
 import {
@@ -48,7 +50,9 @@ import {
   back1StoreNoCursor,
   back1QueryBadArgs,
   front4PostStoreNoCursors,
-  back4PostStoreNoLastCursor
+  back4PostStoreNoLastCursor,
+  back1NoCursorDenormalizedFn,
+  front1After3DenormalizedFn
 } from './src/normalize/__tests__/data-pagination';
 import parseAndInitializeQuery from './src/query/parseAndInitializeQuery';
 import {
@@ -70,16 +74,10 @@ import {front2After3Query, front4Query, front3Response} from './src/normalize/__
 import removeNamespacing from './src/mutate/removeNamespacing';
 
 const idFieldName = '_id';
-const queryAST = parseAndInitializeQuery(front4Query, clientSchema, idFieldName);
-const context = buildExecutionContext(queryAST, {
-  cashayDataState: front3Store,
-  idFieldName,
-  schema: clientSchema,
-  paginationWords,
-  variables: {reverse: true, lang: "spanish"}
-});
-const {data: actual} = denormalizeStore(context);
-const {data: expected} = front3LocalResponseFn();
+const firstDocs = back4PostStore;
+const lastDoc = back1After4StoreFn();
+const actual = mergeStores(firstDocs, lastDoc);
+const expected = fullPostStore;
 debugger
 fs.writeFileSync('./actualResult.json', JSON.stringify(actual, null, 2));
 fs.writeFileSync('./expectedResult.json', JSON.stringify(expected, null, 2));

@@ -55,9 +55,8 @@ const visitEntity = (bag, subResponse, reqAST, subSchema, context, id) => {
 };
 
 const visitIterable = (bag, subResponse, reqAST, subSchema, context) => {
+  const normalizedSubResponse = subResponse.map(res => visit(bag, res, reqAST, subSchema, context));
   if (reqAST.arguments && reqAST.arguments.length) {
-    const normalizedSubResponse = subResponse.map(res => visit(bag, res, reqAST, subSchema, context));
-
     const {first, last} = context.paginationWords;
     const paginationFlags = [{word: first, flag: 'EOF'}, {word: last, flag: 'BOF'}];
     for (let i = 0; i < paginationFlags.length; i++) {
@@ -88,8 +87,8 @@ const visitIterable = (bag, subResponse, reqAST, subSchema, context) => {
         break;
       }
     }
-    return normalizedSubResponse
   }
+  return normalizedSubResponse
 };
 
 const visitUnion = (bag, subResponse, reqAST, subSchema, context) => {
