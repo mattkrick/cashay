@@ -46,8 +46,6 @@ const handlePaginationArgs = (paginationArgs, fieldState, fieldSchema, selection
   let countWord;
   let cursorWord;
   if (last) {
-    debugger
-    //TODO broken
     const firstNonNullIdx = countLeftPadding(usefulArray);
     const firstDesiredDocIdx = cursorIdx - last;
     const startIdx = Math.max(firstNonNullIdx, firstDesiredDocIdx);
@@ -57,7 +55,6 @@ const handlePaginationArgs = (paginationArgs, fieldState, fieldSchema, selection
     countWord = context.paginationWords.last;
     cursorWord = context.paginationWords.before;
   } else {
-    debugger
     const startIdx = cursorIdx + 1;
     const lastNonNullIdx = countRightPadding(usefulArray);
     const lastDesiredDocIdx = startIdx + first - 1;

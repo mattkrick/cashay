@@ -56,7 +56,6 @@ const visitEntity = (bag, subResponse, reqAST, subSchema, context, id) => {
 
 const visitIterable = (bag, subResponse, reqAST, subSchema, context) => {
   if (reqAST.arguments && reqAST.arguments.length) {
-    // debugger
     const normalizedSubResponse = subResponse.map(res => visit(bag, res, reqAST, subSchema, context));
 
     const {first, last} = context.paginationWords;
@@ -64,7 +63,7 @@ const visitIterable = (bag, subResponse, reqAST, subSchema, context) => {
     for (let i = 0; i < paginationFlags.length; i++) {
       const {word, flag} = paginationFlags[i];
       const count = reqAST.arguments.find(arg => arg.name.value === word);
-      debugger
+      // allow count == 0
       if (count !== undefined) {
         let countVal;
         if (count.value.kind === VARIABLE) {
@@ -77,7 +76,7 @@ const visitIterable = (bag, subResponse, reqAST, subSchema, context) => {
           // pass the count onto the normalized response to perform a slice during the state merge
           normalizedSubResponse.count = subResponse.count;
 
-          // mutates the original denormalized response. saves an entire tree walk, but kinda ugly.
+          // mutates the original denormalized response. kinda ugly, but saves an additional tree walk.
           subResponse.count = subResponse.length;
 
         } else {
@@ -89,12 +88,6 @@ const visitIterable = (bag, subResponse, reqAST, subSchema, context) => {
         break;
       }
     }
-    // if (subResponse.count) {
-    //   normalizedSubResponse.count = subResponse.count;
-      // WARNING: mutates the original denormalized response. but saves an entire tree walk. but kinda ugly.
-      // subResponse.count = subResponse.length;
-
-    // }
     return normalizedSubResponse
   }
 };

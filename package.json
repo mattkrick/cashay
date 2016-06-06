@@ -11,7 +11,7 @@
     "prepublish": "npm run clean && npm run build",
     "test": "nyc ava ./src/**/__tests__/**/*-tests.js",
     "quickTest": "ava ./src/**/__tests__/**/*-tests.js",
-    "buildTestSchema": "node src/updateSchema.js src/__tests__/schema.js src/__tests__/clientSchema.json 2"
+    "buildTestSchema": "node null src/updateSchema.js src/__tests__/schema.js src/__tests__/clientSchema.json 2"
   },
   "repository": {
     "type": "git",

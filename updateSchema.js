@@ -7,12 +7,13 @@ const introspectionQuery = require('./introspectionQuery');
 // why instanceof is still a thing is beyond me...
 const graphql = require(path.join(process.cwd(), 'node_modules','graphql')).graphql;
 
-const inputArg = process.argv[2] || '';
+const flushCallback = process.argv[2] || () => {};
+const inputArg = process.argv[3] || '';
 const relativeInputPath = path.join(process.cwd(), inputArg);
-const relativeOutputPath = process.argv[3] || './clientSchema.json';
+const relativeOutputPath = process.argv[4] || './clientSchema.json';
 const outputPath = path.join(process.cwd(), relativeOutputPath);
 const rootSchema = require(relativeInputPath);
-const spacing = Number(process.argv[4]) || 0;
+const spacing = Number(process.argv[5]) || 0;
 
 graphql(rootSchema, introspectionQuery).then(initialResult => {
   if (initialResult.errors) {
@@ -24,6 +25,8 @@ graphql(rootSchema, introspectionQuery).then(initialResult => {
     console.log(`You got yourself a schema! See it here: ${outputPath}`)
   } catch (e) {
     console.log(`Error writing schema to file: ${e}`)
+  } finally {
+    flushCallback()
   }
 });
 

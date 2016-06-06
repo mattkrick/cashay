@@ -11,7 +11,7 @@ import {CASHAY, DELIMITER} from '../utils';
 
 const makeNamespaceString = (componentId, name, d = DELIMITER) => `${CASHAY}${d}${componentId}${d}${name}`;
 
-export default (namespaceAST, componentId, componentStateVars, schema) => {
+export default function namespaceMutation(namespaceAST, component, componentStateVars, schema) {
   const variableEnhancers = [];
   const {operation, fragments} = teardownDocumentAST(namespaceAST);
   const variableDefinitions = operation.variableDefinitions || [];
@@ -20,7 +20,7 @@ export default (namespaceAST, componentId, componentStateVars, schema) => {
   const context = {
     variableDefinitions,
     componentStateVars,
-    componentId,
+    component,
     fragments,
     schema,
     variableEnhancers
@@ -58,7 +58,7 @@ const namespaceAndInlineFrags = (fieldSelections, typeSchema, context) => {
     const fieldSchema = typeSchema.fields[selectionName];
     if (selection.arguments && selection.arguments.length) {
       const aliasOrFieldName = selection.alias && selection.alias.value || selection.name.value;
-      const namespaceAlias = makeNamespaceString(context.componentId, aliasOrFieldName);
+      const namespaceAlias = makeNamespaceString(context.component, aliasOrFieldName);
       selection.alias = new Name(namespaceAlias);
       bagArgs(selection.arguments, fieldSchema, false, context);
     } else {
@@ -84,12 +84,12 @@ const enhancerFactory = (componentStateVars, variableName, namespaceKey) => {
 };
 
 const bagArgs = (argsToDefine, fieldSchema, isMain, context) => {
-  const {variableDefinitions, componentId} = context;
+  const {variableDefinitions, component} = context;
   for (let arg of argsToDefine) {
     const argName = arg.name.value;
     if (arg.value.kind === VARIABLE) {
       const variableName = arg.value.name.value;
-      const namespaceKey = makeNamespaceString(componentId, variableName);
+      const namespaceKey = makeNamespaceString(component, variableName);
       const variableDefOfArg = variableDefinitions.find(def => def.variable.name.value === variableName);
       if (!variableDefOfArg) {
         const varDefKey = isMain ? variableName : namespaceKey;
