@@ -1,7 +1,7 @@
 export const INSERT_QUERY = '@@cashay/INSERT_QUERY';
 export const INSERT_MUTATION = '@@cashay/INSERT_MUTATION';
 export const SET_VARIABLES = '@@cashay/SET_VARIABLES';
-
+export const SET_ERROR = '@@cashay/SET_ERROR';
 import mergeStores from './mergeStores';
 
 const initialState = {
@@ -23,6 +23,8 @@ export const reducer = (state = initialState, action) => {
     return newStateWithVars(state, newMergedState, action.payload);
   } else if (action.type === SET_VARIABLES) {
     return newStateWithVars(state, {...state.data}, action.payload);
+  } else if (action.type === SET_ERROR) {
+    return {...state, error: action.error};
   } else {
     return state;
   }

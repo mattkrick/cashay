@@ -14,7 +14,7 @@ export default class HTTPTransport {
       const resJSON = await result.json();
       const {data, errors} = resJSON;
       const error = this.handleErrors(request, errors);
-      return {data, error};
+      return error ? {data, error} : {data};
     } else {
       return {error: {status, statusText}};
     }

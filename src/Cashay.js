@@ -1,4 +1,4 @@
-import {INSERT_QUERY, INSERT_MUTATION} from './normalize/duck';
+import {INSERT_QUERY, INSERT_MUTATION, SET_ERROR} from './normalize/duck';
 import denormalizeStore from './normalize/denormalizeStore';
 import {rebuildOriginalArgs} from './normalize/denormalizeHelpers';
 import normalizeResponse from './normalize/normalizeResponse';
@@ -227,23 +227,23 @@ export default class Cashay {
     const {variables} = context;
     const contextVariables = isObject(variables) ? clone(variables) : variables;
     // send minimizedQueryString to server and await minimizedQueryResponse
-    const serverResponse = await transport.handleQuery({query: minimizedQueryString, variables});
+    const {error, data} = await transport.handleQuery({query: minimizedQueryString, variables});
 
     const cachedQuery = this.cachedQueries[component];
     // handle errors coming back from the server
-    if (serverResponse.errors) {
-      console.log(serverResponse.errors);
-      cachedQuery.error = serverResponse.errors;
-      // TODO put error in redux state
-      return;
+    if (error) {
+      const cachedResponse = key ? cachedQuery.response : cachedQuery.response[key];
+      cachedResponse.error = error;
+      return this.store.dispatch({type: SET_ERROR, error});
     }
     //re-create the denormalizedPartialResponse because it went stale when we called the server
     rebuildOriginalArgs(context.operation);
     const {data: denormalizedLocalResponse} = denormalizeStore(context);
+
     const normalizedLocalResponse = normalizeResponse(denormalizedLocalResponse, context);
 
-    // normalize response to get ready to dispatch it into the state tree
-    const normalizedServerResponse = normalizeResponse(serverResponse.data, context);
+    // normalize response to get ready to dispatch it into the state tree, mutates variables though
+    const normalizedServerResponse = normalizeResponse(data, context);
     context.variables = contextVariables;
     // now, remove the objects that look identical to the ones already in the state
     // if the incoming entity (eg Person.123) looks exactly like the one already in the store, then
