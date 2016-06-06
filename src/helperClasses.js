@@ -72,14 +72,12 @@ export class CachedQuery {
       const variables = Object.assign({}, currentVariables, cb(currentVariables));
       // invalidate the cache
       this.response = undefined;
-
+      const stateVariables = key ? {[component]: {[key]: variables}} : {[component]: variables};
       // use dispatch to trigger a recompute.
       dispatch({
         type: SET_VARIABLES,
         payload: {
-          component,
-          key,
-          variables
+          variables: stateVariables
         }
       });
     }

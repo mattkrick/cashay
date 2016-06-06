@@ -1,5 +1,5 @@
-export default {
-  p123: {
+export default [
+  {
     _id: 'p123',
     author: 'a123',
     content: 'Cashay is neat',
@@ -10,7 +10,7 @@ export default {
     createdAt: 1411111111111,
     cursor: '1411111111111' + 'chikachikow'
   },
-  p124: {
+  {
     _id: 'p124',
     author: 'a123',
     content: 'Cashay uses the redux store to hold all of its normalized data and variables',
@@ -21,7 +21,7 @@ export default {
     createdAt: 1422222222222,
     cursor: '1422222222222' + 'chikachikow'
   },
-  p125: {
+  {
     _id: 'p125',
     author: 'a124',
     content: 'Benchmarks are usually written by people who have a bias. You should write your own (but yes)',
@@ -32,7 +32,7 @@ export default {
     createdAt: 1433333333333,
     cursor: '1433333333333' + 'chikachikow'
   },
-  p126: {
+  {
     _id: 'p126',
     author: 'a124',
     content: 'Denormalized data is cached in the cashay singleton',
@@ -43,4 +43,4 @@ export default {
     createdAt: 1444444444444,
     cursor: '1444444444444' + 'chikachikow'
   }
-}
+]

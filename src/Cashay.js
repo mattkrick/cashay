@@ -1,4 +1,4 @@
-import {INSERT_NORMALIZED} from './normalize/duck';
+import {INSERT_QUERY, INSERT_MUTATION} from './normalize/duck';
 import denormalizeStore from './normalize/denormalizeStore';
 import {rebuildOriginalArgs} from './normalize/denormalizeHelpers';
 import normalizeResponse from './normalize/normalizeResponse';
@@ -9,7 +9,7 @@ import mergeStores from './normalize/mergeStores';
 import {CachedMutation, CachedQuery, MutationShell} from './helperClasses';
 import flushDependencies from './query/flushDependencies';
 import {makeComponentsToUpdate} from './mutate/mutationHelpers';
-import {parse, equalObjectKeys, buildExecutionContext, getVariables} from './utils';
+import {parse, equalObjectKeys, buildExecutionContext, getVariables, clone} from './utils';
 import namespaceMutation from './mutate/namespaceMutation';
 import mergeMutations from './mutate/mergeMutations';
 import createMutationFromQuery from './mutate/createMutationFromQuery';
@@ -227,7 +227,7 @@ export default class Cashay {
     const {variables} = context;
     // send minimizedQueryString to server and await minimizedQueryResponse
     const serverResponse = await transport.handleQuery({query: minimizedQueryString, variables});
-    
+
     const cachedQuery = this.cachedQueries[component];
     // handle errors coming back from the server
     if (serverResponse.errors) {
@@ -272,13 +272,13 @@ export default class Cashay {
     // remove the responses from this.cachedQueries where necessary
     flushDependencies(normalizedServerResponseForStore.entities, component, key, this.denormalizedDeps, this.cachedQueries);
     // stick normalize data in store and recreate any invalidated denormalized structures
+    const stateVariables = key ? {[component]: {[key]: variables}} : {[component]: variables};
+    
     this.store.dispatch({
-      type: INSERT_NORMALIZED,
+      type: INSERT_QUERY,
       payload: {
         response: normalizedServerResponseForStore,
-        component,
-        key,
-        variables
+        variables: stateVariables
       }
     });
   }
@@ -383,8 +383,7 @@ export default class Cashay {
   async _mutateServer(mutationName, componentsToUpdateObj, mutationString, options) {
     const {variables} = options;
     const transport = options.transport || this.transport;
-    const docFromServer = await transport.handleQuery({query:mutationString, variables});
-    debugger
+    const docFromServer = await transport.handleQuery({query: mutationString, variables});
     // update state with new doc from server
     this._processMutationHandlers(mutationName, componentsToUpdateObj, docFromServer.data);
   }
@@ -393,6 +392,7 @@ export default class Cashay {
     const componentHandlers = this.mutationHandlers[mutationName];
     const cashayDataState = this.getState().data;
     let allNormalizedChanges = {};
+    let allVariables = {};
     const componentsToUpdateKeys = Object.keys(componentsToUpdateObj);
     // for every component that listens the the mutationName
     for (let i = 0; i < componentsToUpdateKeys.length; i++) {
@@ -429,33 +429,60 @@ export default class Cashay {
 
       // create a new object to make sure react-redux's updateStatePropsIfNeeded returns true
       if (key) {
-        this.cachedQueries[component].response[key] = {...this.cachedQueries[component].response[key]};
+        cachedResult.response[key] = {...cachedResult.response[key]};
       } else {
-        this.cachedQueries[component].response = {...this.cachedQueries[component].response}
+        cachedResult.response = {...cachedResult.response}
       }
       const {schema, paginationWords, idFieldName} = this;
-      const stateVars = key ? cashayDataState.variables[component][key] : cashayDataState.variables[component];
+      let contextVars;
+      if (key) {
+        const stateVars = cashayDataState.variables[component][key];
+        if (stateVars) {
+          allVariables[component] = allVariables[component] || {};
+          contextVars = allVariables[component][key] = stateVars;
+        }
+      } else {
+        const stateVars = cashayDataState.variables[component];
+        if (stateVars) {
+          contextVars = allVariables[component] = stateVars;
+        }
+      }
       const context = buildExecutionContext(ast, {
-        variables: stateVars,
+        variables: contextVars,
         paginationWords,
         idFieldName,
         schema,
         cashayDataState
       });
 
+      // create a new 
       const normalizedModifiedResponse = normalizeResponse(modifiedResponse, context);
       allNormalizedChanges = mergeStores(allNormalizedChanges, normalizedModifiedResponse);
+      allVariables = {...allVariables, contextVars};
+      // for each paginated array in the pre-modifiedResponse, I need to know its start and end idx in the state
+      // that way, i can merge the modfiedResponse into the normalized state tree
+      // i'm guaranteed that the start idx is 0 because there's no way to get a cursor without starting there & that'd mess up the EOF
+      // that means, i just need to know the length of the array before it is mutated
+      // pretty easy to do if i create a custom `myLength` in the denormalization process, then calc the diff
+      // so, if i'm doing a merge & the 
+
     }
 
     const normalizedServerResponseForStore = shortenNormalizedResponse(allNormalizedChanges, cashayDataState);
+
+    // walk entire response, looking for a cashayArray
+    // if found, replace the 
+
+
     // merge the normalized optimistic result with the state
     // dont invalidate other queries, they might not want it.
     // if they want it, they'll ask for it in their own listener
     if (normalizedServerResponseForStore) {
       this.store.dispatch({
-        type: '@@cashay/INSERT_NORMALIZED',
+        type: INSERT_MUTATION,
         payload: {
-          response: normalizedServerResponseForStore
+          response: normalizedServerResponseForStore,
+          variables: allVariables
         }
       });
     }
@@ -499,7 +526,7 @@ export default class Cashay {
     // make sure to recreate the response object so react-redux picks up the change
     // call dispatch(insert_normalized)
   }
-  
+
   subscriptionRemove(idToRemove) {
     // 
   }

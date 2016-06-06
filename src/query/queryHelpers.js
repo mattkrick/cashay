@@ -86,10 +86,10 @@ const deepEqualAndReduce = (state, newEntity, reducedNewItem = {}) => {
 
 export const invalidateMutationsOnNewQuery = (component, cachedMutations) => {
   const activeMutations = Object.keys(cachedMutations);
-
   for (let mutationName of activeMutations) {
     const mutation = cachedMutations[mutationName];
-    if (mutation.activeComponents.includes(component)) {
+    // TODO handle logic for keys?
+    if (mutation.activeComponentsObj[component]) {
       mutation.fullMutation = '';
       mutation.variableEnhancers = [];
     }

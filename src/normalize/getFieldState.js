@@ -37,12 +37,6 @@ const handlePaginationArgs = (paginationArgs, fieldState, fieldSchema, selection
   // try to use the full array. if it doesn't exist, see if we're going backwards & use the back array, else front
   const usefulArray = fieldState.full || (last ? fieldState.back : fieldState.front);
   const isFull = usefulArray === fieldState.full;
-
-  // TODO dead code? i think we always guarantee an empty array
-  // if (!usefulArray) {
-  //   console.log('no local data')
-  //   return;
-  // }
   const cursor = before || after;
   const count = last || first;
   const cursorIdx = getCursorIdx(cursor, last, usefulArray, context.cashayDataState.entities);
@@ -52,27 +46,31 @@ const handlePaginationArgs = (paginationArgs, fieldState, fieldSchema, selection
   let countWord;
   let cursorWord;
   if (last) {
-    const minIdx = cursorIdx - last;
-    const usefulArrayNonNull = removeLeftPadding(usefulArray);
-    missingDocCount = -minIdx;
-    const startIdx = minIdx < 0 ? 0 : minIdx;
-    fieldState = usefulArrayNonNull.slice(startIdx, cursorIdx);
-    normalStringWithNewCursor = usefulArrayNonNull[0];
+    debugger
+    //TODO broken
+    const firstNonNullIdx = countLeftPadding(usefulArray);
+    const firstDesiredDocIdx = cursorIdx - last;
+    const startIdx = Math.max(firstNonNullIdx, firstDesiredDocIdx);
+    missingDocCount = startIdx - firstDesiredDocIdx;
+    fieldState = usefulArray.slice(startIdx, cursorIdx);
+    normalStringWithNewCursor = usefulArray[firstNonNullIdx];
     countWord = context.paginationWords.last;
     cursorWord = context.paginationWords.before;
   } else {
-    const maxIdx = cursorIdx + first;
-    const usefulArrayNonNull = removeRightPadding(usefulArray);
-    missingDocCount = maxIdx - usefulArrayNonNull.length + 1;
-    fieldState = usefulArrayNonNull.slice(cursorIdx + 1, cursorIdx + 1 + first);
-    normalStringWithNewCursor = usefulArrayNonNull[usefulArrayNonNull.length - 1];
+    debugger
+    const startIdx = cursorIdx + 1;
+    const lastNonNullIdx = countRightPadding(usefulArray);
+    const lastDesiredDocIdx = startIdx + first - 1;
+    const sliceThrough = Math.min(lastNonNullIdx, lastDesiredDocIdx);
+    missingDocCount = lastDesiredDocIdx - lastNonNullIdx;
+    fieldState = usefulArray.slice(startIdx, sliceThrough + 1);
+    normalStringWithNewCursor = usefulArray[sliceThrough];
     countWord = context.paginationWords.first;
     cursorWord = context.paginationWords.after;
   }
 
   // assign BOF and EOF to the array, similar to hasPreviousPage, hasNextPage
-  assignFieldStateMeta(fieldState, usefulArray);
-
+  assignFieldStateMeta(fieldState, usefulArray, count);
 
   // if there's a document missing & we don't have all the documents yet, get more!
   if (missingDocCount > 0 && !isFull) {
@@ -116,31 +114,35 @@ const handlePaginationArgs = (paginationArgs, fieldState, fieldSchema, selection
   return fieldState;
 };
 
-const removeLeftPadding = array => {
+const countLeftPadding = array => {
   for (let i = 0; i < array.length; i++) {
     if (array[i]) {
-      return array.slice(i);
+      return i;
     }
   }
 };
 
-const removeRightPadding = array => {
+const countRightPadding = array => {
   for (let i = array.length - 1; i >= 0; i--) {
     if (array[i]) {
-      return array.slice(0, i + 1);
+      return i;
     }
   }
 };
 
-const assignFieldStateMeta = (fieldState, usefulArray) => {
+const assignFieldStateMeta = (fieldState, usefulArray, count) => {
   Object.assign(fieldState, {
     EOF: fieldState[fieldState.length - 1] === usefulArray[usefulArray.length - 1],
-    BOF: fieldState[0] === usefulArray[0]
+    BOF: fieldState[0] === usefulArray[0],
+    count
+    // startIdx: subset[0],
+    // endIdx: subset[1]
   });
 };
 
 const getCursorIdx = (cursor, last, usefulArray, entities) => {
-  let cursorIdx = last ? 1 : -1;
+  let cursorIdx = last ? usefulArray.length : -1;
+  // TODO Remove. cursor should always be false because each query is required to start from the beginning or end
   if (cursor) {
     cursorIdx = usefulArray.findIndex(doc => {
       const storedDoc = getDocFromNormalString(doc, entities);

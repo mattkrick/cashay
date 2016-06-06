@@ -34,7 +34,8 @@ import {
 
 import {
   front3Store,
-  front2After3StoreFn
+  front2After3StoreFn,
+  front3LocalResponseFn
 } from './src/normalize/__tests__/data-pagination-front';
 
 import {
@@ -69,18 +70,16 @@ import {front2After3Query, front4Query, front3Response} from './src/normalize/__
 import removeNamespacing from './src/mutate/removeNamespacing';
 
 const idFieldName = '_id';
-
-
-const queryAST = parseAndInitializeQuery(queryPostCount, clientSchema, idFieldName);
+const queryAST = parseAndInitializeQuery(front4Query, clientSchema, idFieldName);
 const context = buildExecutionContext(queryAST, {
-  cashayDataState: storedPostCount,
+  cashayDataState: front3Store,
   idFieldName,
   schema: clientSchema,
-  paginationWords
+  paginationWords,
+  variables: {reverse: true, lang: "spanish"}
 });
 const {data: actual} = denormalizeStore(context);
-const {data: expected} = unionResponse;
-
+const {data: expected} = front3LocalResponseFn();
 debugger
 fs.writeFileSync('./actualResult.json', JSON.stringify(actual, null, 2));
 fs.writeFileSync('./expectedResult.json', JSON.stringify(expected, null, 2));

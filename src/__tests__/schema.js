@@ -80,7 +80,7 @@ const CommentType = new GraphQLObjectType({
     author: {
       type: AuthorType,
       resolve: function({author}) {
-        return AuthorDB[author];
+        return AuthorDB.find(doc => doc.author === author);
       }
     },
     createdAt: {type: GraphQLFloat},
@@ -101,14 +101,24 @@ const GroupType = new GraphQLObjectType({
     owner: {
       type: MemberType,
       resolve(source) {
-        return AuthorDB[source.ownerId] || GroupDB[source.ownerId];
+        let author;
+        author = AuthorDB.find(doc => doc._id === source.ownerId);
+        if (!author) {
+          author =   GroupDB.find(doc => doc._id === source.ownerId);
+        }
+        return author;
       }
     },
     members: {
       type: new GraphQLList(MemberType),
       resolve(source) {
         return source.members.map(member => {
-          return AuthorDB[member] || GroupDB[member];
+          let author;
+          author = AuthorDB.find(doc => doc._id === member);
+          if (!author) {
+            author =   GroupDB.find(doc => doc._id === member);
+          }
+          return author;
         });
       }
     }
@@ -173,15 +183,13 @@ const PostType = new GraphQLObjectType({
         last: {type: GraphQLInt, description: "Limit the comments from the back"}
       },
       resolve: function(post, args) {
-        const keys = Object.keys(CommentDB);
-        const objs = keys.map(key => CommentDB[key]);
-        return handlePaginationArgs(args, objs)
+        return handlePaginationArgs(args, CommentDB)
       }
     },
     author: {
       type: AuthorType,
       resolve: function({author}) {
-        return AuthorDB[author];
+        return AuthorDB.find(doc => doc._id === author);
       }
     },
     cursor: {type: GraphQLString}
@@ -223,7 +231,7 @@ const DateOptionsType = new GraphQLInputObjectType({
   fields: () => ({
     day: {type: GraphQLBoolean},
     month: {type: GraphQLBoolean},
-    year: {type: GraphQLBoolean},
+    year: {type: GraphQLBoolean}
   })
 });
 
@@ -247,16 +255,15 @@ const Query = new GraphQLObjectType({
       type: new GraphQLNonNull(GraphQLInt),
       description: "the number of posts currently in the db",
       resolve() {
-        return Object.keys(PostDB).length;
+        return PostDB.length;
       }
     },
     getLatestPost: {
       type: PostType,
       description: "Latest post in the blog",
       resolve() {
-        const keys = Object.keys(PostDB);
-        const sortedKeys = keys.sort((a, b) => PostDB[b].createdAt - PostDB[a].createdAt);
-        return PostDB[sortedKeys[0]];
+        const sortedPosts = PostDB.sort((a, b) => b.createdAt - a.createdAt);
+        return sortedPosts[0];
       }
     },
     getRecentPosts: {
@@ -269,10 +276,9 @@ const Query = new GraphQLObjectType({
         last: {type: GraphQLInt, description: "Limit the comments from the back"}
       },
       resolve(source, args, ref) {
-        const postKeys = Object.keys(PostDB);
-        const sortedKeys = postKeys.sort((a, b) => PostDB[b].createdAt - PostDB[a].createdAt);
-        const objs = sortedKeys.map(key => PostDB[key]);
-        return handlePaginationArgs(args, objs);
+        const sortedPosts = PostDB.sort((a, b) => b.createdAt - a.createdAt);
+
+        return handlePaginationArgs(args, sortedPosts);
       }
     },
     getPostById: {
@@ -282,7 +288,7 @@ const Query = new GraphQLObjectType({
         _id: {type: new GraphQLNonNull(GraphQLString)}
       },
       resolve: function(source, {_id}) {
-        return PostDB[_id];
+        return PostDB.find(doc => doc._id === _id);
       }
     },
     getGroup: {
@@ -291,7 +297,7 @@ const Query = new GraphQLObjectType({
         _id: {type: new GraphQLNonNull(GraphQLString)}
       },
       resolve(source, {_id}) {
-        return GroupDB[_id]
+        return GroupDB.find(doc => doc._id === _id);
       }
     },
     getCommentsByPostId: {
@@ -301,9 +307,7 @@ const Query = new GraphQLObjectType({
         postId: {type: new GraphQLNonNull(GraphQLString)}
       },
       resolve: function(source, {postId}) {
-        const commentKeys = Object.keys(CommentDB);
-        const filteredCommentKeys = commentKeys.filter(key => CommentDB[key].postId === postId);
-        return filteredCommentKeys.map(key => CommentDB[key]);
+        return CommentDB.filter(doc => doc.postId === postId);
       }
     },
   })
@@ -321,16 +325,18 @@ const Mutation = new GraphQLObjectType({
         author: {type: GraphQLString}
       },
       resolve(source, {newPost, author}) {
+        const now = Date.now();
         const post = Object.assign({}, newPost, {
           karma: 0,
-          createdAt: Date.now(),
+          createdAt: now,
           title_ES: `${newPost.title} EN ESPANOL!`,
+          cursor: `${now}chikachikow`,
           author
         });
-        PostDB[post._id] = post;
+        PostDB.push(post);
         return {
           post,
-          postCount: Object.keys(PostDB).length
+          postCount: PostDB.length
         }
       }
     },
@@ -341,12 +347,14 @@ const Mutation = new GraphQLObjectType({
         postId: {type: new GraphQLNonNull(GraphQLString)}
       },
       resolve(source, {postId}) {
-        const removedPostId = PostDB[postId] && postId;
-        if (removedPostId) {
-          delete PostDB[postId];
+        const removedPostIdx= PostDB.findIndex(doc => doc.postId === postId);
+        let didRemove = false;
+        if (removedPostIdx !== -1) {
+          PostDB.splice(removedPostIdx,1);
+          didRemove = true;
         }
         return {
-          removedPostId,
+          removedPostId: didRemove ? postId : null,
           postCount: Object.keys(PostDB).length
         };
       }
@@ -355,10 +363,10 @@ const Mutation = new GraphQLObjectType({
       type: PostType,
       description: 'update a post',
       args: {
-        post: {type: PostType}
+        post: {type: NewPost}
       },
       resolve(source, {post}) {
-        const storedPost = PostDB[post.id];
+        const storedPost = PostDB.find(doc => doc._id === post._id);
         if (storedPost) {
           const updatedKeys = Object.keys(post);
           updatedKeys.forEach(key => {
@@ -370,7 +378,7 @@ const Mutation = new GraphQLObjectType({
             }
           })
         }
-        return PostDB[post.id];
+        return storedPost;
       }
     },
     createComment: {
@@ -390,7 +398,7 @@ const Mutation = new GraphQLObjectType({
           author: 'a125',
           createdAt: Date.now()
         };
-        CommentDB[_id] = newPost;
+        CommentDB.push(newPost);
         return newPost;
       }
     },

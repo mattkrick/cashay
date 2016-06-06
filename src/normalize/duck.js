@@ -1,10 +1,10 @@
-export const INSERT_NORMALIZED = '@@cashay/INSERT_NORMALIZED';
+export const INSERT_QUERY = '@@cashay/INSERT_QUERY';
+export const INSERT_MUTATION = '@@cashay/INSERT_MUTATION';
 export const SET_VARIABLES = '@@cashay/SET_VARIABLES';
 
 import mergeStores from './mergeStores';
 
 const initialState = {
-  // TODO simplify. isFetching is the same as !cachedResponse._isComplete
   error: {},
   data: {
     entities: {},
@@ -14,56 +14,26 @@ const initialState = {
 };
 
 export const reducer = (state = initialState, action) => {
-  switch (action.type) {
-    case INSERT_NORMALIZED:
-      if (!action.payload.key) {
-        return Object.assign({}, state, {
-          data: Object.assign(mergeStores(state.data, action.payload.response), {
-            variables: Object.assign({}, state.data.variables, {
-              [action.payload.component]: Object.assign({}, state.data.variables[action.payload.component],
-                action.payload.variables)
-            })
-          })
-        });
-      } else {
-        const stateDataVarsComp = Object.assign({}, state.data.variables[action.payload.component]);
-        const stateDataVarsCompKey = Object.assign({}, stateDataVarsComp[action.payload.key], action.payload.variables);
-        return Object.assign({}, state, {
-          data: Object.assign(mergeStores(state.data, action.payload.response), {
-            variables: Object.assign({}, state.data.variables, {
-              [action.payload.component]: Object.assign(stateDataVarsComp, {
-                [action.payload.key]: stateDataVarsCompKey
-              })
-            })
-          })
-        });
-      }
-    case SET_VARIABLES:
-      if (!action.payload.key) {
-        return Object.assign({}, state, {
-          data: Object.assign({}, state.data, {
-            variables: Object.assign({}, state.data.variables, {
-              [action.payload.component]: Object.assign({},
-                state.data.variables[action.payload.component],
-                action.payload.variables)
-            })
-          })
-        });
-      } else {
-        const stateDataVarsComp = Object.assign({}, state.data.variables[action.payload.component]);
-        const stateDataVarsCompKey = Object.assign({}, stateDataVarsComp[action.payload.key], action.payload.variables);
-        return Object.assign({}, state, {
-          data: Object.assign({}, state.data, {
-            variables: Object.assign({}, state.data.variables, {
-              [action.payload.component]: Object.assign(stateDataVarsComp, {
-                [action.payload.key]: stateDataVarsCompKey
-              })
-            })
-          })
-        });
-      }
-
-    default:
-      return state;
+  if (action.type === INSERT_QUERY) {
+    const {variables, response} = action.payload;
+    const newMergedState = mergeStores(state.data, response);
+    return variables ? newStateWithVars(state, newMergedState, action.payload) : {...state, data: newMergedState};
+  } else if (action.type === INSERT_MUTATION) {
+    const newMergedState = mergeStores(state.data, action.payload.response, true);
+    return newStateWithVars(state, newMergedState, action.payload);
+  } else if (action.type === SET_VARIABLES) {
+    return newStateWithVars(state, {...state.data}, action.payload);
+  } else {
+    return state;
   }
+};
+
+
+// TODO pass in the whole variable state, not just the component[key] state
+const newStateWithVars = (state, newDataState, {variables}) => {
+  return Object.assign({}, state, {
+    data: Object.assign(newDataState, {
+      variables: Object.assign({}, state.data.variables, variables)
+    })
+  });
 };

@@ -123,7 +123,20 @@ export default function mergeStores(state, src, isMutation) {
         const stateIsArray = Array.isArray(targetProp);
         if (!srcIsArray && !stateIsArray) {
           // if both the state and src are objects, merge them
-          target[key] = {...mergeStores(targetProp, srcProp)};
+          target[key] = {...mergeStores(targetProp, srcProp, isMutation)};
+        } else if (isCashayArray) {
+          if (key === 'front') {
+            const oldCount = srcProp.count;
+            const targetPropCopy = targetProp.slice();
+            targetPropCopy.splice(0, oldCount, ...srcProp);
+            target[key] = targetPropCopy;
+          } else if (key === 'back') {
+            const oldCount = srcProp.count;
+            const targetPropCopy = targetProp.slice();
+            const spliceStart = targetPropCopy.length - oldCount;
+            targetPropCopy.splice(spliceStart, targetPropCopy.length, ...srcProp);
+            target[key] = targetPropCopy;
+          }
         } else {
           // if the src is not the same as the state, use the pointer from src
           target[key] = srcProp;

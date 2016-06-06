@@ -3,7 +3,7 @@ import {separateArgs} from './separateArgs';
 import {getSubReqAST} from './getSubReqAST';
 import {ensureRootType, getRegularArgsKey, isObject} from '../utils';
 import {TypeKind} from 'graphql/type/introspection';
-const {UNION} = TypeKind;
+const {UNION, VARIABLE} = TypeKind;
 
 const mapResponseToResult = (nestedResult, response, fieldSchema, reqASTArgs, context) => {
   const {regularArgs, paginationArgs} = separateArgs(fieldSchema, reqASTArgs, context);
@@ -54,21 +54,45 @@ const visitEntity = (bag, subResponse, reqAST, subSchema, context, id) => {
 
 const visitIterable = (bag, subResponse, reqAST, subSchema, context) => {
   if (reqAST.arguments && reqAST.arguments.length) {
+    // debugger
+    const normalizedSubResponse = subResponse.map(res => visit(bag, res, reqAST, subSchema, context));
+
     const {first, last} = context.paginationWords;
-    const count = reqAST.arguments.find(arg => arg.name.value === first || arg.name.value === last);
-    if (count !== undefined) {
-      const countVal = +count.value.value;
-      if (subResponse.length < countVal) {
-        // assign an EOF to an array is OK because the final merged result stores this metadata in the key (ie "full")
-        subResponse.EOF = true;
+    const paginationFlags = [{word: first, flag: 'EOF'}, {word: last, flag: 'BOF'}];
+    for (let i = 0; i < paginationFlags.length; i++) {
+      const {word, flag} = paginationFlags[i];
+      const count = reqAST.arguments.find(arg => arg.name.value === word);
+      debugger
+      if (count !== undefined) {
+        const countVal = +count.value.value;
+        if (normalizedSubResponse.length < countVal) {
+          normalizedSubResponse[flag] = true;
+        }
+        if (count.value.kind === VARIABLE) {
+          const variableDefName = count.value.name.value;
+          // const currentVal = context.variables[variableDefName];
+
+          // update the difference in the variables (passed on to redux state)
+          context.variables[variableDefName] = subResponse.length;
+
+          // pass the count onto the normalized response to perform a slice during the state merge
+          normalizedSubResponse.count = subResponse.count;
+
+          // mutates the original denormalized response. saves an entire tree walk, but kinda ugly.
+          subResponse.count = subResponse.length;
+
+        }
+        break;
       }
     }
+    if (subResponse.count) {
+      normalizedSubResponse.count = subResponse.count;
+      // WARNING: mutates the original denormalized response. but saves an entire tree walk. but kinda ugly.
+      subResponse.count = subResponse.length;
+
+    }
+    return normalizedSubResponse
   }
-  const normalizedSubResponse = subResponse.map(res => visit(bag, res, reqAST, subSchema, context));
-  if (subResponse.EOF) {
-    normalizedSubResponse.EOF = true;
-  }
-  return normalizedSubResponse
 };
 
 const visitUnion = (bag, subResponse, reqAST, subSchema, context) => {
@@ -92,7 +116,7 @@ const visit = (bag, subResponse, reqAST, subSchema, context) => {
     return visitEntity(bag, subResponse, reqAST, subSchema, context, id);
   }
   return visitObject(bag, subResponse, reqAST, subSchema, context);
-  
+
 };
 
 export default (response, context) => {

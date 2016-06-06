@@ -11,6 +11,8 @@ import getFieldState from './getFieldState';
 
 const {UNION, LIST, OBJECT} = TypeKind;
 
+const arrayMetadata = ['BOF', 'EOF', 'count'];
+
 const visitObject = (subState = {}, reqAST, subSchema, context, baseReduction = {}) => {
   return reqAST.selectionSet.selections.reduce((reduction, field) => {
     if (field.kind === INLINE_FRAGMENT) {
@@ -61,12 +63,16 @@ const visitIterable = (subState, reqAST, subSchema, context) => {
     const fieldSchema = context.schema.types[fieldType.name];
 
     // for each value in the array, get the denormalized item
-    const mappedState = subState.map(res => visit(res, reqAST, fieldSchema, context));
-    if (subState.BOF) {
-      mappedState.BOF = subState.BOF;
+    const mappedState = [];
+    for (let i = 0; i < subState.length; i++) {
+      const res = subState[i];
+      mappedState[i] = visit(res, reqAST, fieldSchema, context);
     }
-    if (subState.EOF) {
-      mappedState.EOF = subState.EOF;
+    for (let i = 0; i < arrayMetadata.length; i++) {
+      const metadataName = arrayMetadata[i];
+      if (subState[metadataName]) {
+        mappedState[metadataName] = subState[metadataName];
+      }
     }
     return mappedState;
   }
@@ -126,7 +132,7 @@ export default function denormalizeStore(context) {
     // const query
     // get the expected return value, devs can be silly, so if the had the return value in a nonnull, remove it.
     const nonNullQueryFieldSchemaType = ensureTypeFromNonNull(queryFieldSchema.type);
-    const subSchema= nonNullQueryFieldSchemaType.kind === LIST ? queryFieldSchema :
+    const subSchema = nonNullQueryFieldSchemaType.kind === LIST ? queryFieldSchema :
       ensureTypeFromNonNull(context.schema.types[nonNullQueryFieldSchemaType.name]);
 
     // recursively visit each branch, flag missing branches with a sendToServer flag
