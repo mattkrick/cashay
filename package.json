@@ -1,9 +1,11 @@
 {
   "name": "cashay",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "relay for the rest of us",
   "main": "lib/index.js",
-  "bin": { "cashay-schema": "lib/updateSchema.js" },
+  "bin": {
+    "cashay-schema": "lib/updateSchema.js"
+  },
   "scripts": {
     "clean": "rimraf lib",
     "lint": "xo src/index.js --esnext --space --fix",
