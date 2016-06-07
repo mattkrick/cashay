@@ -9,8 +9,8 @@
   "scripts": {
     "clean": "rimraf lib",
     "lint": "xo src/index.js --esnext --space --fix",
-    "build": "babel --presets es2015,stage-0 -d lib/ src/",
-    "watch": "babel -w --presets es2015,stage-0 -d lib/ src/",
+    "build": "babel -d lib/ src/",
+    "watch": "babel -w -d lib/ src/",
     "prepublish": "npm run clean && npm run build",
     "test": "nyc ava ./src/**/__tests__/**/*-tests.js",
     "quicktest": "ava ./src/**/__tests__/**/*-tests.js",
