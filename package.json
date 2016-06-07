@@ -4,7 +4,7 @@
   "description": "relay for the rest of us",
   "main": "lib/index.js",
   "bin": {
-    "cashay-schema": "lib/updateSchema.js"
+    "cashay-schema": "lib/schema/updateSchema.babel.js"
   },
   "scripts": {
     "clean": "rimraf lib",
