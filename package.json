@@ -1,6 +1,6 @@
 {
   "name": "cashay",
-  "version": "0.5.4",
+  "version": "0.5.5",
   "description": "relay for the rest of us",
   "main": "lib/index.js",
   "bin": {
