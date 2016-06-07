@@ -146,5 +146,5 @@ const getSchema = async inputArg => {
     return resJSON.data;
   }
   const relativeInputPath = path.join(process.cwd(), inputArg);
-  return require(relativeInputPath).default;
+  return require(relativeInputPath);
 };
