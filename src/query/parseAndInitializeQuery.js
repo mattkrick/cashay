@@ -33,6 +33,9 @@ const initializeQueryAST = (operationSelections, fragments, fieldSchema, schema,
       if (selection.selectionSet) {
         const children = selection.selectionSet.selections;
         const typeSchema = fieldSchema.fields[selectionName];
+        if (!typeSchema) {
+          throw new Error(`${selectionName} isn't in the schema. Did you update your client schema?`)
+        }
         const rootFieldSchema = ensureRootType(typeSchema.type);
         const subSchema = schema.types[rootFieldSchema.name];
         const fieldsToAdd = subSchema.kind === UNION ? catalogFields : subSchema.fields[idFieldName] ? [idFieldName] : [];

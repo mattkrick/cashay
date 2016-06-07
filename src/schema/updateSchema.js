@@ -3,6 +3,7 @@ import fs from 'fs';
 import minimist from 'minimist';
 import introspectionQuery from './introspectionQuery';
 import fetch from 'isomorphic-fetch';
+
 // why instanceof is still a thing is beyond me...
 const graphql = require(path.join(process.cwd(), 'node_modules', 'graphql')).graphql;
 
@@ -14,7 +15,7 @@ export default async function updateSchema() {
   const relativeOutputPath = process.argv[3] || './clientSchema.json';
   const outputPath = path.join(process.cwd(), relativeOutputPath);
   const spacing = args.production ? 0 : 2;
-  const exitHook = args.exithook && require(path.join(process.cwd(), args.exithook)).default;
+  const oncomplete = args.oncomplete && require(path.join(process.cwd(), args.oncomplete)).default;
 
   const rootSchema = await getSchema(inputArg);
   const initialResult = await graphql(rootSchema, introspectionQuery);
@@ -26,7 +27,7 @@ export default async function updateSchema() {
   try {
     fs.writeFileSync(outputPath, JSON.stringify(finalResult, null, spacing));
     console.log(`You got yourself a schema! See it here: ${outputPath}`);
-    exitHook && exitHook();
+    oncomplete && oncomplete();
   } catch (e) {
     console.log(`Error writing schema to file: ${e}`)
   }

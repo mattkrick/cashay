@@ -414,10 +414,11 @@ export default class Cashay {
       if (dataFromServer) {
         // if it's from the server, send the doc we got back
         const normalizedDataFromServer = removeNamespacing(dataFromServer, component);
-        modifiedResponse = componentHandler(null, normalizedDataFromServer, cachedResponseData, cashayDataState, this._invalidate);
+        const getType = getTypeFactory(this.getState, component, key);
+        modifiedResponse = componentHandler(null, normalizedDataFromServer, cachedResponseData, getType, this._invalidate);
       } else {
         // otherwise, treat it as an optimistic update
-        modifiedResponse = componentHandler(variables, null, cachedResponseData, cashayDataState, this._invalidate);
+        modifiedResponse = componentHandler(variables, null, cachedResponseData, getType, this._invalidate);
       }
 
       // there's a possible 3 updates: optimistic, doc from server, full array from server (invalidated)
@@ -492,6 +493,30 @@ export default class Cashay {
     }
   }
 
+  _getTypeFactory = (component, key) => {
+    return typeName => {
+      const cashayDataState = this.getState().data;
+      const rawState = cashayDataState.entities[typeName];
+      if (!rawState) {
+        throw new Error(`${typeName} does not exist in your cashay data state entities!`);
+      }
+
+      const componentState = cashayDataState.variables[component];
+      const stateVars = key ? componentState : componentState[key];
+      if (!stateVars) {
+        return rawState;
+      }
+      const typeKeys = Object.keys(rawState);
+      const fieldSchema = this.schema.types[typeName];
+      for (let i = 0; i < typeKeys.length; i++) {
+        const typeKey = typeKeys[i];
+        const rawFieldState = rawState[typeKey];
+        getFieldState(rawFieldState, fieldSchema, selection, context)
+      }
+
+
+    }
+  }
   /**
    *
    */
@@ -573,3 +598,26 @@ export default class Cashay {
 //       id,
 //     }
 //   }`]]);
+
+const getTypeFactory = (getState, component, key) => {
+  return typeName => {
+    const cashayDataState = getState().data;
+    const rawState = cashayDataState.entities[typeName];
+    if (!rawState) {
+      throw new Error(`${typeName} does not exist in your cashay data state entities!`);
+    }
+
+    const componentState = cashayDataState.variables[component];
+    const stateVars = key ? componentState : componentState[key];
+    if (!stateVars) {
+      return rawState;
+    }
+    const typeKeys = Object.keys(rawState);
+    for (let i = 0; i < typeKeys.length; i++) {
+
+    }
+
+    ''
+
+  }
+}

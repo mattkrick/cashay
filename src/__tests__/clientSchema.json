@@ -1,1 +1,759 @@
-{"querySchema":{"kind":"OBJECT","name":"BlogSchema","fields":{"getPostCount":{"name":"getPostCount","type":{"kind":"NON_NULL","ofType":{"kind":"SCALAR","name":"Int"}}},"getLatestPost":{"name":"getLatestPost","type":{"kind":"OBJECT","name":"PostType"}},"getRecentPosts":{"name":"getRecentPosts","args":{"beforeCursor":{"name":"beforeCursor","type":{"kind":"SCALAR","name":"String"}},"afterCursor":{"name":"afterCursor","type":{"kind":"SCALAR","name":"String"}},"first":{"name":"first","type":{"kind":"SCALAR","name":"Int"}},"last":{"name":"last","type":{"kind":"SCALAR","name":"Int"}}},"type":{"kind":"LIST","ofType":{"kind":"OBJECT","name":"PostType"}}},"getPostById":{"name":"getPostById","args":{"_id":{"name":"_id","type":{"kind":"NON_NULL","ofType":{"kind":"SCALAR","name":"String"}}}},"type":{"kind":"OBJECT","name":"PostType"}},"getGroup":{"name":"getGroup","args":{"_id":{"name":"_id","type":{"kind":"NON_NULL","ofType":{"kind":"SCALAR","name":"String"}}}},"type":{"kind":"OBJECT","name":"Group"}},"getCommentsByPostId":{"name":"getCommentsByPostId","args":{"postId":{"name":"postId","type":{"kind":"NON_NULL","ofType":{"kind":"SCALAR","name":"String"}}}},"type":{"kind":"LIST","ofType":{"kind":"OBJECT","name":"CommentType"}}}}},"types":{"Int":{"kind":"SCALAR","name":"Int"},"PostType":{"kind":"OBJECT","name":"PostType","fields":{"_id":{"name":"_id","type":{"kind":"SCALAR","name":"String"}},"title":{"name":"title","args":{"language":{"name":"language","type":{"kind":"SCALAR","name":"String"}},"inReverse":{"name":"inReverse","type":{"kind":"SCALAR","name":"Boolean"}}},"type":{"kind":"SCALAR","name":"String"}},"category":{"name":"category","type":{"kind":"ENUM","name":"CategoryType"}},"content":{"name":"content","type":{"kind":"SCALAR","name":"String"}},"createdAt":{"name":"createdAt","args":{"dateOptions":{"name":"dateOptions","type":{"kind":"INPUT_OBJECT","name":"DateOptions"}}},"type":{"kind":"SCALAR","name":"Int"}},"comments":{"name":"comments","args":{"beforeCursor":{"name":"beforeCursor","type":{"kind":"SCALAR","name":"String"}},"afterCursor":{"name":"afterCursor","type":{"kind":"SCALAR","name":"String"}},"first":{"name":"first","type":{"kind":"SCALAR","name":"Int"}},"last":{"name":"last","type":{"kind":"SCALAR","name":"Int"}}},"type":{"kind":"LIST","ofType":{"kind":"OBJECT","name":"CommentType"}}},"author":{"name":"author","type":{"kind":"OBJECT","name":"AuthorType"}},"cursor":{"name":"cursor","type":{"kind":"SCALAR","name":"String"}}},"interfaces":{"HasAuthorType":{"kind":"INTERFACE","name":"HasAuthorType"}}},"HasAuthorType":{"kind":"INTERFACE","name":"HasAuthorType","fields":{"author":{"name":"author","type":{"kind":"OBJECT","name":"AuthorType"}}},"possibleTypes":{"PostType":{"kind":"OBJECT","name":"PostType"},"CommentType":{"kind":"OBJECT","name":"CommentType"}}},"AuthorType":{"kind":"OBJECT","name":"AuthorType","fields":{"_id":{"name":"_id","type":{"kind":"SCALAR","name":"String"}},"name":{"name":"name","type":{"kind":"SCALAR","name":"String"}},"twitterHandle":{"name":"twitterHandle","type":{"kind":"SCALAR","name":"String"}}}},"String":{"kind":"SCALAR","name":"String"},"Boolean":{"kind":"SCALAR","name":"Boolean"},"CategoryType":{"kind":"ENUM","name":"CategoryType","enumValues":{"HOT_STUFF":{"name":"HOT_STUFF"},"ICE_COLD":{"name":"ICE_COLD"}}},"DateOptions":{"kind":"INPUT_OBJECT","name":"DateOptions","inputFields":{"day":{"name":"day","type":{"kind":"SCALAR","name":"Boolean"}},"month":{"name":"month","type":{"kind":"SCALAR","name":"Boolean"}},"year":{"name":"year","type":{"kind":"SCALAR","name":"Boolean"}}}},"CommentType":{"kind":"OBJECT","name":"CommentType","fields":{"_id":{"name":"_id","type":{"kind":"SCALAR","name":"String"}},"content":{"name":"content","type":{"kind":"SCALAR","name":"String"}},"author":{"name":"author","type":{"kind":"OBJECT","name":"AuthorType"}},"createdAt":{"name":"createdAt","type":{"kind":"SCALAR","name":"Float"}},"cursor":{"name":"cursor","type":{"kind":"SCALAR","name":"String"}},"karma":{"name":"karma","type":{"kind":"SCALAR","name":"Int"}},"postId":{"name":"postId","type":{"kind":"SCALAR","name":"String"}}},"interfaces":{"HasAuthorType":{"kind":"INTERFACE","name":"HasAuthorType"}}},"Float":{"kind":"SCALAR","name":"Float"},"Group":{"kind":"OBJECT","name":"Group","fields":{"_id":{"name":"_id","type":{"kind":"SCALAR","name":"String"}},"owner":{"name":"owner","type":{"kind":"UNION","name":"Member"}},"members":{"name":"members","type":{"kind":"LIST","ofType":{"kind":"UNION","name":"Member"}}}}},"Member":{"kind":"UNION","name":"Member","possibleTypes":{"Group":{"kind":"OBJECT","name":"Group"},"AuthorType":{"kind":"OBJECT","name":"AuthorType"}}},"NewPost":{"kind":"INPUT_OBJECT","name":"NewPost","inputFields":{"_id":{"name":"_id","type":{"kind":"NON_NULL","ofType":{"kind":"SCALAR","name":"String"}}},"content":{"name":"content","type":{"kind":"SCALAR","name":"String"}},"title":{"name":"title","type":{"kind":"SCALAR","name":"String"}},"category":{"name":"category","type":{"kind":"SCALAR","name":"String"}}}},"CreatePostMutationPayload":{"kind":"OBJECT","name":"CreatePostMutationPayload","fields":{"post":{"name":"post","type":{"kind":"OBJECT","name":"PostType"}},"postCount":{"name":"postCount","type":{"kind":"SCALAR","name":"Int"}}}},"RemovePostMutationPayload":{"kind":"OBJECT","name":"RemovePostMutationPayload","fields":{"removedPostId":{"name":"removedPostId","type":{"kind":"SCALAR","name":"String"}},"postCount":{"name":"postCount","type":{"kind":"SCALAR","name":"Int"}}}},"NewMember":{"kind":"INPUT_OBJECT","name":"NewMember","inputFields":{"_id":{"name":"_id","type":{"kind":"NON_NULL","ofType":{"kind":"SCALAR","name":"String"}}},"name":{"name":"name","type":{"kind":"SCALAR","name":"String"}},"ownerId":{"name":"ownerId","type":{"kind":"SCALAR","name":"String"}},"members":{"name":"members","type":{"kind":"LIST","ofType":{"kind":"SCALAR","name":"String"}}},"twitterHandle":{"name":"twitterHandle","type":{"kind":"SCALAR","name":"String"}}}}},"directives":{"include":{"name":"include","args":{"if":{"name":"if","type":{"kind":"NON_NULL","ofType":{"kind":"SCALAR","name":"Boolean"}}}},"onOperation":false,"onFragment":true,"onField":true},"skip":{"name":"skip","args":{"if":{"name":"if","type":{"kind":"NON_NULL","ofType":{"kind":"SCALAR","name":"Boolean"}}}},"onOperation":false,"onFragment":true,"onField":true}},"mutationSchema":{"kind":"OBJECT","name":"BlogMutations","fields":{"createPost":{"name":"createPost","args":{"newPost":{"name":"newPost","type":{"kind":"NON_NULL","ofType":{"kind":"INPUT_OBJECT","name":"NewPost"}}},"author":{"name":"author","type":{"kind":"SCALAR","name":"String"}}},"type":{"kind":"OBJECT","name":"CreatePostMutationPayload"}},"removePostById":{"name":"removePostById","args":{"postId":{"name":"postId","type":{"kind":"NON_NULL","ofType":{"kind":"SCALAR","name":"String"}}}},"type":{"kind":"OBJECT","name":"RemovePostMutationPayload"}},"updatePost":{"name":"updatePost","args":{"post":{"name":"post","type":{"kind":"INPUT_OBJECT","name":"NewPost"}}},"type":{"kind":"OBJECT","name":"PostType"}},"createComment":{"name":"createComment","args":{"_id":{"name":"_id","type":{"kind":"NON_NULL","ofType":{"kind":"SCALAR","name":"String"}}},"postId":{"name":"postId","type":{"kind":"NON_NULL","ofType":{"kind":"SCALAR","name":"String"}}},"content":{"name":"content","type":{"kind":"NON_NULL","ofType":{"kind":"SCALAR","name":"String"}}}},"type":{"kind":"OBJECT","name":"CommentType"}},"createMembers":{"name":"createMembers","args":{"members":{"name":"members","type":{"kind":"NON_NULL","ofType":{"kind":"LIST","ofType":{"kind":"NON_NULL","ofType":{"kind":"INPUT_OBJECT","name":"NewMember"}}}}}},"type":{"kind":"LIST","ofType":{"kind":"UNION","name":"Member"}}}}}}
+{
+  "querySchema": {
+    "kind": "OBJECT",
+    "name": "BlogSchema",
+    "fields": {
+      "getPostCount": {
+        "name": "getPostCount",
+        "type": {
+          "kind": "NON_NULL",
+          "ofType": {
+            "kind": "SCALAR",
+            "name": "Int"
+          }
+        }
+      },
+      "getLatestPost": {
+        "name": "getLatestPost",
+        "type": {
+          "kind": "OBJECT",
+          "name": "PostType"
+        }
+      },
+      "getRecentPosts": {
+        "name": "getRecentPosts",
+        "args": {
+          "beforeCursor": {
+            "name": "beforeCursor",
+            "type": {
+              "kind": "SCALAR",
+              "name": "String"
+            }
+          },
+          "afterCursor": {
+            "name": "afterCursor",
+            "type": {
+              "kind": "SCALAR",
+              "name": "String"
+            }
+          },
+          "first": {
+            "name": "first",
+            "type": {
+              "kind": "SCALAR",
+              "name": "Int"
+            }
+          },
+          "last": {
+            "name": "last",
+            "type": {
+              "kind": "SCALAR",
+              "name": "Int"
+            }
+          }
+        },
+        "type": {
+          "kind": "LIST",
+          "ofType": {
+            "kind": "OBJECT",
+            "name": "PostType"
+          }
+        }
+      },
+      "getPostById": {
+        "name": "getPostById",
+        "args": {
+          "_id": {
+            "name": "_id",
+            "type": {
+              "kind": "NON_NULL",
+              "ofType": {
+                "kind": "SCALAR",
+                "name": "String"
+              }
+            }
+          }
+        },
+        "type": {
+          "kind": "OBJECT",
+          "name": "PostType"
+        }
+      },
+      "getGroup": {
+        "name": "getGroup",
+        "args": {
+          "_id": {
+            "name": "_id",
+            "type": {
+              "kind": "NON_NULL",
+              "ofType": {
+                "kind": "SCALAR",
+                "name": "String"
+              }
+            }
+          }
+        },
+        "type": {
+          "kind": "OBJECT",
+          "name": "Group"
+        }
+      },
+      "getCommentsByPostId": {
+        "name": "getCommentsByPostId",
+        "args": {
+          "postId": {
+            "name": "postId",
+            "type": {
+              "kind": "NON_NULL",
+              "ofType": {
+                "kind": "SCALAR",
+                "name": "String"
+              }
+            }
+          }
+        },
+        "type": {
+          "kind": "LIST",
+          "ofType": {
+            "kind": "OBJECT",
+            "name": "CommentType"
+          }
+        }
+      }
+    }
+  },
+  "types": {
+    "Int": {
+      "kind": "SCALAR",
+      "name": "Int"
+    },
+    "PostType": {
+      "kind": "OBJECT",
+      "name": "PostType",
+      "fields": {
+        "_id": {
+          "name": "_id",
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        },
+        "title": {
+          "name": "title",
+          "args": {
+            "language": {
+              "name": "language",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String"
+              }
+            },
+            "inReverse": {
+              "name": "inReverse",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Boolean"
+              }
+            }
+          },
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        },
+        "category": {
+          "name": "category",
+          "type": {
+            "kind": "ENUM",
+            "name": "CategoryType"
+          }
+        },
+        "content": {
+          "name": "content",
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "args": {
+            "dateOptions": {
+              "name": "dateOptions",
+              "type": {
+                "kind": "INPUT_OBJECT",
+                "name": "DateOptions"
+              }
+            }
+          },
+          "type": {
+            "kind": "SCALAR",
+            "name": "Int"
+          }
+        },
+        "comments": {
+          "name": "comments",
+          "args": {
+            "beforeCursor": {
+              "name": "beforeCursor",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String"
+              }
+            },
+            "afterCursor": {
+              "name": "afterCursor",
+              "type": {
+                "kind": "SCALAR",
+                "name": "String"
+              }
+            },
+            "first": {
+              "name": "first",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Int"
+              }
+            },
+            "last": {
+              "name": "last",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Int"
+              }
+            }
+          },
+          "type": {
+            "kind": "LIST",
+            "ofType": {
+              "kind": "OBJECT",
+              "name": "CommentType"
+            }
+          }
+        },
+        "author": {
+          "name": "author",
+          "type": {
+            "kind": "OBJECT",
+            "name": "AuthorType"
+          }
+        },
+        "cursor": {
+          "name": "cursor",
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        }
+      },
+      "interfaces": {
+        "HasAuthorType": {
+          "kind": "INTERFACE",
+          "name": "HasAuthorType"
+        }
+      }
+    },
+    "HasAuthorType": {
+      "kind": "INTERFACE",
+      "name": "HasAuthorType",
+      "fields": {
+        "author": {
+          "name": "author",
+          "type": {
+            "kind": "OBJECT",
+            "name": "AuthorType"
+          }
+        }
+      },
+      "possibleTypes": {
+        "PostType": {
+          "kind": "OBJECT",
+          "name": "PostType"
+        },
+        "CommentType": {
+          "kind": "OBJECT",
+          "name": "CommentType"
+        }
+      }
+    },
+    "AuthorType": {
+      "kind": "OBJECT",
+      "name": "AuthorType",
+      "fields": {
+        "_id": {
+          "name": "_id",
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        },
+        "name": {
+          "name": "name",
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        },
+        "twitterHandle": {
+          "name": "twitterHandle",
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        }
+      }
+    },
+    "String": {
+      "kind": "SCALAR",
+      "name": "String"
+    },
+    "Boolean": {
+      "kind": "SCALAR",
+      "name": "Boolean"
+    },
+    "CategoryType": {
+      "kind": "ENUM",
+      "name": "CategoryType",
+      "enumValues": {
+        "HOT_STUFF": {
+          "name": "HOT_STUFF"
+        },
+        "ICE_COLD": {
+          "name": "ICE_COLD"
+        }
+      }
+    },
+    "DateOptions": {
+      "kind": "INPUT_OBJECT",
+      "name": "DateOptions",
+      "inputFields": {
+        "day": {
+          "name": "day",
+          "type": {
+            "kind": "SCALAR",
+            "name": "Boolean"
+          }
+        },
+        "month": {
+          "name": "month",
+          "type": {
+            "kind": "SCALAR",
+            "name": "Boolean"
+          }
+        },
+        "year": {
+          "name": "year",
+          "type": {
+            "kind": "SCALAR",
+            "name": "Boolean"
+          }
+        }
+      }
+    },
+    "CommentType": {
+      "kind": "OBJECT",
+      "name": "CommentType",
+      "fields": {
+        "_id": {
+          "name": "_id",
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        },
+        "content": {
+          "name": "content",
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        },
+        "author": {
+          "name": "author",
+          "type": {
+            "kind": "OBJECT",
+            "name": "AuthorType"
+          }
+        },
+        "createdAt": {
+          "name": "createdAt",
+          "type": {
+            "kind": "SCALAR",
+            "name": "Float"
+          }
+        },
+        "cursor": {
+          "name": "cursor",
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        },
+        "karma": {
+          "name": "karma",
+          "type": {
+            "kind": "SCALAR",
+            "name": "Int"
+          }
+        },
+        "postId": {
+          "name": "postId",
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        }
+      },
+      "interfaces": {
+        "HasAuthorType": {
+          "kind": "INTERFACE",
+          "name": "HasAuthorType"
+        }
+      }
+    },
+    "Float": {
+      "kind": "SCALAR",
+      "name": "Float"
+    },
+    "Group": {
+      "kind": "OBJECT",
+      "name": "Group",
+      "fields": {
+        "_id": {
+          "name": "_id",
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        },
+        "owner": {
+          "name": "owner",
+          "type": {
+            "kind": "UNION",
+            "name": "Member"
+          }
+        },
+        "members": {
+          "name": "members",
+          "type": {
+            "kind": "LIST",
+            "ofType": {
+              "kind": "UNION",
+              "name": "Member"
+            }
+          }
+        }
+      }
+    },
+    "Member": {
+      "kind": "UNION",
+      "name": "Member",
+      "possibleTypes": {
+        "Group": {
+          "kind": "OBJECT",
+          "name": "Group"
+        },
+        "AuthorType": {
+          "kind": "OBJECT",
+          "name": "AuthorType"
+        }
+      }
+    },
+    "NewPost": {
+      "kind": "INPUT_OBJECT",
+      "name": "NewPost",
+      "inputFields": {
+        "_id": {
+          "name": "_id",
+          "type": {
+            "kind": "NON_NULL",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "String"
+            }
+          }
+        },
+        "content": {
+          "name": "content",
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        },
+        "title": {
+          "name": "title",
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        },
+        "category": {
+          "name": "category",
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        }
+      }
+    },
+    "CreatePostMutationPayload": {
+      "kind": "OBJECT",
+      "name": "CreatePostMutationPayload",
+      "fields": {
+        "post": {
+          "name": "post",
+          "type": {
+            "kind": "OBJECT",
+            "name": "PostType"
+          }
+        },
+        "postCount": {
+          "name": "postCount",
+          "type": {
+            "kind": "SCALAR",
+            "name": "Int"
+          }
+        }
+      }
+    },
+    "RemovePostMutationPayload": {
+      "kind": "OBJECT",
+      "name": "RemovePostMutationPayload",
+      "fields": {
+        "removedPostId": {
+          "name": "removedPostId",
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        },
+        "postCount": {
+          "name": "postCount",
+          "type": {
+            "kind": "SCALAR",
+            "name": "Int"
+          }
+        }
+      }
+    },
+    "NewMember": {
+      "kind": "INPUT_OBJECT",
+      "name": "NewMember",
+      "inputFields": {
+        "_id": {
+          "name": "_id",
+          "type": {
+            "kind": "NON_NULL",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "String"
+            }
+          }
+        },
+        "name": {
+          "name": "name",
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        },
+        "ownerId": {
+          "name": "ownerId",
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        },
+        "members": {
+          "name": "members",
+          "type": {
+            "kind": "LIST",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "String"
+            }
+          }
+        },
+        "twitterHandle": {
+          "name": "twitterHandle",
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        }
+      }
+    }
+  },
+  "directives": {
+    "include": {
+      "name": "include",
+      "args": {
+        "if": {
+          "name": "if",
+          "type": {
+            "kind": "NON_NULL",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "Boolean"
+            }
+          }
+        }
+      },
+      "onOperation": false,
+      "onFragment": true,
+      "onField": true
+    },
+    "skip": {
+      "name": "skip",
+      "args": {
+        "if": {
+          "name": "if",
+          "type": {
+            "kind": "NON_NULL",
+            "ofType": {
+              "kind": "SCALAR",
+              "name": "Boolean"
+            }
+          }
+        }
+      },
+      "onOperation": false,
+      "onFragment": true,
+      "onField": true
+    }
+  },
+  "mutationSchema": {
+    "kind": "OBJECT",
+    "name": "BlogMutations",
+    "fields": {
+      "createPost": {
+        "name": "createPost",
+        "args": {
+          "newPost": {
+            "name": "newPost",
+            "type": {
+              "kind": "NON_NULL",
+              "ofType": {
+                "kind": "INPUT_OBJECT",
+                "name": "NewPost"
+              }
+            }
+          },
+          "author": {
+            "name": "author",
+            "type": {
+              "kind": "SCALAR",
+              "name": "String"
+            }
+          }
+        },
+        "type": {
+          "kind": "OBJECT",
+          "name": "CreatePostMutationPayload"
+        }
+      },
+      "removePostById": {
+        "name": "removePostById",
+        "args": {
+          "postId": {
+            "name": "postId",
+            "type": {
+              "kind": "NON_NULL",
+              "ofType": {
+                "kind": "SCALAR",
+                "name": "String"
+              }
+            }
+          }
+        },
+        "type": {
+          "kind": "OBJECT",
+          "name": "RemovePostMutationPayload"
+        }
+      },
+      "updatePost": {
+        "name": "updatePost",
+        "args": {
+          "post": {
+            "name": "post",
+            "type": {
+              "kind": "INPUT_OBJECT",
+              "name": "NewPost"
+            }
+          }
+        },
+        "type": {
+          "kind": "OBJECT",
+          "name": "PostType"
+        }
+      },
+      "createComment": {
+        "name": "createComment",
+        "args": {
+          "_id": {
+            "name": "_id",
+            "type": {
+              "kind": "NON_NULL",
+              "ofType": {
+                "kind": "SCALAR",
+                "name": "String"
+              }
+            }
+          },
+          "postId": {
+            "name": "postId",
+            "type": {
+              "kind": "NON_NULL",
+              "ofType": {
+                "kind": "SCALAR",
+                "name": "String"
+              }
+            }
+          },
+          "content": {
+            "name": "content",
+            "type": {
+              "kind": "NON_NULL",
+              "ofType": {
+                "kind": "SCALAR",
+                "name": "String"
+              }
+            }
+          }
+        },
+        "type": {
+          "kind": "OBJECT",
+          "name": "CommentType"
+        }
+      },
+      "createMembers": {
+        "name": "createMembers",
+        "args": {
+          "members": {
+            "name": "members",
+            "type": {
+              "kind": "NON_NULL",
+              "ofType": {
+                "kind": "LIST",
+                "ofType": {
+                  "kind": "NON_NULL",
+                  "ofType": {
+                    "kind": "INPUT_OBJECT",
+                    "name": "NewMember"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "type": {
+          "kind": "LIST",
+          "ofType": {
+            "kind": "UNION",
+            "name": "Member"
+          }
+        }
+      }
+    }
+  }
+}

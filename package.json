@@ -3,6 +3,7 @@
   "version": "0.5.3",
   "description": "relay for the rest of us",
   "main": "lib/index.js",
+  "bin": { "cashay-schema": "lib/updateSchema.js" },
   "scripts": {
     "clean": "rimraf lib",
     "lint": "xo src/index.js --esnext --space --fix",
@@ -11,7 +12,7 @@
     "prepublish": "npm run clean && npm run build",
     "test": "nyc ava ./src/**/__tests__/**/*-tests.js",
     "quicktest": "ava ./src/**/__tests__/**/*-tests.js",
-    "buildTestSchema": "node ./updateSchema.js src/__tests__/schema.js src/__tests__/clientSchema.json"
+    "buildTestSchema": "node ./lib/schema/updateSchema.babel.js src/__tests__/schema.js src/__tests__/clientSchema.json"
   },
   "repository": {
     "type": "git",
@@ -30,15 +31,16 @@
   },
   "homepage": "https://github.com/mattkrick/cashay#readme",
   "devDependencies": {
-    "ava": "0.15.1",
+    "ava": "0.15.2",
     "babel-cli": "6.9.0",
     "babel-preset-es2015": "6.9.0",
     "babel-preset-stage-0": "6.5.0",
-    "babel-register": "6.9.0",
     "coveralls": "^2.11.9",
     "nyc": "^6.4.4",
     "rimraf": "2.5.2",
-    "xo": "0.15.1"
+    "xo": "0.15.1",
+    "babel-polyfill": "^6.9.1",
+    "babel-register": "6.9.1"
   },
   "dependencies": {
     "graphql": "0.6.0",
