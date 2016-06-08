@@ -15,7 +15,7 @@ export default async function updateSchema() {
   const relativeOutputPath = process.argv[3] || './clientSchema.json';
   const outputPath = path.join(process.cwd(), relativeOutputPath);
   const spacing = args.production ? 0 : 2;
-  const oncomplete = args.oncomplete && require(path.join(process.cwd(), args.oncomplete)).default;
+  const oncomplete = args.oncomplete && require(path.join(process.cwd(), args.oncomplete));
 
   const rootSchema = await getSchema(inputArg);
   const initialResult = await graphql(rootSchema, introspectionQuery);
