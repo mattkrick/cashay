@@ -1,7 +1,7 @@
 import mergeStores from './mergeStores';
 import {separateArgs} from './separateArgs';
 import {getSubReqAST} from './getSubReqAST';
-import {ensureRootType, getRegularArgsKey, isObject} from '../utils';
+import {ensureRootType, getRegularArgsKey, isObject, FULL, FRONT, BACK} from '../utils';
 import {VARIABLE} from 'graphql/language/kinds';
 import {TypeKind} from 'graphql/type/introspection';
 
@@ -12,7 +12,7 @@ const mapResponseToResult = (nestedResult, response, fieldSchema, reqASTArgs, co
   const regularArgsString = getRegularArgsKey(regularArgs);
   if (paginationArgs) {
     const {first, last} = paginationArgs;
-    const arrName = first ? 'front' : last ? 'back' : 'full';
+    const arrName = first ? FRONT : last ? BACK : FULL;
     response = {[arrName]: response};
   }
   if (regularArgs === false) {
@@ -62,20 +62,20 @@ const visitIterable = (bag, subResponse, reqAST, subSchema, context) => {
     for (let i = 0; i < paginationFlags.length; i++) {
       const {word, flag} = paginationFlags[i];
       const count = reqAST.arguments.find(arg => arg.name.value === word);
-      // allow count == 0
+      // allow count === 0
       if (count !== undefined) {
         let countVal;
         if (count.value.kind === VARIABLE) {
           const variableDefName = count.value.name.value;
           countVal = +context.variables[variableDefName];
 
-          // update the difference in the variables (passed on to redux state)
-          context.variables[variableDefName] = subResponse.length;
-
           // pass the count onto the normalized response to perform a slice during the state merge
           normalizedSubResponse.count = subResponse.count;
 
-          // mutates the original denormalized response. kinda ugly, but saves an additional tree walk.
+          // MUTATES CONTEXT VARIABLES. update the difference in the variables (passed on to redux state)
+          context.variables[variableDefName] = subResponse.length;
+
+          // MUTATES ORIGINAL DENORMALIZED RESPONSE. kinda ugly, but saves an additional tree walk.
           subResponse.count = subResponse.length;
 
         } else {

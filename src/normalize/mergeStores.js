@@ -1,6 +1,6 @@
-import {isObject} from '../utils';
+import {isObject, FRONT, BACK, FULL} from '../utils';
 
-const paginationArrayNames = new Set(['front', 'back', 'full']);
+const paginationArrayNames = new Set([FRONT, BACK, FULL]);
 
 /**
  * check for overlap in docs, intelligently append keys
@@ -49,46 +49,46 @@ const handleArrays = (target, src) => {
     pageTarget[arrType] = Array.isArray(target[arrType]);
     pageSrc[arrType] = Array.isArray(src[arrType]);
   }
-  if (pageTarget.full) {
-    if (pageSrc.full) {
-      target.full = mergeSameArrays(target.full, src.full, true);
-    } else if (pageSrc.front) {
-      target.full = mergeSameArrays(target.full, src.front, false);
-    } else if (pageSrc.back) {
-      target.full = mergeSameArrays(target.full, src.back, true);
+  if (pageTarget[FULL]) {
+    if (pageSrc[FULL]) {
+      target[FULL] = mergeSameArrays(target[FULL], src[FULL], true);
+    } else if (pageSrc[FRONT]) {
+      target[FULL] = mergeSameArrays(target[FULL], src[FRONT], false);
+    } else if (pageSrc[BACK]) {
+      target[FULL] = mergeSameArrays(target[FULL], src[BACK], true);
     }
   } else {
-    if (pageSrc.full) {
-      target.full = src.full;
+    if (pageSrc[FULL]) {
+      target[FULL] = src[FULL];
     } else {
-      if (pageTarget.front && pageSrc.front) {
-        const targetArr = src.front.EOF ? 'full' : 'front';
-        target[targetArr] = mergeSameArrays(target.front, src.front, true);
+      if (pageTarget[FRONT] && pageSrc[FRONT]) {
+        const targetArr = src[FRONT].EOF ? FULL : FRONT;
+        target[targetArr] = mergeSameArrays(target[FRONT], src[FRONT], true);
       }
-      if (pageTarget.back && pageSrc.back) {
-        const targetArr = src.back.BOF ? 'full' : 'back';
-        target[targetArr] = mergeSameArrays(target.back, src.back, false);
+      if (pageTarget[BACK] && pageSrc[BACK]) {
+        const targetArr = src[BACK].BOF ? FULL : BACK;
+        target[targetArr] = mergeSameArrays(target[BACK], src[BACK], false);
       }
     }
   }
 
-  if (!target.front && src.front) {
-    target.front = src.front;
+  if (!target[FRONT] && src[FRONT]) {
+    target[FRONT] = src[FRONT];
   }
-  if (!target.back && src.back) {
-    target.back = src.back;
+  if (!target[BACK] && src[BACK]) {
+    target[BACK] = src[BACK];
   }
 
   // check to see if target has all the docs (but only if we got something new recently)
-  if (target.front && target.back && (src.front || src.back)) {
-    const full = mergeDifferentArrays(target.front, target.back);
+  if (target[FRONT] && target[BACK] && (src[FRONT] || src[BACK])) {
+    const full = mergeDifferentArrays(target[FRONT], target[BACK]);
     if (full) {
-      target.full = full;
+      target[FULL] = full;
     }
   }
-  if (target.full) {
-    delete target.front;
-    delete target.back;
+  if (target[FULL]) {
+    delete target[FRONT];
+    delete target[BACK];
   }
 };
 
@@ -126,12 +126,12 @@ export default function mergeStores(state, src, isMutation) {
           // if both the state and src are objects, merge them
           target[key] = {...mergeStores(targetProp, srcProp, isMutation)};
         } else if (isCashayArray) {
-          if (key === 'front') {
+          if (key === FRONT) {
             const oldCount = srcProp.count;
             const targetPropCopy = targetProp.slice();
             targetPropCopy.splice(0, oldCount, ...srcProp);
             target[key] = targetPropCopy;
-          } else if (key === 'back') {
+          } else if (key === BACK) {
             const oldCount = srcProp.count;
             const targetPropCopy = targetProp.slice();
             const spliceStart = targetPropCopy.length - oldCount;

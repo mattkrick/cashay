@@ -2,6 +2,7 @@ import {INSERT_QUERY, INSERT_MUTATION, SET_ERROR} from './normalize/duck';
 import denormalizeStore from './normalize/denormalizeStore';
 import {rebuildOriginalArgs} from './normalize/denormalizeHelpers';
 import normalizeResponse from './normalize/normalizeResponse';
+import getFieldState from './normalize/getFieldState';
 import {printMinimalQuery} from './query/printMinimalQuery';
 import {shortenNormalizedResponse, invalidateMutationsOnNewQuery} from './query/queryHelpers';
 import {isObject, checkMutationInSchema} from './utils';
@@ -14,6 +15,7 @@ import namespaceMutation from './mutate/namespaceMutation';
 import mergeMutations from './mutate/mergeMutations';
 import createMutationFromQuery from './mutate/createMutationFromQuery';
 import removeNamespacing from './mutate/removeNamespacing';
+import findTypeInQuery from './mutate/findTypeInQuery';
 import addDeps from './normalize/addDeps';
 
 const defaultGetToState = store => store.getState().cashay;
@@ -511,6 +513,8 @@ export default class Cashay {
       for (let i = 0; i < typeKeys.length; i++) {
         const typeKey = typeKeys[i];
         const rawFieldState = rawState[typeKey];
+        const queryAST = this.cachedQueries[component].ast;
+        const selection = findTypeInQuery(typeName, queryAST, this.schema);
         getFieldState(rawFieldState, fieldSchema, selection, context)
       }
 
@@ -598,26 +602,3 @@ export default class Cashay {
 //       id,
 //     }
 //   }`]]);
-
-const getTypeFactory = (getState, component, key) => {
-  return typeName => {
-    const cashayDataState = getState().data;
-    const rawState = cashayDataState.entities[typeName];
-    if (!rawState) {
-      throw new Error(`${typeName} does not exist in your cashay data state entities!`);
-    }
-
-    const componentState = cashayDataState.variables[component];
-    const stateVars = key ? componentState : componentState[key];
-    if (!stateVars) {
-      return rawState;
-    }
-    const typeKeys = Object.keys(rawState);
-    for (let i = 0; i < typeKeys.length; i++) {
-
-    }
-
-    ''
-
-  }
-}

@@ -69,25 +69,3 @@ export const getDocFromNormalString = (normalString, entities) => {
   const [typeName, docId] = normalString.split(':');
   return entities[typeName][docId];
 };
-
-// TODO: move this logic to the vistor
-//let unionHasTypeNameChild = false;
-//if (fieldSchema.type.kind === UNION) {
-//
-//  const fieldHasTypeName = field.selectionSet.selections.find(selection => selection.name.value === '__typename');
-//  if (!fieldHasTypeName) {
-//    field.selectionSet.selection.shift({
-//      "kind": "Field",
-//      "alias": null,
-//      "name": {
-//        "kind": "Name",
-//        "value": "__typename",
-//        "loc": null
-//      },
-//      "arguments": [],
-//      "directives": [],
-//      "selectionSet": null,
-//      "loc": null
-//    })
-//  }
-//}

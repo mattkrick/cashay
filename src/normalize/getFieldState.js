@@ -1,5 +1,5 @@
 import {STRING, INT, VARIABLE} from 'graphql/language/kinds';
-import {isObject, getRegularArgsKey} from '../utils';
+import {isObject, getRegularArgsKey, FULL, FRONT, BACK} from '../utils';
 import {separateArgs} from './separateArgs';
 import {getDocFromNormalString, sendChildrenToServer} from './denormalizeHelpers';
 import {RequestArgument} from '../helperClasses';
@@ -15,100 +15,113 @@ import {RequestArgument} from '../helperClasses';
  * @returns {*} an object, or array, or scalar from the normalized store
  * */
 export default function getFieldState(fieldState, fieldSchema, selection, context) {
-  if (!isObject(fieldState)) {
-    return fieldState
-  }
-  const {arguments: fieldArgs} = selection;
-  const {regularArgs, paginationArgs} = separateArgs(fieldSchema, fieldArgs, context);
-  if (regularArgs) {
-    const regularArgsString = getRegularArgsKey(regularArgs);
-    fieldState = fieldState[regularArgsString];
-  }
-  if (paginationArgs) {
-    fieldState = handlePaginationArgs(paginationArgs, fieldState, fieldSchema, selection, context);
-  }
-  flagUsefulArgs(fieldArgs, context);
-  return fieldState;
-};
-
-const handlePaginationArgs = (paginationArgs, fieldState, fieldSchema, selection, context) => {
-  const {before, after, first, last} = paginationArgs;
-  const {arguments: fieldArgs} = selection;
-  // try to use the full array. if it doesn't exist, see if we're going backwards & use the back array, else front
-  const usefulArray = fieldState.full || (last ? fieldState.back : fieldState.front);
-  const isFull = usefulArray === fieldState.full;
-  const cursor = before || after;
-  const count = last || first;
-  const cursorIdx = getCursorIdx(cursor, last, usefulArray, context.cashayDataState.entities);
-  // if last is provided, then first is not and we need to go from last to first
-  let missingDocCount;
-  let normalStringWithNewCursor;
-  let countWord;
-  let cursorWord;
-  if (last) {
-    const firstNonNullIdx = countLeftPadding(usefulArray);
-    const firstDesiredDocIdx = cursorIdx - last;
-    const startIdx = Math.max(firstNonNullIdx, firstDesiredDocIdx);
-    missingDocCount = startIdx - firstDesiredDocIdx;
-    fieldState = usefulArray.slice(startIdx, cursorIdx);
-    normalStringWithNewCursor = usefulArray[firstNonNullIdx];
-    countWord = context.paginationWords.last;
-    cursorWord = context.paginationWords.before;
-  } else {
-    const startIdx = cursorIdx + 1;
-    const lastNonNullIdx = countRightPadding(usefulArray);
-    const lastDesiredDocIdx = startIdx + first - 1;
-    const sliceThrough = Math.min(lastNonNullIdx, lastDesiredDocIdx);
-    missingDocCount = lastDesiredDocIdx - lastNonNullIdx;
-    fieldState = usefulArray.slice(startIdx, sliceThrough + 1);
-    normalStringWithNewCursor = usefulArray[sliceThrough];
-    countWord = context.paginationWords.first;
-    cursorWord = context.paginationWords.after;
-  }
-
-  // assign BOF and EOF to the array, similar to hasPreviousPage, hasNextPage
-  assignFieldStateMeta(fieldState, usefulArray, count);
-
-  // if there's a document missing & we don't have all the documents yet, get more!
-  if (missingDocCount > 0 && !isFull) {
-
-    // if we have a partial response & the backend accepts a cursor, only ask for the missing pieces
-    if (missingDocCount < count && fieldSchema.args[cursorWord]) {
-      // flag all AST children with sendToServer = true
-      sendChildrenToServer(selection);
-
-      // given something like `Post:123`, return the document from the store
-      const storedDoc = getDocFromNormalString(normalStringWithNewCursor, context.cashayDataState.entities);
-      if (!storedDoc.cursor) {
-        throw new Error(`No cursor was included for ${normalStringWithNewCursor}. 
-        Please include the cursor field for the ${fieldSchema.name} query`)
-      }
-
-      // save the original arguments, we'll overwrite them with efficient ones for the server,
-      // but need them later to create the denormaliezd response
-      selection.originalArguments = fieldArgs.slice();
-
-      //get the index of the count argument so we can replace it with the new one
-      const countArgIdx = fieldArgs.findIndex(arg => arg.name.value === countWord);
-
-      //  create a new count arg & override the old one
-      fieldArgs[countArgIdx] = makeCountArg(countWord, missingDocCount);
-
-      //get the index of the cursor argument so we can replace it with the new one. it may not exist
-      const cursorArgIdx = fieldArgs.findIndex(arg => arg.name.value === cursorWord);
-
-      // make a new cursor argument
-      const newCursorArg = makeCursorArg(cursorWord, storedDoc.cursor);
-
-      // if the cursor arg exists, overwrite it. otherwise, just put it anywhere
-      if (cursorArgIdx !== -1) {
-        fieldArgs[cursorArgIdx] = newCursorArg;
-      } else {
-        fieldArgs.push(newCursorArg);
+  // context must include: paginationWords, variables
+  if (isObject(fieldState)) {
+    const {isTransform, operation, paginationWords} = context;
+    const {arguments: fieldArgs} = selection;
+    if (isTransform) {
+      flagUsefulArgs(fieldArgs, operation.variableDefinitions);
+    }
+    const {regularArgs, paginationArgs} = separateArgs(fieldSchema, fieldArgs, context);
+    if (regularArgs) {
+      const regularArgsString = getRegularArgsKey(regularArgs);
+      fieldState = fieldState[regularArgsString];
+    }
+    if (paginationArgs) {
+      const arrType = fieldState[FULL] ? FULL : paginationWords.last ? BACK : FRONT;
+      fieldState = handlePaginationArgs(paginationArgs, fieldState, arrType);
+      if (arrType !== FULL && isTransform) {
+        reducePaginationRequest(paginationArgs, fieldState, fieldSchema, selection, context);
       }
     }
   }
   return fieldState;
+};
+
+const handlePaginationArgs = (paginationArgs, usefulArray) => {
+  const {first, last} = paginationArgs;
+
+  // try to use the full array. if it doesn't exist, see if we're going backwards & use the back array, else front
+  const count = last || first;
+
+  // if last is provided, then first is not and we need to go from last to first
+  let slicedArr;
+  if (last) {
+    const firstNonNullIdx = countLeftPadding(usefulArray);
+    const firstDesiredDocIdx = usefulArray.length - last;
+    const startIdx = Math.max(firstNonNullIdx, firstDesiredDocIdx);
+    slicedArr = usefulArray.slice(startIdx, usefulArray.length);
+  } else {
+    const lastNonNullIdx = countRightPadding(usefulArray);
+    const lastDesiredDocIdx = first - 1;
+    const sliceThrough = Math.min(lastNonNullIdx, lastDesiredDocIdx);
+    slicedArr = usefulArray.slice(0, sliceThrough + 1);
+  }
+
+  // assign BOF and EOF to the array, similar to hasPreviousPage, hasNextPage
+  assignFieldStateMeta(slicedArr, usefulArray, count);
+  return slicedArr;
+};
+
+const reducePaginationRequest = (paginationArgs, usefulArray, fieldSchema, selection, context) => {
+  const {first, last} = paginationArgs;
+  const count = last || first;
+  const {arguments: fieldArgs} = selection;
+  const {paginationWords} = context;
+  const countWord = last ? paginationWords.last : paginationWords.first;
+
+  const missingDocCount = count - usefulArray.length;
+  // if we have a partial response & the backend accepts a cursor, only ask for the missing pieces
+  if (missingDocCount > 0 && missingDocCount < count) {
+    const cursorWord = last ? paginationWords.before : paginationWords.after;
+    if (!fieldSchema.args[cursorWord]) {
+      throw new Error(`Your schema does not accept an argument for your cursor named ${cursorWord}.`);
+    }
+    // flag all AST children with sendToServer = true
+    sendChildrenToServer(selection);
+    // TODO when to remove doWarn?
+    const doWarn = true;
+    const {bestCursor, cursorIdx} = getBestCursor(first, usefulArray, context.cashayDataState.entities, doWarn);
+    const desiredDocCount = count - (cursorIdx + 1);
+
+    // save the original arguments, we'll overwrite them with efficient ones for the server,
+    // but need them later to create the denormaliezd response
+    selection.originalArguments = fieldArgs.slice();
+
+    //get the index of the count argument so we can replace it with the new one
+    const countArgIdx = fieldArgs.findIndex(arg => arg.name.value === countWord);
+
+    //  create a new count arg & override the old one
+    fieldArgs[countArgIdx] = makeCountArg(countWord, desiredDocCount);
+
+    // make a new cursor argument
+    const newCursorArg = makeCursorArg(cursorWord, bestCursor);
+    fieldArgs.push(newCursorArg);
+  }
+};
+
+const getBestCursor = (first, usefulArray, entities, doWarn) => {
+  let storedDoc;
+  let i;
+  if (first) {
+    for (i = usefulArray.length - 1; i >= 0; i--) {
+      // given something like `Post:123`, return the document from the store
+      storedDoc = getDocFromNormalString(usefulArray[i], entities);
+      if (storedDoc.cursor) break;
+    }
+  } else {
+    for (i = 0; i < usefulArray.length; i++) {
+      storedDoc = getDocFromNormalString(usefulArray[i], entities);
+      if (storedDoc.cursor) break;
+    }
+  }
+
+  if (i >= 0 && i < usefulArray.length) {
+    return {bestCursor: storedDoc.cursor, cursorIdx: i};
+  } else if (doWarn) {
+    console.warn(`No cursor was included for the following docs: ${usefulArray}. 
+        Include the 'cursor' field for those docs`)
+  }
 };
 
 const countLeftPadding = array => {
@@ -127,43 +140,25 @@ const countRightPadding = array => {
   }
 };
 
-const assignFieldStateMeta = (fieldState, usefulArray, count) => {
-  Object.assign(fieldState, {
-    EOF: fieldState[fieldState.length - 1] === usefulArray[usefulArray.length - 1],
-    BOF: fieldState[0] === usefulArray[0],
+const assignFieldStateMeta = (slicedArray, usefulArray, count) => {
+  Object.assign(slicedArray, {
+    EOF: slicedArray[slicedArray.length - 1] === usefulArray[usefulArray.length - 1],
+    BOF: slicedArray[0] === usefulArray[0],
     count
-    // startIdx: subset[0],
-    // endIdx: subset[1]
   });
-};
-
-const getCursorIdx = (cursor, last, usefulArray, entities) => {
-  let cursorIdx = last ? usefulArray.length : -1;
-  // TODO Remove. cursor should always be false because each query is required to start from the beginning or end
-  if (cursor) {
-    cursorIdx = usefulArray.findIndex(doc => {
-      const storedDoc = getDocFromNormalString(doc, entities);
-      return storedDoc.cursor === cursor
-    });
-    if (cursorIdx === -1) {
-      throw new Error(`Invalid cursor: ${cursor}`);
-    }
-  }
-  return cursorIdx;
 };
 
 const makeCursorArg = (cursorName, cursorValue) => new RequestArgument(cursorName, STRING, cursorValue);
 const makeCountArg = (countName, countValue) => new RequestArgument(countName, INT, countValue);
 
-const flagUsefulArgs = (fieldArgs, context) => {
-  for (let arg of fieldArgs) {
+const flagUsefulArgs = (fieldArgs, variableDefinitions) => {
+  for (let i = 0; i < fieldArgs.length; i++) {
+    const arg = fieldArgs[0];
     if (arg.value.kind === VARIABLE) {
-      const argInOperation = context.operation.variableDefinitions.find(varDef => {
-        return varDef.variable.name.value === arg.value.name.value
-      });
+      const operationArg = variableDefinitions.find(varDef => varDef.variable.name.value === arg.value.name.value);
       // if calling normalize from the queryServer, it's possible we already nuked the arg from the operation
-      if (argInOperation) {
-        argInOperation._inUse = true;
+      if (operationArg) {
+        operationArg._inUse = true;
       }
     }
   }

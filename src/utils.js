@@ -55,18 +55,10 @@ export const equalObjectKeys = (obj1, obj2) => {
   return true;
 };
 
-export const buildExecutionContext = (queryAST, {cashayDataState, variables, paginationWords, idFieldName, schema}) => {
+export const buildExecutionContext = (queryAST, params) => {
   const clonedAST = clone(queryAST);
   const {operation, fragments} = teardownDocumentAST(clonedAST);
-  return {
-    cashayDataState,
-    operation,
-    fragments,
-    variables,
-    paginationWords,
-    idFieldName,
-    schema
-  };
+  return {operation, fragments, ...params};
 };
 
 export const teardownDocumentAST = queryAST => {
