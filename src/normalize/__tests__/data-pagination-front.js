@@ -131,14 +131,6 @@ export const front2After3StoreFn = () => {
   return base;
 };
 
-export const front1After3Query = `
-query {
-  getRecentPosts(first:1, afterCursor: "1422222222222chikachikow") {
-    _id,
-    cursor
-  }
-}`;
-
 export const front1After3Store = {
   entities: {
     PostType: {

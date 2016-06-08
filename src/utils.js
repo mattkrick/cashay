@@ -9,9 +9,9 @@ export const CASHAY = 'CASHAY';
 export const DELIMITER = '_';
 
 // redux store array constants 
-export const FRONT  = 'front';
-export const BACK  = 'back';
-export const FULL  = 'full';
+export const FRONT = 'front';
+export const BACK = 'back';
+export const FULL = 'full';
 
 
 export const ensureTypeFromNonNull = type => type.kind === NON_NULL ? type.ofType : type;

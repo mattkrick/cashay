@@ -2,7 +2,6 @@ import {INSERT_QUERY, INSERT_MUTATION, SET_ERROR} from './normalize/duck';
 import denormalizeStore from './normalize/denormalizeStore';
 import {rebuildOriginalArgs} from './normalize/denormalizeHelpers';
 import normalizeResponse from './normalize/normalizeResponse';
-import getFieldState from './normalize/getFieldState';
 import {printMinimalQuery} from './query/printMinimalQuery';
 import {shortenNormalizedResponse, invalidateMutationsOnNewQuery} from './query/queryHelpers';
 import {isObject, checkMutationInSchema} from './utils';
@@ -15,7 +14,7 @@ import namespaceMutation from './mutate/namespaceMutation';
 import mergeMutations from './mutate/mergeMutations';
 import createMutationFromQuery from './mutate/createMutationFromQuery';
 import removeNamespacing from './mutate/removeNamespacing';
-import findTypeInQuery from './mutate/findTypeInQuery';
+import makeFriendlyStore from './mutate/makeFriendlyStore';
 import addDeps from './normalize/addDeps';
 
 const defaultGetToState = store => store.getState().cashay;
@@ -279,7 +278,7 @@ export default class Cashay {
     flushDependencies(normalizedServerResponseForStore.entities, component, key, this.denormalizedDeps, this.cachedQueries);
     // stick normalize data in store and recreate any invalidated denormalized structures
     const stateVariables = key ? {[component]: {[key]: contextVariables}} : {[component]: contextVariables};
-    
+
     this.store.dispatch({
       type: INSERT_QUERY,
       payload: {
@@ -416,7 +415,7 @@ export default class Cashay {
       if (dataFromServer) {
         // if it's from the server, send the doc we got back
         const normalizedDataFromServer = removeNamespacing(dataFromServer, component);
-        const getType = getTypeFactory(this.getState, component, key);
+        const getType = this._getTypeFactory(component, key);
         modifiedResponse = componentHandler(null, normalizedDataFromServer, cachedResponseData, getType, this._invalidate);
       } else {
         // otherwise, treat it as an optimistic update
@@ -508,19 +507,18 @@ export default class Cashay {
       if (!stateVars) {
         return rawState;
       }
-      const typeKeys = Object.keys(rawState);
-      const fieldSchema = this.schema.types[typeName];
-      for (let i = 0; i < typeKeys.length; i++) {
-        const typeKey = typeKeys[i];
-        const rawFieldState = rawState[typeKey];
-        const queryAST = this.cachedQueries[component].ast;
-        const selection = findTypeInQuery(typeName, queryAST, this.schema);
-        getFieldState(rawFieldState, fieldSchema, selection, context)
-      }
-
-
+      const queryAST = this.cachedQueries[component].ast;
+      const context = {
+        paginationWords: this.paginationWords,
+        variables: stateVars,
+        skipTransform: true,
+        queryAST,
+        schema: this.schema
+      };
+      return makeFriendlyStore(rawState, typeName, context);
     }
-  }
+  };
+
   /**
    *
    */
@@ -565,7 +563,6 @@ export default class Cashay {
   }
 
 }
-
 
 // const subscriber = (subscriptionString, handlers, variables) => {
 //   let baseChannel;

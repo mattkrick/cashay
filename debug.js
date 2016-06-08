@@ -24,12 +24,12 @@ import {
   back2After3Query,
   back1After3Response,
   back2After3StoreFn,
-  back1After3Query,
+  back4,
   back1After3Store,
   back1After4Query,
   back1After4Response,
   back1After4StoreFn,
-  back1After3ResponseFn,
+  back4ResponseFn,
 } from './src/normalize/__tests__/data-pagination-back';
 
 import {
@@ -74,10 +74,16 @@ import {front2After3Query, front4Query, front3Response} from './src/normalize/__
 import removeNamespacing from './src/mutate/removeNamespacing';
 
 const idFieldName = '_id';
-const firstDocs = back4PostStore;
-const lastDoc = back1After4StoreFn();
-const actual = mergeStores(firstDocs, lastDoc);
-const expected = fullPostStore;
+const queryAST = parseAndInitializeQuery(back4, clientSchema, idFieldName);
+const context = buildExecutionContext(queryAST, {
+  cashayDataState: fullPostStore,
+  idFieldName,
+  schema: clientSchema,
+  paginationWords,
+  variables: {reverse: true, lang: "spanish"}
+});
+const {data: actual} = denormalizeStore(context);
+const {data: expected} = back4ResponseFn(1);
 debugger
 fs.writeFileSync('./actualResult.json', JSON.stringify(actual, null, 2));
 fs.writeFileSync('./expectedResult.json', JSON.stringify(expected, null, 2));

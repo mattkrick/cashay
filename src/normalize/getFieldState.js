@@ -17,9 +17,9 @@ import {RequestArgument} from '../helperClasses';
 export default function getFieldState(fieldState, fieldSchema, selection, context) {
   // context must include: paginationWords, variables
   if (isObject(fieldState)) {
-    const {isTransform, operation, paginationWords} = context;
+    const {skipTransform, operation, paginationWords} = context;
     const {arguments: fieldArgs} = selection;
-    if (isTransform) {
+    if (!skipTransform) {
       flagUsefulArgs(fieldArgs, operation.variableDefinitions);
     }
     const {regularArgs, paginationArgs} = separateArgs(fieldSchema, fieldArgs, context);
@@ -29,8 +29,8 @@ export default function getFieldState(fieldState, fieldSchema, selection, contex
     }
     if (paginationArgs) {
       const arrType = fieldState[FULL] ? FULL : paginationWords.last ? BACK : FRONT;
-      fieldState = handlePaginationArgs(paginationArgs, fieldState, arrType);
-      if (arrType !== FULL && isTransform) {
+      fieldState = handlePaginationArgs(paginationArgs, fieldState[arrType], arrType);
+      if (arrType !== FULL && !skipTransform) {
         reducePaginationRequest(paginationArgs, fieldState, fieldSchema, selection, context);
       }
     }

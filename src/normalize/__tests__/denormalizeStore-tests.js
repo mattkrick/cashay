@@ -33,7 +33,7 @@ import {
   back4PostStoreNoLastCursor
 } from './data-pagination';
 
-import {back1After3Query,back1After3ResponseFn, back2After3Query} from './data-pagination-back'
+import {back4,back4ResponseFn, back2After3Query} from './data-pagination-back'
 import {front2After3Query, front3Store, front4Query, front3LocalResponseFn} from './data-pagination-front';
 import {parse} from '../../utils';
 import parseAndInitializeQuery from '../../query/parseAndInitializeQuery';
@@ -118,7 +118,7 @@ test('denormalize store with scalar fields with args', t => {
 });
 
 test('get a page from a full store (back)', t => {
-  const queryAST = parseAndInitializeQuery(back1After3Query, clientSchema, idFieldName);
+  const queryAST = parseAndInitializeQuery(back4, clientSchema, idFieldName);
   const context = buildExecutionContext(queryAST, {
     cashayDataState: fullPostStore,
     idFieldName,
@@ -127,21 +127,7 @@ test('get a page from a full store (back)', t => {
     variables: {reverse: true, lang: "spanish"}
   });
   const {data: actual} = denormalizeStore(context);
-  const {data: expected} = back1After3ResponseFn(1);
-  t.deepEqual(actual, expected);
-});
-
-test('request next 2 docs when first 3 docs are in the store', t => {
-  const queryAST = parseAndInitializeQuery(front2After3Query, clientSchema, idFieldName);
-  const context = buildExecutionContext(queryAST, {
-    cashayDataState: front4PostStore,
-    idFieldName,
-    schema: clientSchema,
-    paginationWords,
-    variables: {reverse: true, lang: "spanish"}
-  });
-  const {data: actual} = denormalizeStore(context);
-  const {data: expected} = front1After3DenormalizedFn(2);
+  const {data: expected} = back4ResponseFn(4);
   t.deepEqual(actual, expected);
 });
 
@@ -155,32 +141,6 @@ test('throw if no cursor is found for the afterCursor doc', t => {
     variables: {reverse: true, lang: "spanish"}
   });
   t.throws(() => denormalizeStore(context));
-});
-
-test('throw if no new cursor is found for the updated beforeCursor doc', t => {
-  const queryAST = parseAndInitializeQuery(back2After3Query, clientSchema, idFieldName);
-  const context = buildExecutionContext(queryAST, {
-    cashayDataState: back4PostStoreNoLastCursor,
-    idFieldName,
-    schema: clientSchema,
-    paginationWords,
-    variables: {reverse: true, lang: "spanish"}
-  });
-  t.throws(() => denormalizeStore(context));
-});
-
-test('have 3, request 4, turn the request into 1 with a skip3 cursor', t => {
-  const queryAST = parseAndInitializeQuery(front4Query, clientSchema, idFieldName);
-  const context = buildExecutionContext(queryAST, {
-    cashayDataState: front3Store,
-    idFieldName,
-    schema: clientSchema,
-    paginationWords,
-    variables: {reverse: true, lang: "spanish"}
-  });
-  const {data: actual} = denormalizeStore(context);
-  const {data: expected} = front3LocalResponseFn(4);
-  t.deepEqual(actual, expected);
 });
 
 test('request an array that does not exist in the state', t => {

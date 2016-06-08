@@ -13,7 +13,7 @@ import {
   front2After3Query,
   front1After3Response,
   front2After3StoreFn,
-  front1After3Query,
+  front4Query,
   front1After3Store,
   front1After4Query,
   front1After4Response,
@@ -26,7 +26,7 @@ import {
   back2After3Query,
   back1After3Response,
   back2After3StoreFn,
-  back1After3Query,
+  back4,
   back1After3Store,
   back1After4Query,
   back1After4Response,
@@ -61,14 +61,6 @@ test('normalize pagination: request 2 after 3rd cursor, receive 1', t => {
   t.deepEqual(actual, expected);
 });
 
-test('normalize pagination: request 1 after 3rd cursor, receive 1', t => {
-  const queryAST = parse(front1After3Query);
-  const context = buildExecutionContext(queryAST, {idFieldName: '_id', schema: clientSchema, paginationWords});
-  const actual = normalizeResponse(clone(front1After3Response.data), context);
-  const expected = front1After3Store;
-  t.deepEqual(actual, expected);
-});
-
 test('normalize pagination: request doc 5 when it doesnt exist', t => {
   const queryAST = parse(front1After4Query);
   const context = buildExecutionContext(queryAST, {idFieldName: '_id', schema: clientSchema, paginationWords});
@@ -90,14 +82,6 @@ test('normalize back pagination: request 2 after 3rd cursor, receive 1', t => {
   const context = buildExecutionContext(queryAST, {idFieldName: '_id', schema: clientSchema, paginationWords});
   const actual = normalizeResponse(clone(back1After3Response.data), context);
   const expected = back2After3StoreFn();
-  t.deepEqual(actual, expected);
-});
-
-test('normalize back pagination: request 1 after 3rd cursor, receive 1', t => {
-  const queryAST = parse(back1After3Query);
-  const context = buildExecutionContext(queryAST, {idFieldName: '_id', schema: clientSchema, paginationWords});
-  const actual = normalizeResponse(clone(back1After3Response.data), context);
-  const expected = back1After3Store;
   t.deepEqual(actual, expected);
 });
 

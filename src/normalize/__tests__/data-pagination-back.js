@@ -94,9 +94,9 @@ export const back2After3StoreFn = () => {
   return base;
 };
 
-export const back1After3Query = `
+export const back4 = `
 query {
-  getRecentPosts(last:1, beforeCursor: "1433333333333chikachikow") {
+  getRecentPosts(last:4) {
     _id,
     cursor
   }
@@ -147,18 +147,31 @@ export const back1After4StoreFn = () => {
   return base;
 };
 
-export const back1After3ResponseFn = (requestAmount) => {
+export const back4ResponseFn = (requestAmount) => {
   const base = {
     data: {
       "getRecentPosts": [
         {
           "_id": "p126",
           "cursor": "1444444444444chikachikow"
+        },
+        {
+          "_id": "p125",
+          "cursor": "1433333333333chikachikow"
+        },
+        {
+          "_id": "p124",
+          "cursor": "1422222222222chikachikow"
+        },
+        {
+          "_id": "p123",
+          "cursor": "1411111111111chikachikow"
         }
       ]
     }
   };
   base.data.getRecentPosts.BOF = true;
+  base.data.getRecentPosts.EOF = true;
   if (requestAmount !== undefined) {
     base.data.getRecentPosts.count = requestAmount;
   }
