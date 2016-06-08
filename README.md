@@ -108,7 +108,7 @@ cashay.query(queryString, options)
 ```
 
 Options include: 
-- `component`: A string to match the component. Typically shares the same name as the React component. If left blank, it defaults to the `queryString`.
+- `component`: A string to match the component. Required if you pass in `mutationHandlers`. Typically shares the same name as the React component. If left blank, it defaults to the `queryString`.
 - `key`: A unique key to match the component instance, only used where you would use React's `key` (eg in a component that you called `map` on in the parent component). 
 - `forceFetch`: A Boolean to ignore local data & get some fresh stuff. Defaults to `false`. Don't use this in `mapStateToProps` or you'll be calling the server every time you call `dispatch`.
 - `transport`: A function to override the singleton transport. Useful if this particular component needs different credentials, or uses websockets, etc.
@@ -124,7 +124,7 @@ A mutation handler is called twice per mutation: once with `optimisticVariables`
 
 - `optimisticVariables`: The variables you send to the server when you call a mutation. You can use this to optimistically update the UI. Is `null` when the function is called after receving a resonse from the server.
 - `serverData`: The data that came back from the server. The shape is identical to whatever the `type` is in your GraphQL schema for that mutation. It is `null` when optimistically updating.
-- `currentResponse`: The response you receive from your query. The shape follows whatever you entered in `queryString`.
+- `currentResponse`: The response you receive from your query. The shape follows whatever you entered in `queryString`. You can modify this and return it, Cashay will detect the differences.
 - `entities`: The entities stored in your redux state. This is useful in case you want to e.g. replace a deleted document with the next-best one you have locally.
 - `invalidate`: A function that you can call to retrigger the query (with `forceFetch = true`). This is useful if you want to guarantee that a query has accurate data after each mutation.
 
