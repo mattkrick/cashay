@@ -13,7 +13,7 @@ const initialState = {
   }
 };
 
-export const reducer = (state = initialState, action) => {
+export default function reducer(state = initialState, action) {
   if (action.type === INSERT_QUERY) {
     const {variables, response} = action.payload;
     const newMergedState = mergeStores(state.data, response);
