@@ -1,4 +1,4 @@
-import {ensureRootType} from '../utils';
+import {ensureRootType, clone} from '../utils';
 import {MutationShell, RequestArgument, Field} from '../helperClasses';
 import {mergeSelections} from './mergeMutations';
 import {VARIABLE} from 'graphql/language/kinds';
@@ -18,7 +18,7 @@ export default function createMutationFromQuery(queryAST, mutationName, mutation
   const mutationAST = new MutationShell(mutationName, mutationArgs);
 
   // Assume the mutationReturnSchema is a single type (opposed to a payload full of many types)
-  const selectionsInQuery = findTypeInQuery(mutationReturnSchema.name, operation, schema);
+  const selectionsInQuery = clone(clone(findTypeInQuery(mutationReturnSchema.name, operation, schema)));
   const simpleObject = trySimpleObject(selectionsInQuery);
   if (simpleObject) {
     mutationAST.definitions[0].selectionSet.selections[0].selectionSet.selections = simpleObject;
@@ -29,8 +29,13 @@ export default function createMutationFromQuery(queryAST, mutationName, mutation
 
 const trySimpleObject = selectionsInQuery => {
   if (selectionsInQuery.length) {
-    const newSelections = selectionsInQuery.pop();
-    for (let srcSelections of selectionsInQuery) {
+    const allSelections = [];
+    for (let i = 0; i < selectionsInQuery.length; i++) {
+      const {selections} = selectionsInQuery[i].selectionSet;
+      allSelections.push(selections);
+    }
+    const newSelections = allSelections.pop();
+    for (let srcSelections of allSelections) {
       mergeSelections(newSelections, srcSelections);
     }
     return newSelections;
@@ -46,7 +51,7 @@ const tryPayloadObject = (mutationAST, operation, mutationReturnSchema, schema) 
     const rootPayloadFieldType = ensureRootType(payloadField.type);
     // 2 strings probably don't refer to the same field, so for scalars the name has to match, too
     const matchName = rootPayloadFieldType.kind === SCALAR && payloadField.name;
-    const selectionsInQuery = findTypeInQuery(rootPayloadFieldType.name, operation, schema, matchName);
+    const selectionsInQuery = clone(findTypeInQuery(rootPayloadFieldType.name, operation, schema, matchName));
     if (selectionsInQuery.length) {
       atLeastOne = true;
       let mutationField;

@@ -503,16 +503,18 @@ export default class Cashay {
       }
 
       const componentState = cashayDataState.variables[component];
-      const stateVars = key ? componentState : componentState[key];
+      // TODO using stateVars is wrong because vars could be static in the query, instead we need to check the schema + varDefs + vars 
+      const stateVars = key ? componentState[key] : componentState;
+      debugger
       if (!stateVars) {
         return rawState;
       }
-      const queryAST = this.cachedQueries[component].ast;
+      const {ast} = this.cachedQueries[component];
       const context = {
         paginationWords: this.paginationWords,
         variables: stateVars,
         skipTransform: true,
-        queryAST,
+        operation: ast.definitions[0],
         schema: this.schema
       };
       return makeFriendlyStore(rawState, typeName, context);

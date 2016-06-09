@@ -27,11 +27,11 @@ export default function findTypeInQuery(typeName, queryAST, schema, matchName) {
             if (matchName) {
               const fieldNameOrAlias = selection.alias && selection.alias.value || selectionName;
               if (matchName === fieldNameOrAlias) {
-                bag[0] = clone(selection);
+                bag[0] = selection;
                 return bag;
               }
             } else {
-              bag.push(clone(selection.selectionSet.selections));
+              bag.push(selection);
             }
           }
         }
