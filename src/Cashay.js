@@ -236,7 +236,7 @@ export default class Cashay {
     const cachedQuery = this.cachedQueries[component];
     // handle errors coming back from the server
     if (error) {
-      const cachedResponse = key ? cachedQuery.response : cachedQuery.response[key];
+      const cachedResponse = key ? cachedQuery.response[key] : cachedQuery.response;
       cachedResponse.error = error;
       return this.store.dispatch({type: SET_ERROR, error});
     }

@@ -19,20 +19,20 @@ export default function getFieldState(fieldState, fieldSchema, selection, contex
   if (isObject(fieldState)) {
     const {skipTransform, operation, paginationWords} = context;
     const {arguments: fieldArgs} = selection;
-    if (!skipTransform) {
-      flagUsefulArgs(fieldArgs, operation.variableDefinitions);
-    }
     const {regularArgs, paginationArgs} = separateArgs(fieldSchema, fieldArgs, context);
     if (regularArgs) {
       const regularArgsString = getRegularArgsKey(regularArgs);
       fieldState = fieldState[regularArgsString];
     }
     if (paginationArgs) {
-      const arrType = fieldState[FULL] ? FULL : paginationWords.last ? BACK : FRONT;
+      const arrType = fieldState[FULL] ? FULL : paginationArgs[paginationWords.last] ? BACK : FRONT;
       fieldState = handlePaginationArgs(paginationArgs, fieldState[arrType], arrType);
       if (arrType !== FULL && !skipTransform) {
         reducePaginationRequest(paginationArgs, fieldState, fieldSchema, selection, context);
       }
+    }
+    if (!skipTransform) {
+      flagUsefulArgs(fieldArgs, operation.variableDefinitions);
     }
   }
   return fieldState;

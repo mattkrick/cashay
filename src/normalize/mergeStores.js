@@ -112,7 +112,6 @@ export default function mergeStores(state, src, isMutation) {
   const srcKeys = Object.keys(src);
   const isCashayArray = detectCashayArray(src, srcKeys);
   if (isCashayArray && !isMutation) {
-    debugger
     handleArrays(target, src)
   } else {
     for (let i = 0; i < srcKeys.length; i++) {
