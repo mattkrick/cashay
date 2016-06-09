@@ -1,3 +1,4 @@
+import {NON_NULL_TYPE} from 'graphql/language/kinds';
 /*
  * reduce the fields to merge into the state
  * doing this here means a smaller flushSet and fewer invalidations
@@ -94,4 +95,17 @@ export const invalidateMutationsOnNewQuery = (component, cachedMutations) => {
       mutation.variableEnhancers = [];
     }
   }
+};
+
+export const requiredVariablesHaveValues = (variableDefinitions, variables) => {
+  for (let i = 0; i < variableDefinitions.length; i++) {
+    const def = variableDefinitions[i];
+    if (def.type.kind === NON_NULL_TYPE) {
+      const defKey = def.variable.name.value;
+      if (!variables[defKey]) {
+        return false;
+      }
+    }
+  }
+  return true;
 };

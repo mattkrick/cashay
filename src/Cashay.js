@@ -3,7 +3,7 @@ import denormalizeStore from './normalize/denormalizeStore';
 import {rebuildOriginalArgs} from './normalize/denormalizeHelpers';
 import normalizeResponse from './normalize/normalizeResponse';
 import {printMinimalQuery} from './query/printMinimalQuery';
-import {shortenNormalizedResponse, invalidateMutationsOnNewQuery} from './query/queryHelpers';
+import {shortenNormalizedResponse, invalidateMutationsOnNewQuery, requiredVariablesHaveValues} from './query/queryHelpers';
 import {isObject, checkMutationInSchema} from './utils';
 import mergeStores from './normalize/mergeStores';
 import {CachedMutation, CachedQuery, MutationShell} from './helperClasses';
@@ -599,15 +599,3 @@ export default class Cashay {
 //       id,
 //     }
 //   }`]]);
-const requiredVariablesHaveValues = (variableDefinitions, variables) => {
-  for (let i = 0; i < variableDefinitions.length; i++) {
-    const def = variableDefinitions[i];
-    if (def.type.kind === NON_NULL_TYPE) {
-      const defKey = def.variable.name.value;
-      if (!variables[defKey]) {
-        return false;
-      }
-    }
-  }
-  return true;
-};
