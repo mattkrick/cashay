@@ -199,7 +199,7 @@ export default class Cashay {
     }
 
     // if we need more data, get it from the server
-    if (!cachedResponse.isComplete) {
+    if (!cachedResponse.isComplete && requiredVariablesHaveValues(context.operation.variableDefinitions, context.variables)) {
       // given an operation enhanced with sendToServer flags, print minimal query
       const serverQueryString = (forceFetch || cachedResponse.firstRun) ?
         queryString : printMinimalQuery(context.operation, idFieldName);
@@ -208,7 +208,7 @@ export default class Cashay {
       this.queryServer(transport, context, serverQueryString, component, key);
     }
     if (options.mutationHandlers && component === queryString) {
-      throw new Error(`component name for ${queryString} is not optional when it includes mutationHandlers`);
+      throw new Error(`'component' option is required when including 'mutationHandlers' for: ${queryString}`);
     }
     this._prepareMutations(component, cashayDataState.variables[component], options);
     return cachedResponse;
@@ -599,3 +599,15 @@ export default class Cashay {
 //       id,
 //     }
 //   }`]]);
+const requiredVariablesHaveValues = (variableDefinitions, variables) => {
+  for (let i = 0; i < variableDefinitions.length; i++) {
+    const def = variableDefinitions[i];
+    if (def.type.kind === NON_NULL_TYPE) {
+      const defKey = def.variable.name.value;
+      if (!variables[defKey]) {
+        return false;
+      }
+    }
+  }
+  return true;
+};
