@@ -412,10 +412,10 @@ export default class Cashay {
       const cachedResponseData = key ? response[key].data : response.data;
       let modifiedResponse;
       // for the denormalized response, mutate it in place or return undefined if no mutation was made
+      const getType = this._getTypeFactory(component, key);
       if (dataFromServer) {
         // if it's from the server, send the doc we got back
         const normalizedDataFromServer = removeNamespacing(dataFromServer, component);
-        const getType = this._getTypeFactory(component, key);
         modifiedResponse = componentHandler(null, normalizedDataFromServer, cachedResponseData, getType, this._invalidate);
       } else {
         // otherwise, treat it as an optimistic update
