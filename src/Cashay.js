@@ -3,7 +3,11 @@ import denormalizeStore from './normalize/denormalizeStore';
 import {rebuildOriginalArgs} from './normalize/denormalizeHelpers';
 import normalizeResponse from './normalize/normalizeResponse';
 import {printMinimalQuery} from './query/printMinimalQuery';
-import {shortenNormalizedResponse, invalidateMutationsOnNewQuery, requiredVariablesHaveValues} from './query/queryHelpers';
+import {
+  shortenNormalizedResponse,
+  invalidateMutationsOnNewQuery,
+  requiredVariablesHaveValues
+} from './query/queryHelpers';
 import {isObject, checkMutationInSchema} from './utils';
 import mergeStores from './normalize/mergeStores';
 import {CachedMutation, CachedQuery, MutationShell} from './helperClasses';
@@ -199,13 +203,13 @@ export default class Cashay {
     }
 
     // if we need more data, get it from the server
-    if (!cachedResponse.isComplete && requiredVariablesHaveValues(context.operation.variableDefinitions, context.variables)) {
+    if (!cachedResponse.isComplete) {
       // given an operation enhanced with sendToServer flags, print minimal query
-      const serverQueryString = (forceFetch || cachedResponse.firstRun) ?
-        queryString : printMinimalQuery(context.operation, idFieldName);
+      // const serverQueryString = (forceFetch || cachedResponse.firstRun) ?
+      //   queryString : printMinimalQuery(context.operation, idFieldName);
 
       //  async query the server (no need to track the promise it returns, as it will change the redux state)
-      this.queryServer(transport, context, serverQueryString, component, key);
+      this.queryServer(transport, context, component, key);
     }
     if (options.mutationHandlers && component === queryString) {
       throw new Error(`'component' option is required when including 'mutationHandlers' for: ${queryString}`);
@@ -221,41 +225,49 @@ export default class Cashay {
    *
    * @param {function} transport the transport function to send the query + vars to a GraphQL endpoint
    * @param {object} context the context to normalize data, including the requestAST and schema
-   * @param {string} minimizedQueryString the query string to send to the GraphQL endpoint
    * @param {string} component an ID specific to the queryString/variable combo (defaults to the queryString)
    * @param {key} key A unique key to match the component instance, only used where you would use React's key (eg in a component that you called map on in the parent component).
    *
    * @return {undefined}
    */
-  async queryServer(transport, context, minimizedQueryString, component, key) {
-    const {variables} = context;
-    const contextVariables = isObject(variables) ? clone(variables) : variables;
+  async queryServer(transport, context, component, key) {
+    const {variables, operation, idFieldName} = context;
+    const {dispatch} = this.store;
+    const minimizedQueryString = printMinimalQuery(operation, idFieldName, variables);
+    const contextVariables = variables && clone(variables);
+    
     // send minimizedQueryString to server and await minimizedQueryResponse
     const {error, data} = await transport.handleQuery({query: minimizedQueryString, variables});
-
+    
+    // make sure we get a fresh cached reference after the promise resolves
     const cachedQuery = this.cachedQueries[component];
+    
     // handle errors coming back from the server
     if (error) {
       const cachedResponse = key ? cachedQuery.response[key] : cachedQuery.response;
       cachedResponse.error = error;
-      return this.store.dispatch({type: SET_ERROR, error});
+      return dispatch({type: SET_ERROR, error});
     }
+    
     //re-create the denormalizedPartialResponse because it went stale when we called the server
     rebuildOriginalArgs(context.operation);
     const {data: denormalizedLocalResponse} = denormalizeStore(context);
-
     const normalizedLocalResponse = normalizeResponse(denormalizedLocalResponse, context);
 
-    // normalize response to get ready to dispatch it into the state tree, mutates variables though
+    // normalize response to get ready to dispatch it into the state tree
     const normalizedServerResponse = normalizeResponse(data, context);
+    
+    // reset the variables that normalizeResponse mutated TODO find a better way
     context.variables = contextVariables;
+    
     // now, remove the objects that look identical to the ones already in the state
-    // if the incoming entity (eg Person.123) looks exactly like the one already in the store, then
+    // that way, if the incoming entity (eg Person.123) looks exactly like the one already in the store
     // we don't have to invalidate and rerender
     const normalizedServerResponseForStore = shortenNormalizedResponse(normalizedServerResponse, this.getState().data);
 
     // if the server didn't give us any new stuff, we already set the vars, so we're done here
     if (!normalizedServerResponseForStore) return;
+    
     // combine the partial response with the server response to fully respond to the query
     const fullNormalizedResponse = mergeStores(normalizedLocalResponse, normalizedServerResponse);
 
@@ -267,8 +279,10 @@ export default class Cashay {
     // read from a pseudo store (eliminates a requery)
     // even if the requery wasn't expensive, doing it here means we don't have to keep track of the fetching status
     // eg if fetching is true, then we always return the cached result
-    const reducedContext = Object.assign(context, {cashayDataState: fullNormalizedResponse});
-    cachedQuery.createResponse(reducedContext, component, key, this.store.dispatch, this.getState);
+
+    // we can't create here because the minimized query may not return a complete response (multi-part queries)
+    // const reducedContext = Object.assign(context, {cashayDataState: fullNormalizedResponse});
+    // cachedQuery.createResponse(reducedContext, component, key, dispatch, this.getState);
 
     // add denormalizedDeps so we can invalidate when other queries come in
     // add normalizedDeps to find those deps when a denormalizedReponse is mutated
@@ -279,7 +293,7 @@ export default class Cashay {
     // stick normalize data in store and recreate any invalidated denormalized structures
     const stateVariables = key ? {[component]: {[key]: contextVariables}} : {[component]: contextVariables};
 
-    this.store.dispatch({
+    dispatch({
       type: INSERT_QUERY,
       payload: {
         response: normalizedServerResponseForStore,

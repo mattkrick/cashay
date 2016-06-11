@@ -97,15 +97,16 @@ export const invalidateMutationsOnNewQuery = (component, cachedMutations) => {
   }
 };
 
-export const requiredVariablesHaveValues = (variableDefinitions, variables) => {
+export const getMissingRequiredVariables = (variableDefinitions, variables) => {
+  const missingVars = [];
   for (let i = 0; i < variableDefinitions.length; i++) {
     const def = variableDefinitions[i];
     if (def.type.kind === NON_NULL_TYPE) {
       const defKey = def.variable.name.value;
       if (!variables[defKey]) {
-        return false;
+        missingVars.push(defKey);
       }
     }
   }
-  return true;
+  return missingVars;
 };

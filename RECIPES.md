@@ -27,14 +27,19 @@ It will throw an error if you try to use the cursor within your queries.
 Sometimes, it is preferable to sacrifice a round trip in exchange for a smaller payload.
 In such a case, you'd want to perform a 2-part query.
 
-In part 1, you would craft a query such as `getPostIds`, which would return an array like `['123', '124', '125']`.
-When this query returns, `isComplete` will be `true` and you'll have a modified Redux state
-(note that Cashay fully embraces the Redux pattern & doesn't return a promise to you).
-When that happens, you can filter the result with what you have in your Redux state (eg `getState().cashay.data.entities.fooType`).
+In the same operation, you would have 2 queries.
+The first query would be something like `getPostIds`,
+which would return an array like `['123', '124', '125']`.
 
-Finally, you can call the second query (eg `getPostsByIds`).
-By filtering between the queries, you ensure that no document will ever be fetched twice, which is great for documents that rarely change.
-In the future, Cashay will offer an additional method to make this pattern simpler.
+The second query would be something like `getPostsByIds`,
+which accepts a required array of IDs `($IDs: [ID!]!)`
+
+then your variables might look like `{IDs: this.props.cashayData && this.props.cashayData.getPostIds}`
+It's here that you can perform a filter against what you already have (this part will be memoized in the future)
+
+Since `IDs` will be falsy for the first pass, that query will be removed from initial server request.
+Then, after the response comes back, `getPostIds` will be removed from the second server request
+since that piece was returned locally.
 
 ### Starting from the middle of a query
 
