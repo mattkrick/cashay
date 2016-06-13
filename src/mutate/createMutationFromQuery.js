@@ -50,12 +50,9 @@ const tryComplexPayload = (mutationAST, operation, mutationResponseSchema, schem
     const payloadFieldKey = payloadFieldKeys[i];
     const payloadField = mutationResponseSchema.fields[payloadFieldKey];
     const rootPayloadFieldType = ensureRootType(payloadField.type);
-    // const mutationFieldSchema = schema.mutationSchema.fields[payloadFieldKey];
-    // if (!mutationFieldSchema) debugger
-    // const mutationResponseType = ensureRootType(mutationFieldSchema.type);
-    // 2 STRINGs probably don't refer to the same field, so for scalars the name has to match, too
+
+    // For scalars, make sure the names match (don't want a million strings in the mutation request)
     const matchName = rootPayloadFieldType.kind === SCALAR && payloadField.name;
-    // mutationResponseType.name === PostType
     const selectionsInQuery = findTypeInQuery(rootPayloadFieldType.name, operation, schema, matchName);
     if (selectionsInQuery.length) {
       atLeastOne = true;

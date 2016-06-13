@@ -12,6 +12,7 @@ export default function mergeMutations(cachedSingles) {
   const mergedAST = clone(firstSingle);
   const mainOperation = mergedAST.definitions[0];
   const mainMutation = mainOperation.selectionSet.selections[0];
+  
   // now add the new ASTs one-by-one
   for (let i = 0; i < cachedSingles.length; i++) {
     const single = cachedSingles[i];
@@ -72,7 +73,6 @@ const mergeSingleProp = (targetSelections, srcProp) => {
     // alias infers args, which means we can't join anything
     targetSelections.push(clone(srcProp));
   } else {
-    if (!srcProp.name) debugger
     const propName = srcProp.name.value;
     const propInTarget = targetSelections.find(selection => !selection.alias && selection.name.value === propName);
     if (propInTarget) {

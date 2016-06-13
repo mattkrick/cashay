@@ -2,7 +2,7 @@ import {INLINE_FRAGMENT} from 'graphql/language/kinds';
 import {TypeKind} from 'graphql/type/introspection';
 import {ensureTypeFromNonNull} from '../utils';
 
-const {UNION, LIST, OBJECT, SCALAR} = TypeKind;
+const {UNION, LIST, SCALAR} = TypeKind;
 
 export const handleMissingData = (visit, aliasOrFieldName, field, fieldSchema, context) => {
   field.sendToServer = true;

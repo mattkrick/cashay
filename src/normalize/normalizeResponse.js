@@ -32,7 +32,7 @@ const visitObject = (bag, subResponse, reqAST, subSchema, context) => {
     if (!field) {
       throw new Error(`No field exists for ${field}. Did you update your schema?`)
     }
-    let fieldType = ensureRootType(field.type);
+    const fieldType = ensureRootType(field.type);
     let fieldSchema = context.schema.types[fieldType.name];
     // handle first recursion where things are stored in the query
     fieldSchema = fieldSchema || subSchema.types[fieldType.name];

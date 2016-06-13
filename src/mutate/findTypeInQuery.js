@@ -1,5 +1,5 @@
 import {INLINE_FRAGMENT} from 'graphql/language/kinds';
-import {ensureRootType, clone} from '../utils'
+import {ensureRootType} from '../utils'
 /**
  * Traverses a query AST operation looking for a specific type (for objects) or name (for scalars)
  * Uses a BFS since return values are likely high up the tree & scalars can break as soon as a matching name is found

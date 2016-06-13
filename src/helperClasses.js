@@ -35,12 +35,6 @@ export class CachedSubscription {
   }
 }
 
-// used to avoid ducktyping if a response contains keys or not
-export class CachedQueryResponse {
-  constructor() {
-  }
-}
-
 export class CachedQuery {
   constructor(queryFunction, queryString, schema, idFieldName, options) {
     this.ast = parseAndInitializeQuery(queryString, schema, idFieldName);
@@ -48,7 +42,7 @@ export class CachedQuery {
       let newOptions = key ? Object.assign({}, options, {key}) : options;
       queryFunction(queryString, newOptions);
     };
-    this.response = new CachedQueryResponse();
+    this.response = {};
   }
 
   /**
@@ -75,15 +69,14 @@ export class CachedQuery {
 
   setVariablesFactory(component, key, dispatch, getState) {
     return cb => {
-      // invalidate the cache
-      this.response = undefined;
-
       let stateVariables;
       if (key) {
+        this.response.key = undefined;
         const currentVariables = getState().data.variables[component][key];
         const variables = Object.assign({}, currentVariables, cb(currentVariables));
         stateVariables = {[component]: {[key]: variables}};
       } else {
+        this.response = undefined;
         const currentVariables = getState().data.variables[component];
         const variables = Object.assign({}, currentVariables, cb(currentVariables));
         stateVariables = {[component]: variables};
@@ -111,13 +104,6 @@ export class Name {
   constructor(value) {
     this.kind = NAME;
     this.value = value;
-  }
-}
-
-class TypeCondition {
-  constructor(condition) {
-    this.kind = NAMED_TYPE;
-    this.name = new Name(condition);
   }
 }
 
@@ -165,19 +151,8 @@ export class RequestArgument {
 
 export class VariableDefinition {
   constructor(variableName, argType) {
-    // let argTypeNN = ensureTypeFromNonNull(argType);
-    // const rootType = ensureRootType(argTypeNN);
-    // const rootVarDefType = {
-    //   kind: NAMED_TYPE,
-    //   name: new Name(rootType.name)
-    // };
-
     this.kind = VARIABLE_DEFINITION;
     this.type = processArgType(argType);
-    // this.type = argTypeNN.kind !== LIST ? varDefType : {
-    //   kind: LIST_TYPE,
-    //   type: varDefType
-    // };
     this.variable = {
       kind: VARIABLE,
       name: new Name(variableName)

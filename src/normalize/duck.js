@@ -30,8 +30,6 @@ export default function reducer(state = initialState, action) {
   }
 };
 
-
-// TODO pass in the whole variable state, not just the component[key] state
 const newStateWithVars = (state, newDataState, {variables}) => {
   return Object.assign({}, state, {
     data: Object.assign(newDataState, {

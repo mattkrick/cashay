@@ -85,6 +85,7 @@ export default class Cashay {
     //   }
     // };
     this.cachedSubscriptions = {};
+
     // a flag thrown by the invalidate function and reset when that query is added to the queue
     this._willInvalidateListener = false;
 
@@ -147,9 +148,11 @@ export default class Cashay {
     //if you call forceFetch in a mapStateToProps, you're gonna have a bad time (it'll refresh on EVERY dispatch)
     const {key} = options;
     const forceFetch = Boolean(options.forceFetch);
+
     // Each component can have only 1 unique queryString/variable combo. This keeps memory use minimal.
     // if 2 components have the same queryString/variable but a different component, it'll fetch twice
     const component = options.component || queryString;
+
     // get the result, containing a response, queryString, and options to re-call the query
     const fastResult = this.cachedQueries[component];
 
@@ -272,23 +275,17 @@ export default class Cashay {
 
     // it's possible that we adjusted the arguments for the operation we sent to server
     // for example, instead of asking for 20 docs, we asked for 5 at index 15.
-    // now, we want to ask for the 20 again
+    // now, we want to ask for the 20 again (but locally)
     rebuildOriginalArgs(context.operation);
-
-    // read from a pseudo store (eliminates a requery)
-    // even if the requery wasn't expensive, doing it here means we don't have to keep track of the fetching status
-    // eg if fetching is true, then we always return the cached result
-
-    // we can't create here because the minimized query may not return a complete response (multi-part queries)
-    // const reducedContext = Object.assign(context, {cashayDataState: fullNormalizedResponse});
-    // cachedQuery.createResponse(reducedContext, component, key, dispatch, this.getState);
 
     // add denormalizedDeps so we can invalidate when other queries come in
     // add normalizedDeps to find those deps when a denormalizedReponse is mutated
     // the data fetched from server is only part of the story, so we need the full normalized response
     addDeps(fullNormalizedResponse, component, key, this.normalizedDeps, this.denormalizedDeps);
+
     // remove the responses from this.cachedQueries where necessary
     flushDependencies(normalizedServerResponseForStore.entities, component, key, this.denormalizedDeps, this.cachedQueries);
+
     // stick normalize data in store and recreate any invalidated denormalized structures
     const stateVariables = key ? {[component]: {[key]: contextVariables}} : {[component]: contextVariables};
 
@@ -349,7 +346,7 @@ export default class Cashay {
     this._processMutationHandlers(mutationName, cachedMutation.activeComponentsObj, null, variables);
 
     // async call the server
-    this._mutateServer(mutationName, cachedMutation.activeComponentsObj, mutationString, newOptions);
+    this._mutateServer(mutationName, cachedMutation.activeComponentsObj, cachedMutation.fullMutation, newOptions);
   }
 
   _updateCachedMutation(mutationName, options) {
@@ -364,8 +361,9 @@ export default class Cashay {
     if (componentsToUpdateKeys.length === 0) {
       // for mutations that dont affect the client (eg analytics)
       cachedMutation.fullMutation = print(new MutationShell(mutationName, null, null, true));
+    } else {
+      this._createMutationsFromQueries(componentsToUpdateKeys, mutationName, variables);
     }
-    this._createMutationsFromQueries(componentsToUpdateKeys, mutationName, variables);
   }
 
   _createMutationsFromQueries(componentsToUpdateKeys, mutationName, variables) {
@@ -389,7 +387,7 @@ export default class Cashay {
       newVariableEnhancers.push(...variableEnhancers);
     }
     const cachedMutation = this.cachedMutations[mutationName];
-    cachedMutation.fullMutation = mergeMutations(cachedSingles);
+    cachedMutation.fullMutation = mergeMutations(cachedSinglesASTs);
     cachedMutation.variableEnhancers.push(...newVariableEnhancers);
   };
 
@@ -397,6 +395,7 @@ export default class Cashay {
     const {variables} = options;
     const transport = options.transport || this.transport;
     const docFromServer = await transport.handleQuery({query: mutationString, variables});
+
     // update state with new doc from server
     this._processMutationHandlers(mutationName, componentsToUpdateObj, docFromServer.data);
   }
@@ -407,6 +406,7 @@ export default class Cashay {
     let allNormalizedChanges = {};
     let allVariables = {};
     const componentsToUpdateKeys = Object.keys(componentsToUpdateObj);
+
     // for every component that listens the the mutationName
     for (let i = 0; i < componentsToUpdateKeys.length; i++) {
       const component = componentsToUpdateKeys[i];
@@ -419,13 +419,16 @@ export default class Cashay {
       const {ast, refetch, response} = cachedResult;
       const cachedResponseData = key ? response[key].data : response.data;
       let modifiedResponse;
+
       // for the denormalized response, mutate it in place or return undefined if no mutation was made
       const getType = this._getTypeFactory(component, key);
       if (dataFromServer) {
+
         // if it's from the server, send the doc we got back
         const normalizedDataFromServer = removeNamespacing(dataFromServer, component);
         modifiedResponse = componentHandler(null, normalizedDataFromServer, cachedResponseData, getType, this._invalidate);
       } else {
+
         // otherwise, treat it as an optimistic update
         modifiedResponse = componentHandler(variables, null, cachedResponseData, getType, this._invalidate);
       }
@@ -469,24 +472,13 @@ export default class Cashay {
         cashayDataState
       });
 
-      // create a new 
       const normalizedModifiedResponse = normalizeResponse(modifiedResponse, context);
       allNormalizedChanges = mergeStores(allNormalizedChanges, normalizedModifiedResponse);
       allVariables = {...allVariables, ...contextVars};
-      // for each paginated array in the pre-modifiedResponse, I need to know its start and end idx in the state
-      // that way, i can merge the modfiedResponse into the normalized state tree
-      // i'm guaranteed that the start idx is 0 because there's no way to get a cursor without starting there & that'd mess up the EOF
-      // that means, i just need to know the length of the array before it is mutated
-      // pretty easy to do if i create a custom `myLength` in the denormalization process, then calc the diff
-      // so, if i'm doing a merge & the 
 
     }
 
     const normalizedServerResponseForStore = shortenNormalizedResponse(allNormalizedChanges, cashayDataState);
-
-    // walk entire response, looking for a cashayArray
-    // if found, replace the 
-
 
     // merge the normalized optimistic result with the state
     // dont invalidate other queries, they might not want it.
