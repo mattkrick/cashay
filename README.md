@@ -27,17 +27,24 @@ Relay for the rest of us
 
 ### Creating the client schema
 
-Cashay sends a subset of the introspection query to the client. Creating it is easy because cashay gives you the script.
-`cashay-schema`
+Cashay requires a portion of GraphQL schema to reside on the client. The schema
+is extracted by executing a subset of the introspection query.
+Included are two convenient mechanisms for extracting this schema:
 
-The script takes an `input` and an `output`:
-- `input`: The relative path to your server schema. Alternatively, you can pass in the url to a GraphQL endpoint
-- `output`: The relative path to your output file. Defaults to `./clientSchema.json`
+1. `cashay-schema` – a command-line utility
+2. `cashay-loader` – a webpack loader
 
-Options:
-- `--production`: Removes whitespaces from the generated `clientSchema.json`
-- `--oncomplete`: A relative path to a callback to run after generation is complete.
-This is useful if you need to drain a DB connection pool:
+#### cashay-schema
+
+The script takes an `input` and an `output`: - `input`: The relative path to
+your server schema. Alternatively, you can pass in the url to a GraphQL endpoint -
+`output`: The relative path to your output file. Defaults to
+`./clientSchema.json`
+
+Options: - `--production`: Removes whitespaces from the generated
+`clientSchema.json` - `--oncomplete`: A relative path to a callback to run after
+generation is complete. This is useful if you need to drain a DB connection
+pool:
 
 ```js
 // drainPool.js
@@ -46,10 +53,47 @@ export default () => {
   r.getPoolMaster().drain();
 }
 ```
- 
+
 **Pro tip: Make it an npm script:**
 
 `"updateSchema": "cashay-schema src/schema.js src/clientSchema.json --oncomplete src/drainPool.js --production"`
+
+#### cashay-loader
+
+If you're using [Webpack](https://webpack.github.io/), including the schema is
+made even easier by using the `cashay-loader`. You can include the schema
+information within your client (likely near the instantiation of your
+[Cashay singleton](#creating-the-singleton)) by using a `require()` statement:
+
+```js
+const cashaySchema = require('cashay!../server/utils/getCashaySchema.babel.js');
+///            cashay-loader ^^^     ^^^ module returning promise for a schema
+```
+
+**Note:** `cashay-loader` is included with Cashay. If you've installed
+cashay with `npm install -S cashay`, the loader will be located by
+Webpack automatically.
+
+
+All the loader needs is a module that returns a Promise for a schema that's
+been transformed by the Cashay's `transformSchema()` convenience function.
+Ours looks like this:
+
+```js
+import rootSchema from '../graphql/rootSchema';
+import {transformSchema} from 'cashay';
+import rethinkExit from './rethinkExit';
+
+// side-step 'Error: Schema must be an instance of GraphQLSchema.'
+const graphql = require('graphql').graphql;
+
+export default async () => {
+  const schema = await transformSchema(rootSchema, graphql);
+  rethinkExit();
+  return schema;
+};
+```
+
 
 ### Adding the reducer
 
@@ -66,6 +110,7 @@ const store = createStore(rootReducer, {});
 Cashay is front-end agnostic, so instead of passing it through React context or making you replace `react-redux` with something non-vanilla, you can just easily export your singleton from where you created it.
 ```js
 import clientSchema from './clientSchema.json';
+// or use webpack: const clientSchema = require('cashay!../server/utils/getCashaySchema.babel.js');
 import {Cashay, HTTPTransport} from 'cashay';
 export const cashay = new Cashay(paramsObject);
 ```
@@ -107,9 +152,9 @@ const transport = new HTTPTransport('/myEndpoint', {headers: {Authorization}});
 cashay.query(queryString, options)
 ```
 
-Options include: 
+Options include:
 - `component`: A string to match the component. Required if you pass in `mutationHandlers`. Typically shares the same name as the React component. If left blank, it defaults to the `queryString`.
-- `key`: A unique key to match the component instance, only used where you would use React's `key` (eg in a component that you called `map` on in the parent component). 
+- `key`: A unique key to match the component instance, only used where you would use React's `key` (eg in a component that you called `map` on in the parent component).
 - `forceFetch`: A Boolean to ignore local data & get some fresh stuff. Defaults to `false`. Don't use this in `mapStateToProps` or you'll be calling the server every time you call `dispatch`.
 - `transport`: A function to override the singleton transport. Useful if this particular component needs different credentials, or uses websockets, etc.
 - `variables`: the variables object to pass onto the GraphQL server
@@ -165,14 +210,14 @@ Cashay mutations are pretty darn simple, too:
 cashay.mutate(mutationName, options)
 ```
 
-Cashay is smart. By default, it will go through all the `mutationHandlers` that are currently active, looking for any handlers for `mutationName`. Then, it intersects your mutation payload schema with the corresponding queries to automatically fetch all the fields you need. No fat queries, no mutation fragments in your queries, no problems. If two different queries need the same field but with different arguments (eg. `Query1` needs `profilePic(size:SMALL)` and `Query2` needs `profilePic(size:LARGE)`, it'll take care of that, too. For the curious, it does this by assigning a namespaced alias to all fields with args, in addition to namespacing the variables you passed in. Then when the result comes back, it de-namespaces it for the `mutationHandler`. Note: if you return a scalar variable at the highest level of your mutation payload schema, make sure the name in the mutation payload schema matches the name in the query to give Cashay a hint to grab it. 
+Cashay is smart. By default, it will go through all the `mutationHandlers` that are currently active, looking for any handlers for `mutationName`. Then, it intersects your mutation payload schema with the corresponding queries to automatically fetch all the fields you need. No fat queries, no mutation fragments in your queries, no problems. If two different queries need the same field but with different arguments (eg. `Query1` needs `profilePic(size:SMALL)` and `Query2` needs `profilePic(size:LARGE)`, it'll take care of that, too. For the curious, it does this by assigning a namespaced alias to all fields with args, in addition to namespacing the variables you passed in. Then when the result comes back, it de-namespaces it for the `mutationHandler`. Note: if you return a scalar variable at the highest level of your mutation payload schema, make sure the name in the mutation payload schema matches the name in the query to give Cashay a hint to grab it.
 
 The options are as follows:
 - `variables`: The variables object to pass onto the GraphQL server. Make sure the variables have the same names as what your schema expects so Cashay can automatically create the mutation for you. For maximum efficiency, be sure to pass in all variables that you will possibly use (even if that means passing it in as `undefined`). If you can't do these 2 things, you can write a `customMutation` (and tell me your usecase, I'm curious!).
 - `components`: An object the determines which `mutationHandlers` to call. If not provided, it'll call every `component` that has a `mutationHandler` for that `mutationName`. See below.
 
 In this example, we just want to call the `mutationHandler` for the `comments` component where `key === postId`. If you wanted to delete Comment #3 (where `key = 3`), you'd want to trigger the `mutationHandler` for `{comments: 3}` and not bother wasting CPU cycles checking `{comments: 1}` and `{comments: 2}`.
-Additionally, we call the `mutationHandler` for `post` if the value is true. This might be common if the `post` query includes a `commentCount` that should decrement when a comment is deleted. This logic makes Cashay super efficient by default, while still being flexible enough to write multiple mutations that have the same `mutationName`, but affect different queries. For example, you might have a mutation called `deleteSomething` that accepts a `tableName` and `id` variable. Then, a good practice to to hardcode `tableName` to `Posts` that component. In doing so, you reduce the # of mutations in your schema (since `deleteSomething` can delete any doc in your db). Additionally, because you hardcoded in the tableName, you don't have to pass that variable down via `this.props`. 
+Additionally, we call the `mutationHandler` for `post` if the value is true. This might be common if the `post` query includes a `commentCount` that should decrement when a comment is deleted. This logic makes Cashay super efficient by default, while still being flexible enough to write multiple mutations that have the same `mutationName`, but affect different queries. For example, you might have a mutation called `deleteSomething` that accepts a `tableName` and `id` variable. Then, a good practice to to hardcode `tableName` to `Posts` that component. In doing so, you reduce the # of mutations in your schema (since `deleteSomething` can delete any doc in your db). Additionally, because you hardcoded in the tableName, you don't have to pass that variable down via `this.props`.
 
 ```js
 const {postId} = this.props;
