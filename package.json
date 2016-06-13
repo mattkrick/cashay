@@ -6,6 +6,7 @@
   "bin": {
     "cashay-schema": "lib/schema/updateSchema.babel.js"
   },
+  "loader": "lib/schema/cashay-loader",
   "scripts": {
     "clean": "rimraf lib",
     "lint": "xo src/index.js --esnext --space --fix",
