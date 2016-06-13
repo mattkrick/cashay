@@ -1,20 +1,13 @@
 import {ensureRootType} from '../utils';
-import {
-  VARIABLE,
-  FRAGMENT_SPREAD,
-  INLINE_FRAGMENT,
-  OBJECT
-} from 'graphql/language/kinds';
-import {clone, convertFragmentToInline, teardownDocumentAST} from '../utils';
-import {Name, VariableDefinition} from '../helperClasses';
-import {CASHAY, DELIMITER} from '../utils';
+import {FRAGMENT_SPREAD, INLINE_FRAGMENT} from 'graphql/language/kinds';
+import {clone, convertFragmentToInline, teardownDocumentAST, makeNamespaceString} from '../utils';
+import {Name} from '../helperClasses';
+import createVariableDefinitions from '../createVariableDefinitions';
 
-const makeNamespaceString = (componentId, name, d = DELIMITER) => `${CASHAY}${d}${componentId}${d}${name}`;
-
-export default function namespaceMutation(namespaceAST, component, componentStateVars, schema) {
+export default function namespaceMutation(mutationAST, component, componentStateVars, schema) {
   const variableEnhancers = [];
-  const {operation, fragments} = teardownDocumentAST(namespaceAST);
-  const variableDefinitions = operation.variableDefinitions || [];
+  const {operation, fragments} = teardownDocumentAST(mutationAST);
+  const variableDefinitions = [];
   const mainMutation = operation.selectionSet.selections[0];
   const fieldSchema = schema.mutationSchema.fields[mainMutation.name.value];
   const context = {
@@ -25,16 +18,18 @@ export default function namespaceMutation(namespaceAST, component, componentStat
     schema,
     variableEnhancers
   };
-  bagArgs(mainMutation.arguments, fieldSchema, true, context);
+  createVariableDefinitions(mainMutation.arguments, fieldSchema, false, context);
+  operation.variableDefinitions = variableDefinitions;
   const rootSchemaType = ensureRootType(fieldSchema.type);
   const subSchema = schema.types[rootSchemaType.name];
   namespaceAndInlineFrags(mainMutation.selectionSet.selections, subSchema, context);
-  namespaceAST.definitions = [operation];
-  return {namespaceAST, variableEnhancers}
+
+  // just take the operation & leave behind the fragment spreads, since we inlined them
+  mutationAST.definitions = [operation];
+  return {namespaceAST: mutationAST, variableEnhancers}
 };
 
 const namespaceAndInlineFrags = (fieldSelections, typeSchema, context) => {
-  // let fieldSelectionLen = fieldSelections.length;
   for (let i = 0; i < fieldSelections.length; i++) {
     let selection = fieldSelections[i];
     if (selection.kind === FRAGMENT_SPREAD) {
@@ -45,9 +40,8 @@ const namespaceAndInlineFrags = (fieldSelections, typeSchema, context) => {
       // if the fragment is unnecessary, remove it
       if (selection.typeCondition === null) {
         fieldSelections.push(...selection.selectionSet.selections);
-        fieldSelections.splice(i--,1);
-        
-        // fieldSelectionLen += selection.selectionSet.selections.length;
+        // since we're pushing to the looped array, going in reverse won't save us from not having to change i
+        fieldSelections.splice(i--, 1);
       } else {
         namespaceAndInlineFrags(selection.selectionSet.selections, typeSchema, context);
       }
@@ -60,7 +54,7 @@ const namespaceAndInlineFrags = (fieldSelections, typeSchema, context) => {
       const aliasOrFieldName = selection.alias && selection.alias.value || selection.name.value;
       const namespaceAlias = makeNamespaceString(context.component, aliasOrFieldName);
       selection.alias = new Name(namespaceAlias);
-      bagArgs(selection.arguments, fieldSchema, false, context);
+      createVariableDefinitions(selection.arguments, fieldSchema, true, context);
     } else {
       // guarantee that props without args are also without aliases
       // that way, we can share fields across mutations & not make the server repeat the same action twice
@@ -72,50 +66,4 @@ const namespaceAndInlineFrags = (fieldSelections, typeSchema, context) => {
       namespaceAndInlineFrags(selection.selectionSet.selections, typeSchema, context);
     }
   }
-};
-
-const enhancerFactory = (componentStateVars, variableName, namespaceKey) => {
-  return variablesObj => {
-    return {
-      ...variablesObj,
-      [namespaceKey]: componentStateVars[variableName]
-    }
-  }
-};
-
-const bagArgs = (argsToDefine, fieldSchema, isMain, context) => {
-  const {variableDefinitions, component} = context;
-  for (let arg of argsToDefine) {
-    const argName = arg.name.value;
-    if (arg.value.kind === VARIABLE) {
-      const variableName = arg.value.name.value;
-      const namespaceKey = makeNamespaceString(component, variableName);
-      const variableDefOfArg = variableDefinitions.find(def => def.variable.name.value === variableName);
-      if (!variableDefOfArg) {
-        const varDefKey = isMain ? variableName : namespaceKey;
-        const newVariableDef = makeVariableDefinition(argName, varDefKey, fieldSchema);
-        variableDefinitions.push(newVariableDef);
-      }
-      if (!isMain) {
-        const {componentStateVars, variableEnhancers} = context;
-        const variableEnhancer = enhancerFactory(componentStateVars, variableName, namespaceKey);
-        variableEnhancers.push(variableEnhancer);
-      }
-    } else if (arg.value.kind === OBJECT) {
-      const argSchema = fieldSchema.args[argName];
-      const rootArgType = ensureRootType(argSchema.type);
-      const subSchema = context.schema.types[rootArgType.name];
-      bagArgs(arg.value.fields, subSchema, isMain, context);
-    }
-  }
-};
-
-const makeVariableDefinition = (argName, variableName, fieldSchema) => {
-  // we're not sure whether we're inside an arg or an input object
-  const fields = fieldSchema.args || fieldSchema.inputFields;
-  const argSchema = fields[argName];
-  if (!argSchema) {
-    throw new Error(`Invalid mutation argument: ${argName}`);
-  }
-  return new VariableDefinition(variableName, argSchema.type);
 };

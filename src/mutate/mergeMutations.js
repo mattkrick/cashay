@@ -5,11 +5,9 @@ import {
 import {clone} from '../utils';
 import {print} from 'graphql/language/printer';
 
-export default (cachedSingles) => {
+export default function mergeMutations(cachedSingles) {
   const firstSingle = cachedSingles.pop();
-  if (!firstSingle) {
-    
-  }
+  
   // deep copy to create the base AST (slow, but faster than a parse!)
   const mergedAST = clone(firstSingle);
   const mainOperation = mergedAST.definitions[0];
@@ -47,9 +45,12 @@ const mergeNewAST = (target, src) => {
   mergeSelections(target.selectionSet.selections, src.selectionSet.selections);
 };
 
-
+/**
+ * Mutates the targetSelections by adding srcSelections & excluding the duplicates
+ */
 export const mergeSelections = (targetSelections, srcSelections) => {
-  for (let selection of srcSelections) {
+  for (let i = 0; i < srcSelections.length; i++) {
+    const selection = srcSelections[i];
     mergeSingleProp(targetSelections, selection)
   }
 };
@@ -60,16 +61,18 @@ const mergeSingleProp = (targetSelections, srcProp) => {
     const srcTypeCondition = srcProp.typeCondition.name.value;
     let targetFragment = targetSelections.find(field => field.kind === INLINE_FRAGMENT && field.typeCondition.name.value === srcTypeCondition);
     if (!targetFragment) {
-      targetSelections.push(srcProp);
+      // by pushing a clone, we don't have to clone the srcProp beforehand, making for the smallest amount of cloning possible
+      targetSelections.push(clone(srcProp));
     } else {
       mergeSelections(targetFragment.selectionSet.selections, srcProp.selectionSet.selections);
     }
     return;
   }
   if (srcProp.alias) {
-    // alias means args, which means we can't join anything
-    targetSelections.push(srcProp);
+    // alias infers args, which means we can't join anything
+    targetSelections.push(clone(srcProp));
   } else {
+    if (!srcProp.name) debugger
     const propName = srcProp.name.value;
     const propInTarget = targetSelections.find(selection => !selection.alias && selection.name.value === propName);
     if (propInTarget) {
@@ -77,7 +80,7 @@ const mergeSingleProp = (targetSelections, srcProp) => {
         mergeSelections(propInTarget.selectionSet.selections, srcProp.selectionSet.selections)
       }
     } else {
-      targetSelections.push(srcProp);
+      targetSelections.push(clone(srcProp));
     }
   }
 };
@@ -87,11 +90,13 @@ const mergeSingleProp = (targetSelections, srcProp) => {
  * but for children of the mutation, don't
  */
 const mergeMutationArgs = (targetArgs, srcArgs) => {
-  for (let srcArg of srcArgs) {
+  for (let i = 0; i < srcArgs.length; i++) {
+    const srcArg = srcArgs[i];
     const targetArg = targetArgs.find(arg => arg.name.value === srcArg.name.value);
     if (targetArg) {
       if (targetArg.value.kind === OBJECT) {
         if (srcArg.value.kind === OBJECT) {
+          // handle input objects
           mergeMutationArgs(targetArg.value.fields, srcArg.value.fields);
         } else {
           throw new Error(`Conflicting kind for argument: ${targetArg.name.value}`)
@@ -100,7 +105,7 @@ const mergeMutationArgs = (targetArgs, srcArgs) => {
         throw new Error(`Conflicting values for argument: ${targetArg.name.value}`)
       }
     } else {
-      targetArgs.push(srcArg);
+      targetArgs.push(clone(srcArg));
     }
   }
 };

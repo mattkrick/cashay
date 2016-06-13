@@ -35,6 +35,12 @@ export class CachedSubscription {
   }
 }
 
+// used to avoid ducktyping if a response contains keys or not
+export class CachedQueryResponse {
+  constructor() {
+  }
+}
+
 export class CachedQuery {
   constructor(queryFunction, queryString, schema, idFieldName, options) {
     this.ast = parseAndInitializeQuery(queryString, schema, idFieldName);
@@ -42,7 +48,7 @@ export class CachedQuery {
       let newOptions = key ? Object.assign({}, options, {key}) : options;
       queryFunction(queryString, newOptions);
     };
-    this.response = {};
+    this.response = new CachedQueryResponse();
   }
 
   /**
@@ -133,7 +139,11 @@ export class MutationShell {
       operation: 'mutation',
       variableDefinitions,
       directives: [],
-      selectionSet: isEmpty ? null : new SelectionSet([new Field({args: mutationArgs, name: mutationName, selections: []})])
+      selectionSet: isEmpty ? null : new SelectionSet([new Field({
+        args: mutationArgs,
+        name: mutationName,
+        selections: []
+      })])
     }]
   }
 }

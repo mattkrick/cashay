@@ -19,8 +19,8 @@ export const createCommentWithId = `
   }`;
 
 export const createCommentWithId2 = `
-  mutation($postId: String!, $content: String!, $author: String!) {
-    createComment(postId: $postId, content: $content, author: $author) {
+  mutation($postId: String!, $content: String!, $_id: String!) {
+    createComment(postId: $postId, content: $content, _id: $_id) {
       _id,
     }
   }`;

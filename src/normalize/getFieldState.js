@@ -17,7 +17,7 @@ import {RequestArgument} from '../helperClasses';
 export default function getFieldState(fieldState, fieldSchema, selection, context) {
   // context must include: paginationWords, variables
   if (isObject(fieldState)) {
-    const {skipTransform, operation, paginationWords} = context;
+    const {skipTransform, paginationWords} = context;
     const {arguments: fieldArgs} = selection;
     const {regularArgs, paginationArgs} = separateArgs(fieldSchema, fieldArgs, context);
     if (regularArgs) {
@@ -31,9 +31,9 @@ export default function getFieldState(fieldState, fieldSchema, selection, contex
         reducePaginationRequest(paginationArgs, fieldState, fieldSchema, selection, context);
       }
     }
-    if (!skipTransform) {
-      flagUsefulArgs(fieldArgs, operation.variableDefinitions);
-    }
+    // if (!skipTransform) {
+    //   flagUsefulArgs(fieldArgs, operation.variableDefinitions);
+    // }
   }
   return fieldState;
 };

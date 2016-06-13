@@ -87,3 +87,5 @@ export const getVariables = (variables, componentVars, key) => {
   }
   return stateVars || variables;
 };
+
+export const makeNamespaceString = (component, name, d = DELIMITER) => `${CASHAY}${d}${component}${d}${name}`;
