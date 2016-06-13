@@ -131,18 +131,6 @@ test('get a page from a full store (back)', t => {
   t.deepEqual(actual, expected);
 });
 
-test('throw if no cursor is found for the afterCursor doc', t => {
-  const queryAST = parseAndInitializeQuery(front2After3Query, clientSchema, idFieldName);
-  const context = buildExecutionContext(queryAST, {
-    cashayDataState: front4PostStoreNoCursors,
-    idFieldName,
-    schema: clientSchema,
-    paginationWords,
-    variables: {reverse: true, lang: "spanish"}
-  });
-  t.throws(() => denormalizeStore(context));
-});
-
 test('request an array that does not exist in the state', t => {
   const queryAST = parseAndInitializeQuery(back1Query, clientSchema, idFieldName);
   const context = buildExecutionContext(queryAST, {

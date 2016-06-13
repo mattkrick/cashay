@@ -231,35 +231,7 @@ cashay.mutate('deletComment', {variables: {commentId: postId}, components})
 
 ## Recipes
 
-### Pagination
-
-Cashay uses cursor-based pagination.
-That means your backend queries should accept `last, before` and/or `first, after` arguments.
-Of course, naming is up to you (although it must be consistent across your whole backend).
-Each returned document should also include a field called `cursor` that contains the cursor used by your database
-in conjunction with `before, after`.
-- `first`: The number of documents you want to receive _starting from the beginning of the array_.
-- `last`: The number of documents you want to receive _starting from the end of the array_.
-- `after`: The cursor of the document prior to the one you want. `first` will start counting at `after + 1`.
-- `before`: Similar to `after`, but starting from the back of the array.
- For example, you want the _least_ recent posts on a query called `getRecentPosts`.
-
-Cashay manages cursors for you.
-All you have to do is request `first` or `last` (but not both!).
-Behind the scenes, it will add the cursor and reduce the amount fetched.
-For example, start by requesting 10 by passing in a `variables` object like `{first: 10}`.
-Then when you want more, call `setVariables` and change the value to `20`.
-Cashay will see that you already have the first 10 and only request the next 10 starting with the cursor of the last document you have.
-Cashay enforces best practices and only supports querys that start from the beginning or end.
-It will throw an error if you try to use the cursor within your queries.
-
-#### Starting from the middle of a query
-
-TODO
-
-#### Detecting if all documents have been fetched
-
-TODO
+[See recipes](./RECIPES.md)
 
 ## Example
 

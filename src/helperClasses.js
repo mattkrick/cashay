@@ -69,15 +69,14 @@ export class CachedQuery {
 
   setVariablesFactory(component, key, dispatch, getState) {
     return cb => {
-      // invalidate the cache
-      this.response = undefined;
-
       let stateVariables;
       if (key) {
+        this.response.key = undefined;
         const currentVariables = getState().data.variables[component][key];
         const variables = Object.assign({}, currentVariables, cb(currentVariables));
         stateVariables = {[component]: {[key]: variables}};
       } else {
+        this.response = undefined;
         const currentVariables = getState().data.variables[component];
         const variables = Object.assign({}, currentVariables, cb(currentVariables));
         stateVariables = {[component]: variables};
@@ -108,13 +107,6 @@ export class Name {
   }
 }
 
-class TypeCondition {
-  constructor(condition) {
-    this.kind = NAMED_TYPE;
-    this.name = new Name(condition);
-  }
-}
-
 export class Field {
   constructor({alias, args, directives, name, selections}) {
     this.kind = FIELD;
@@ -133,7 +125,11 @@ export class MutationShell {
       operation: 'mutation',
       variableDefinitions,
       directives: [],
-      selectionSet: isEmpty ? null : new SelectionSet([new Field({args: mutationArgs, name: mutationName, selections: []})])
+      selectionSet: isEmpty ? null : new SelectionSet([new Field({
+        args: mutationArgs,
+        name: mutationName,
+        selections: []
+      })])
     }]
   }
 }
@@ -155,19 +151,8 @@ export class RequestArgument {
 
 export class VariableDefinition {
   constructor(variableName, argType) {
-    // let argTypeNN = ensureTypeFromNonNull(argType);
-    // const rootType = ensureRootType(argTypeNN);
-    // const rootVarDefType = {
-    //   kind: NAMED_TYPE,
-    //   name: new Name(rootType.name)
-    // };
-
     this.kind = VARIABLE_DEFINITION;
     this.type = processArgType(argType);
-    // this.type = argTypeNN.kind !== LIST ? varDefType : {
-    //   kind: LIST_TYPE,
-    //   type: varDefType
-    // };
     this.variable = {
       kind: VARIABLE,
       name: new Name(variableName)

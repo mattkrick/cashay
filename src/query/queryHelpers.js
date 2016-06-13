@@ -87,7 +87,8 @@ const deepEqualAndReduce = (state, newEntity, reducedNewItem = {}) => {
 
 export const invalidateMutationsOnNewQuery = (component, cachedMutations) => {
   const activeMutations = Object.keys(cachedMutations);
-  for (let mutationName of activeMutations) {
+  for (let i = 0; i < activeMutations.length; i++) {
+    const mutationName = activeMutations[i];
     const mutation = cachedMutations[mutationName];
     // TODO handle logic for keys?
     if (mutation.activeComponentsObj[component]) {
@@ -97,15 +98,16 @@ export const invalidateMutationsOnNewQuery = (component, cachedMutations) => {
   }
 };
 
-export const requiredVariablesHaveValues = (variableDefinitions, variables) => {
+export const getMissingRequiredVariables = (variableDefinitions, variables) => {
+  const missingVars = [];
   for (let i = 0; i < variableDefinitions.length; i++) {
     const def = variableDefinitions[i];
     if (def.type.kind === NON_NULL_TYPE) {
       const defKey = def.variable.name.value;
       if (!variables[defKey]) {
-        return false;
+        missingVars.push(defKey);
       }
     }
   }
-  return true;
+  return missingVars;
 };

@@ -15,9 +15,8 @@ import {RequestArgument} from '../helperClasses';
  * @returns {*} an object, or array, or scalar from the normalized store
  * */
 export default function getFieldState(fieldState, fieldSchema, selection, context) {
-  // context must include: paginationWords, variables
   if (isObject(fieldState)) {
-    const {skipTransform, operation, paginationWords} = context;
+    const {skipTransform, paginationWords} = context;
     const {arguments: fieldArgs} = selection;
     const {regularArgs, paginationArgs} = separateArgs(fieldSchema, fieldArgs, context);
     if (regularArgs) {
@@ -30,9 +29,6 @@ export default function getFieldState(fieldState, fieldSchema, selection, contex
       if (arrType !== FULL && !skipTransform) {
         reducePaginationRequest(paginationArgs, fieldState, fieldSchema, selection, context);
       }
-    }
-    if (!skipTransform) {
-      flagUsefulArgs(fieldArgs, operation.variableDefinitions);
     }
   }
   return fieldState;
@@ -150,16 +146,3 @@ const assignFieldStateMeta = (slicedArray, usefulArray, count) => {
 
 const makeCursorArg = (cursorName, cursorValue) => new RequestArgument(cursorName, STRING, cursorValue);
 const makeCountArg = (countName, countValue) => new RequestArgument(countName, INT, countValue);
-
-const flagUsefulArgs = (fieldArgs, variableDefinitions) => {
-  for (let i = 0; i < fieldArgs.length; i++) {
-    const arg = fieldArgs[0];
-    if (arg.value.kind === VARIABLE) {
-      const operationArg = variableDefinitions.find(varDef => varDef.variable.name.value === arg.value.name.value);
-      // if calling normalize from the queryServer, it's possible we already nuked the arg from the operation
-      if (operationArg) {
-        operationArg._inUse = true;
-      }
-    }
-  }
-};

@@ -46,13 +46,13 @@ const makeFlushSet = (entities, component, key, denormalizedDeps) => {
     }
   }
 
-  // no need to flush the callee
+  // ensure flushing the callee
   if (key) {
-    if (keyFlush[component]) {
-      keyFlush[component].delete(key);
+    if (!keyFlush[component]) {
+      keyFlush[component].add(key);
     }
   } else {
-    componentFlushSet.delete(component);
+    componentFlushSet.add(component);
   }
   return {keyFlush, componentFlushSet};
 };

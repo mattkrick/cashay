@@ -152,8 +152,8 @@ test('merge a typed inline fragment when the target does not have one', t => {
 
 test('merge a new variableDefinition', t => {
   const expectedRaw = `
-  mutation($postId: String!, $content: String!, $author: String!) {
-    createComment(postId: $postId, content: $content, author: $author) {
+  mutation($postId: String!, $content: String!, $_id: String!) {
+    createComment(postId: $postId, content: $content, _id: $_id) {
       _id,
     }
   }`;

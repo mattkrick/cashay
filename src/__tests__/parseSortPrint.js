@@ -28,11 +28,45 @@ const recurse = astSelections => {
       recurse(selection.selectionSet.selections);
     }
   }
-  astSelections.sort((a,b) => sortField(a) > sortField(b));
+  astSelections.sort(sortFields);
 };
 
+// if true, b moves forward
+const sortFields = (a,b) => {
+  if (a.alias) {
+    if (b.alias) {
+      // if both have aliases, sort them alphabetically
+      return a.alias.value > b.alias.value
+    }
+    // if a has an alias, put it ahead of b
+    return false;
+  } else if (b.alias) {
+    // if b has an alias, put it ahead of a
+    return true;
+  }
+  if (a.name) {
+    if (b.name) {
+      // if both have names, sort them alphabetically
+      return a.name.value > b.name.value;
+    }
+    // if a has a name, put it ahead of b
+    return false;
+  } else if (b.name) {
+    // if b has a name, put it ahead of a
+    return true;
+  }
+  if (a.selectionSet) {
+    if (b.selectionSet) {
+      // if both are inline frags, sort by the length
+      return a.selectionSet.selections.length > b.selectionSet.selections.length
+    }
+    return false;
+  } else if (b.selectionSet) {
+    return true
+  }
+};
 // inline frags don't have names, so just stick em at the end
-const sortField = field => (field.alias && field.alias.value) ||
-(field.name && field.name.value) ||
-(field.selectionSet.selections[0].name && field.selectionSet.selections[0].name.value) ||
-Infinity;
+// const sortField = field => (field.alias && field.alias.value) ||
+// (field.name && field.name.value) ||
+// (field.selectionSet.selections[0].name && field.selectionSet.selections[0].name.value) ||
+// Infinity;

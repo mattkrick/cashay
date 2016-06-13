@@ -73,17 +73,53 @@ import {
 import {front2After3Query, front4Query, front3Response} from './src/normalize/__tests__/data-pagination-front';
 import removeNamespacing from './src/mutate/removeNamespacing';
 
+import {
+  createCommentWithId,
+  createCommentDifferentArg,
+  mixHardSoftArgs,
+  createMembers,
+  nestedFragmentSpreads,
+  postSpanishTitle,
+  postSpanishTitleVars,
+  mixPostFieldArgs,
+  badArg
+} from './src/mutate/__tests__/namespaceMutation-data';
+
+import {
+  mutationForCommentQueryNoVars,
+  queryCommentsForPostId,
+} from './src/mutate/__tests__/createMutationFromQuery-data';
+import createMutationFromQuery from './src/mutate/createMutationFromQuery';
+
+import {
+  parseAndNamespace,
+  createPostWithIncompleteArgs,
+  createPostWithPostId,createCommentWithId2
+} from './src/mutate/__tests__/mergeMutations-data';
 const idFieldName = '_id';
-const queryAST = parseAndInitializeQuery(back4, clientSchema, idFieldName);
-const context = buildExecutionContext(queryAST, {
-  cashayDataState: fullPostStore,
-  idFieldName,
-  schema: clientSchema,
-  paginationWords,
-  variables: {reverse: true, lang: "spanish"}
-});
-const {data: actual} = denormalizeStore(context);
-const {data: expected} = back4ResponseFn(1);
-debugger
+const queryPostWithInlineFieldVars = `
+  query($first: Int!, $defaultLanguage: String, $secondaryLanguage: String) {
+    getRecentPosts(count: $first) {
+      ... on PostType {
+        title(language: $defaultLanguage),
+        secondaryTitle: title(language: $secondaryLanguage)
+      }
+    }
+  }`;
+const mutatePostWithInlineFieldVars = `
+  mutation {
+    createPost {
+      post {
+        ... on PostType {
+          title(language: $defaultLanguage),
+          secondaryTitle: title(language: $secondaryLanguage)
+        }
+      }
+    }
+  }`;
+const queryAST = parse(queryPostWithInlineFieldVars);
+const expected = parseSortPrint(mutatePostWithInlineFieldVars);
+const actualAST = createMutationFromQuery(queryAST.definitions[0], 'createPost', {}, clientSchema);
+const actual = sortPrint(actualAST);
 fs.writeFileSync('./actualResult.json', JSON.stringify(actual, null, 2));
 fs.writeFileSync('./expectedResult.json', JSON.stringify(expected, null, 2));

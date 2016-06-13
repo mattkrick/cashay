@@ -3,19 +3,20 @@ import denormalizeStore from './normalize/denormalizeStore';
 import {rebuildOriginalArgs} from './normalize/denormalizeHelpers';
 import normalizeResponse from './normalize/normalizeResponse';
 import {printMinimalQuery} from './query/printMinimalQuery';
-import {shortenNormalizedResponse, invalidateMutationsOnNewQuery, requiredVariablesHaveValues} from './query/queryHelpers';
+import {shortenNormalizedResponse, invalidateMutationsOnNewQuery} from './query/queryHelpers';
 import {isObject, checkMutationInSchema} from './utils';
 import mergeStores from './normalize/mergeStores';
 import {CachedMutation, CachedQuery, MutationShell} from './helperClasses';
 import flushDependencies from './query/flushDependencies';
-import {makeComponentsToUpdate} from './mutate/mutationHelpers';
-import {parse, equalObjectKeys, buildExecutionContext, getVariables, clone} from './utils';
+import {parse, buildExecutionContext, getVariables, clone} from './utils';
 import namespaceMutation from './mutate/namespaceMutation';
-import mergeMutations from './mutate/mergeMutations';
 import createMutationFromQuery from './mutate/createMutationFromQuery';
 import removeNamespacing from './mutate/removeNamespacing';
 import makeFriendlyStore from './mutate/makeFriendlyStore';
 import addDeps from './normalize/addDeps';
+import mergeMutations from './mutate/mergeMutations';
+import {print} from 'graphql/language/printer';
+import ActiveComponentsObj from './mutate/ActiveComponentsObj';
 
 const defaultGetToState = store => store.getState().cashay;
 const defaultPaginationWords = {
@@ -49,13 +50,15 @@ export default class Cashay {
     // we can assume that a mutationName + the components it affects = a unique, reproduceable fullMutation
     // const example = {
     //   [mutationName]: {
-    //     activeComponentsObj: {},
+    //     activeComponentsObj: {
+    //       [component]: key || Boolean
+    //     },
     //     fullMutation: MutationString,
-    //     variableEnhancers: [],
+    //     variableEnhancers: [variableEnhancerFn],
     //     singles: {
     //       [component]: {
     //          ast: MutationAST,
-    //          variableEnhancers: []
+    //          variableEnhancers: [variableEnhancerFn]
     //       }
     //     }
     //   }
@@ -75,15 +78,14 @@ export default class Cashay {
     // }
     this.cachedQueries = {};
 
-    /*
-     const example = {
-     [subscriptionString]: {
-     ast: SubscriptionAST,
-     response: DenormalizedResponseWithUnsub
-     }
-     };
-     */
+    // const example = {
+    //   [subscriptionString]: {
+    //     ast: SubscriptionAST,
+    //     response: DenormalizedResponseWithUnsub
+    //   }
+    // };
     this.cachedSubscriptions = {};
+
     // a flag thrown by the invalidate function and reset when that query is added to the queue
     this._willInvalidateListener = false;
 
@@ -146,11 +148,14 @@ export default class Cashay {
     //if you call forceFetch in a mapStateToProps, you're gonna have a bad time (it'll refresh on EVERY dispatch)
     const {key} = options;
     const forceFetch = Boolean(options.forceFetch);
+
     // Each component can have only 1 unique queryString/variable combo. This keeps memory use minimal.
     // if 2 components have the same queryString/variable but a different component, it'll fetch twice
     const component = options.component || queryString;
+
     // get the result, containing a response, queryString, and options to re-call the query
     const fastResult = this.cachedQueries[component];
+
     // if we got local data cached already, send it back fast
     if (!forceFetch && fastResult && fastResult.response) {
       if (!key) {
@@ -199,13 +204,13 @@ export default class Cashay {
     }
 
     // if we need more data, get it from the server
-    if (!cachedResponse.isComplete && requiredVariablesHaveValues(context.operation.variableDefinitions, context.variables)) {
+    if (!cachedResponse.isComplete) {
       // given an operation enhanced with sendToServer flags, print minimal query
-      const serverQueryString = (forceFetch || cachedResponse.firstRun) ?
-        queryString : printMinimalQuery(context.operation, idFieldName);
+      // const serverQueryString = (forceFetch || cachedResponse.firstRun) ?
+      //   queryString : printMinimalQuery(context.operation, idFieldName);
 
       //  async query the server (no need to track the promise it returns, as it will change the redux state)
-      this.queryServer(transport, context, serverQueryString, component, key);
+      this.queryServer(transport, context, component, key);
     }
     if (options.mutationHandlers && component === queryString) {
       throw new Error(`'component' option is required when including 'mutationHandlers' for: ${queryString}`);
@@ -219,67 +224,72 @@ export default class Cashay {
    * Once the data comes back, it is normalized, old dependencies are removed, new ones are created,
    * and the data that comes back from the server is compared to local data to minimize invalidations
    *
-   * @param {function} transport the transport function to send the query + vars to a GraphQL endpoint
+   * @param {function} transport the transport class to send the query + vars to a GraphQL endpoint
    * @param {object} context the context to normalize data, including the requestAST and schema
-   * @param {string} minimizedQueryString the query string to send to the GraphQL endpoint
    * @param {string} component an ID specific to the queryString/variable combo (defaults to the queryString)
-   * @param {key} key A unique key to match the component instance, only used where you would use React's key (eg in a component that you called map on in the parent component).
+   * @param {key} key A unique key to match the component instance, only used where you would use React's key
+   * (eg in a component that you called map on in the parent component).
    *
    * @return {undefined}
    */
-  async queryServer(transport, context, minimizedQueryString, component, key) {
-    const {variables} = context;
-    const contextVariables = isObject(variables) ? clone(variables) : variables;
+  async queryServer(transport, context, component, key) {
+    const {variables, operation, idFieldName, schema} = context;
+    const {dispatch} = this.store;
+    const minimizedQueryString = printMinimalQuery(operation, idFieldName, variables, component, schema);
+    const contextVariables = variables && clone(variables);
+
     // send minimizedQueryString to server and await minimizedQueryResponse
     const {error, data} = await transport.handleQuery({query: minimizedQueryString, variables});
 
+    // make sure we get a fresh cached reference after the promise resolves
     const cachedQuery = this.cachedQueries[component];
+
     // handle errors coming back from the server
     if (error) {
       const cachedResponse = key ? cachedQuery.response[key] : cachedQuery.response;
       cachedResponse.error = error;
-      return this.store.dispatch({type: SET_ERROR, error});
+      return dispatch({type: SET_ERROR, error});
     }
+
     //re-create the denormalizedPartialResponse because it went stale when we called the server
     rebuildOriginalArgs(context.operation);
     const {data: denormalizedLocalResponse} = denormalizeStore(context);
-
     const normalizedLocalResponse = normalizeResponse(denormalizedLocalResponse, context);
 
-    // normalize response to get ready to dispatch it into the state tree, mutates variables though
+    // normalize response to get ready to dispatch it into the state tree
     const normalizedServerResponse = normalizeResponse(data, context);
+
+    // reset the variables that normalizeResponse mutated TODO find a better way
     context.variables = contextVariables;
+
     // now, remove the objects that look identical to the ones already in the state
-    // if the incoming entity (eg Person.123) looks exactly like the one already in the store, then
+    // that way, if the incoming entity (eg Person.123) looks exactly like the one already in the store
     // we don't have to invalidate and rerender
     const normalizedServerResponseForStore = shortenNormalizedResponse(normalizedServerResponse, this.getState().data);
 
     // if the server didn't give us any new stuff, we already set the vars, so we're done here
     if (!normalizedServerResponseForStore) return;
+
     // combine the partial response with the server response to fully respond to the query
     const fullNormalizedResponse = mergeStores(normalizedLocalResponse, normalizedServerResponse);
 
     // it's possible that we adjusted the arguments for the operation we sent to server
     // for example, instead of asking for 20 docs, we asked for 5 at index 15.
-    // now, we want to ask for the 20 again
+    // now, we want to ask for the 20 again (but locally)
     rebuildOriginalArgs(context.operation);
-
-    // read from a pseudo store (eliminates a requery)
-    // even if the requery wasn't expensive, doing it here means we don't have to keep track of the fetching status
-    // eg if fetching is true, then we always return the cached result
-    const reducedContext = Object.assign(context, {cashayDataState: fullNormalizedResponse});
-    cachedQuery.createResponse(reducedContext, component, key, this.store.dispatch, this.getState);
 
     // add denormalizedDeps so we can invalidate when other queries come in
     // add normalizedDeps to find those deps when a denormalizedReponse is mutated
     // the data fetched from server is only part of the story, so we need the full normalized response
     addDeps(fullNormalizedResponse, component, key, this.normalizedDeps, this.denormalizedDeps);
+
     // remove the responses from this.cachedQueries where necessary
     flushDependencies(normalizedServerResponseForStore.entities, component, key, this.denormalizedDeps, this.cachedQueries);
+
     // stick normalize data in store and recreate any invalidated denormalized structures
     const stateVariables = key ? {[component]: {[key]: contextVariables}} : {[component]: contextVariables};
 
-    this.store.dispatch({
+    dispatch({
       type: INSERT_QUERY,
       payload: {
         response: normalizedServerResponseForStore,
@@ -322,59 +332,49 @@ export default class Cashay {
    *
    */
   mutate(mutationName, options = {}) {
-    const {variables, components: possibleComponentsObj} = options;
+    const {variables} = options;
     this.cachedMutations[mutationName] = this.cachedMutations[mutationName] || new CachedMutation();
     const cachedMutation = this.cachedMutations[mutationName];
-    const {fullMutation, activeComponentsObj, singles} = cachedMutation;
-    let mutationString;
-    if (fullMutation) {
-      const objToCheck = possibleComponentsObj || makeComponentsToUpdate(mutationName, possibleComponentsObj, this.cachedQueries, this.mutationHandlers);
-      if (objToCheck === activeComponentsObj) {
-        mutationString = fullMutation;
-      } else if (equalObjectKeys(objToCheck, activeComponentsObj)) {
-        mutationString = fullMutation;
-      }
-    }
-    if (!mutationString) {
-      const componentsToUpdateObj = makeComponentsToUpdate(mutationName, possibleComponentsObj, this.cachedQueries, this.mutationHandlers);
-      const componentsToUpdateKeys = Object.keys(componentsToUpdateObj);
-      cachedMutation.activeComponentsObj = componentsToUpdateObj;
 
-      if (componentsToUpdateKeys.length === 0) {
-        // for analytics or mutations that dont affect the client
-        mutationString = cachedMutation.fullMutation = print(new MutationShell(mutationName, null, null, true));
-      } else {
-        // load the cachedMutation.singles with a bespoke (or user-defined) namespaced mutation for each query
-        // TODO handle performance boost if only 1 componentIdToUpdate
-        this._createMutationsFromQueries(componentsToUpdateKeys, mutationName, variables);
-
-        const cachedSingles = [];
-        for (let i = 0; i < componentsToUpdateKeys.length; i++) {
-          const component = componentsToUpdateKeys[i];
-          const {ast, variableEnhancers} = singles[component];
-          cachedSingles.push(ast);
-          cachedMutation.variableEnhancers.push(...variableEnhancers);
-        }
-        mutationString = cachedMutation.fullMutation = mergeMutations(cachedSingles);
-      }
-    }
-    const namespacedVariables = cachedMutation.variableEnhancers.reduce((enhancer, reduction) => enhancer(reduction), variables);
-    const newOptions = Object.assign({}, options, {variables: namespacedVariables});
+    // update fullMutation and variableEnhancers
+    this._updateCachedMutation(mutationName, options);
+    const {variableEnhancers} = this.cachedMutations[mutationName];
+    const namespacedVariables = variableEnhancers.reduce((enhancer, reduction) => enhancer(reduction), variables);
+    const newOptions = {...options, variables: namespacedVariables};
 
     // optimistcally update
     this._processMutationHandlers(mutationName, cachedMutation.activeComponentsObj, null, variables);
 
     // async call the server
-    this._mutateServer(mutationName, cachedMutation.activeComponentsObj, mutationString, newOptions);
+    this._mutateServer(mutationName, cachedMutation.activeComponentsObj, cachedMutation.fullMutation, newOptions);
+  }
+
+  _updateCachedMutation(mutationName, options) {
+    // try to return fast!
+    const cachedMutation = this.cachedMutations[mutationName];
+    if (cachedMutation.fullMutation) return;
+
+    const {variables, components} = options;
+    cachedMutation.activeComponentsObj = new ActiveComponentsObj(mutationName, components, this.cachedQueries, this.mutationHandlers);
+    const componentsToUpdateKeys = Object.keys(cachedMutation.activeComponentsObj);
+
+    if (componentsToUpdateKeys.length === 0) {
+      // for mutations that dont affect the client (eg analytics)
+      cachedMutation.fullMutation = print(new MutationShell(mutationName, null, null, true));
+    } else {
+      this._createMutationsFromQueries(componentsToUpdateKeys, mutationName, variables);
+    }
   }
 
   _createMutationsFromQueries(componentsToUpdateKeys, mutationName, variables) {
     const cachedSingles = this.cachedMutations[mutationName].singles;
+    const cachedSinglesASTs = [];
+    const newVariableEnhancers = [];
     for (let i = 0; i < componentsToUpdateKeys.length; i++) {
       const component = componentsToUpdateKeys[i];
       if (!cachedSingles[component]) {
-        const {ast} = this.cachedQueries[component];
-        const mutationAST = createMutationFromQuery(ast, mutationName, variables, this.schema);
+        const queryOperation = this.cachedQueries[component].ast.definitions[0];
+        const mutationAST = createMutationFromQuery(queryOperation, mutationName, variables, this.schema);
         const componentStateVars = this.getState().data.variables[component];
         const {namespaceAST, variableEnhancers} = namespaceMutation(mutationAST, component, componentStateVars, this.schema);
         cachedSingles[component] = {
@@ -382,13 +382,20 @@ export default class Cashay {
           variableEnhancers
         }
       }
+      const {ast, variableEnhancers} = cachedSingles[component];
+      cachedSinglesASTs.push(ast);
+      newVariableEnhancers.push(...variableEnhancers);
     }
+    const cachedMutation = this.cachedMutations[mutationName];
+    cachedMutation.fullMutation = mergeMutations(cachedSinglesASTs);
+    cachedMutation.variableEnhancers.push(...newVariableEnhancers);
   };
 
   async _mutateServer(mutationName, componentsToUpdateObj, mutationString, options) {
     const {variables} = options;
     const transport = options.transport || this.transport;
     const docFromServer = await transport.handleQuery({query: mutationString, variables});
+
     // update state with new doc from server
     this._processMutationHandlers(mutationName, componentsToUpdateObj, docFromServer.data);
   }
@@ -399,6 +406,7 @@ export default class Cashay {
     let allNormalizedChanges = {};
     let allVariables = {};
     const componentsToUpdateKeys = Object.keys(componentsToUpdateObj);
+
     // for every component that listens the the mutationName
     for (let i = 0; i < componentsToUpdateKeys.length; i++) {
       const component = componentsToUpdateKeys[i];
@@ -411,13 +419,16 @@ export default class Cashay {
       const {ast, refetch, response} = cachedResult;
       const cachedResponseData = key ? response[key].data : response.data;
       let modifiedResponse;
+
       // for the denormalized response, mutate it in place or return undefined if no mutation was made
       const getType = this._getTypeFactory(component, key);
       if (dataFromServer) {
+
         // if it's from the server, send the doc we got back
         const normalizedDataFromServer = removeNamespacing(dataFromServer, component);
         modifiedResponse = componentHandler(null, normalizedDataFromServer, cachedResponseData, getType, this._invalidate);
       } else {
+
         // otherwise, treat it as an optimistic update
         modifiedResponse = componentHandler(variables, null, cachedResponseData, getType, this._invalidate);
       }
@@ -461,24 +472,13 @@ export default class Cashay {
         cashayDataState
       });
 
-      // create a new 
       const normalizedModifiedResponse = normalizeResponse(modifiedResponse, context);
       allNormalizedChanges = mergeStores(allNormalizedChanges, normalizedModifiedResponse);
       allVariables = {...allVariables, ...contextVars};
-      // for each paginated array in the pre-modifiedResponse, I need to know its start and end idx in the state
-      // that way, i can merge the modfiedResponse into the normalized state tree
-      // i'm guaranteed that the start idx is 0 because there's no way to get a cursor without starting there & that'd mess up the EOF
-      // that means, i just need to know the length of the array before it is mutated
-      // pretty easy to do if i create a custom `myLength` in the denormalization process, then calc the diff
-      // so, if i'm doing a merge & the 
 
     }
 
     const normalizedServerResponseForStore = shortenNormalizedResponse(allNormalizedChanges, cashayDataState);
-
-    // walk entire response, looking for a cashayArray
-    // if found, replace the 
-
 
     // merge the normalized optimistic result with the state
     // dont invalidate other queries, they might not want it.
@@ -503,16 +503,15 @@ export default class Cashay {
       }
 
       const componentState = cashayDataState.variables[component];
-      const stateVars = key ? componentState : componentState[key];
+      // TODO using stateVars is wrong because vars could be static in the query, instead we need to check the schema + varDefs + vars 
+      const stateVars = key ? componentState[key] : componentState;
       if (!stateVars) {
         return rawState;
       }
-      const queryAST = this.cachedQueries[component].ast;
       const context = {
         paginationWords: this.paginationWords,
         variables: stateVars,
         skipTransform: true,
-        queryAST,
         schema: this.schema
       };
       return makeFriendlyStore(rawState, typeName, context);

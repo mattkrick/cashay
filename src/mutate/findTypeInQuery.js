@@ -1,20 +1,29 @@
 import {INLINE_FRAGMENT} from 'graphql/language/kinds';
-import {ensureRootType, clone} from '../utils'
+import {ensureRootType} from '../utils'
 /**
- * Uses a BFS since types are likely high up the tree & scalars can break as soon as a matching name is found
+ * Traverses a query AST operation looking for a specific type (for objects) or name (for scalars)
+ * Uses a BFS since return values are likely high up the tree & scalars can break as soon as a matching name is found
  *
+ * @param {String} typeName the type of GraphQL object to look for
+ * @param {Object} operation the request AST's definition to traverse
+ * @param {Object} schema the cashay client schema
+ * @param {String} [matchName] if provided, it will match by typeName AND matchName (used for scalars)
+ *
+ * @returns {Array} a bag full of selections whose children will be added to the mutation response
  */
-export default function findTypeInQuery(typeName, queryAST, schema, matchName) {
+export default function findTypeInQuery(typeName, operation, schema, matchName) {
   const bag = [];
   const queue = [];
   let next = {
-    reqAST: queryAST,
+    operation,
     typeSchema: schema.querySchema
   };
   while (next) {
-    const {reqAST, typeSchema} = next;
-    if (reqAST.selectionSet) {
-      for (let selection of reqAST.selectionSet.selections) {
+    const {operation, typeSchema} = next;
+    if (operation.selectionSet) {
+      const {selections} = operation.selectionSet;
+      for (let i = 0; i <  selections.length; i++) {
+        const selection = selections[i];
         let subSchema;
         if (selection.kind === INLINE_FRAGMENT) {
           subSchema = typeSchema;
@@ -27,16 +36,16 @@ export default function findTypeInQuery(typeName, queryAST, schema, matchName) {
             if (matchName) {
               const fieldNameOrAlias = selection.alias && selection.alias.value || selectionName;
               if (matchName === fieldNameOrAlias) {
-                bag[0] = clone(selection);
+                bag[0] = selection;
                 return bag;
               }
             } else {
-              bag.push(clone(selection.selectionSet.selections));
+              bag.push(selection);
             }
           }
         }
         queue.push({
-          reqAST: selection,
+          operation: selection,
           typeSchema: subSchema
         })
       }

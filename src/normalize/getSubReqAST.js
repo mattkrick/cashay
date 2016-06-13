@@ -1,4 +1,4 @@
-import {FRAGMENT_SPREAD, INLINE_FRAGMENT} from 'graphql/language/kinds';
+import {INLINE_FRAGMENT} from 'graphql/language/kinds';
 
 export const getSubReqAST = (key, reqAST, fragments) => {
   let subReqAST;
