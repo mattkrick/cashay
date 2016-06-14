@@ -2,7 +2,7 @@ import {print} from 'graphql/language/printer';
 import {VARIABLE} from 'graphql/language/kinds';
 import {getMissingRequiredVariables} from './queryHelpers';
 import createVariableDefinitions from '../createVariableDefinitions';
-import {ensureRootType} from '../utils';
+import {ensureRootType, clone} from '../utils';
 
 export const printMinimalQuery = (reqAST, idFieldName, variables, component, schema) => {
   const context = {
@@ -23,12 +23,14 @@ const minimizeQueryAST = (reqAST, idFieldName, variables, subSchema, context) =>
     if (field.sendToServer) {
       const fieldSchema = subSchema.fields[field.name.value];
       if (field.arguments && field.arguments.length) {
+        const cachedVariableDefinitions = clone(context.variableDefinitions);
         createVariableDefinitions(field.arguments, fieldSchema, false, context);
         const missingRequiredVars = getMissingRequiredVariables(context.variableDefinitions, variables);
         const hasMissingVar = findMissingVar(field.arguments, missingRequiredVars);
         if (hasMissingVar) {
           // remove fields that aren't given the vars they need to be successful
           selections[i] = undefined;
+          context.variableDefinitions = cachedVariableDefinitions;
           continue;
         }
       }
@@ -40,17 +42,17 @@ const minimizeQueryAST = (reqAST, idFieldName, variables, subSchema, context) =>
     } else if (field.name.value !== idFieldName) {
       selections[i] = undefined;
     }
-    // clean up unnecessary children
-    const minimizedFields = selections.filter(Boolean);
+  }
+  // clean up unnecessary children
+  const minimizedFields = selections.filter(Boolean);
 
-    // if there aren't any fields or maybe just an unnecessary id field, remove the req
-    const firstField = minimizedFields[0];
-    if (!firstField ||
-      (minimizedFields.length === 1 && !firstField.sendToServer && firstField.name && firstField.name.value === idFieldName)) {
-      reqAST.selectionSet = null;
-    } else {
-      reqAST.selectionSet.selections = minimizedFields;
-    }
+  // if there aren't any fields or maybe just an unnecessary id field, remove the req
+  const firstField = minimizedFields[0];
+  if (!firstField ||
+    (minimizedFields.length === 1 && !firstField.sendToServer && firstField.name && firstField.name.value === idFieldName)) {
+    reqAST.selectionSet = null;
+  } else {
+    reqAST.selectionSet.selections = minimizedFields;
   }
 };
 

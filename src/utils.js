@@ -70,12 +70,29 @@ export const teardownDocumentAST = queryAST => {
   return {operation, fragments};
 };
 
-export const getVariables = (variables, componentVars, key) => {
+export const getVariables = (variables = {}, cashayDataState, component, key, cachedResponse) => {
+  const componentVars = cashayDataState.variables[component];
   let stateVars;
   if (componentVars) {
     stateVars = key ? componentVars[key] : componentVars;
   }
-  return stateVars || variables;
+  return resolveVariables(cashayDataState, stateVars, variables, key, cachedResponse);
 };
+
+const resolveVariables = (cashayDataState, stateVars, variables, key, cachedResponse) => {
+  const variableNames = Object.keys(variables);
+  // if (!variableNames.length) return stateVars;
+  const response = key ? cachedResponse[key] : cachedResponse;
+  const newVariables = {};
+  for (let i = 0; i < variableNames.length; i++) {
+    const variableName = variableNames[i];
+    const value = variables[variableName];
+    newVariables[variableName] = (typeof value === 'function') ? safeValue(response, value, cashayDataState) : value;
+  }
+  // make the stateVars override the likely stale UD vars, but if the UD vars have something that used to be undefined, keep it
+  return {...newVariables, ...stateVars};
+};
+
+const safeValue = (response, cb, cashayDataState) => response && response.data && cb(response.data, cashayDataState);
 
 export const makeNamespaceString = (component, name, d = DELIMITER) => `${CASHAY}${d}${component}${d}${name}`;
