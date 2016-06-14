@@ -80,13 +80,13 @@ import {Cashay, HTTPTransport} from 'cashay';
 export const cashay = new Cashay(paramsObject);
 ```
 
-The params that you can pass in are as follows:
-- `store`: Your redux store
-- `schema`: your client schema that cashay helped you make
+The params that you can pass in are as follows (*required):
+- *`store`: Your redux store
+- *`schema`: your client schema that cashay helped you make
+- *`transport`: An instance of `HTTPTransport` used to send off the query + variables to your GraphQL server.
 - `idFieldName`: Defaults to `id`, but you can call it whatever it is in your DB (eg Mongo uses `_id`)
 - `paginationWords`: The reserved words that you use for pagination. Defaults to an object with 4 properties: `first, last, after, before`. If, for example, your backend uses `count` instead of `first`, you'd send in `{first: 'count'}`.
 - `getToState`: A function to get to the cashay sub-state inside the redux state. Defaults to `store => store.getState().cashay`
-- `transport`: An instance of `HTTPTransport` used to send off the query + variables to your GraphQL server.
 
 
 
@@ -100,7 +100,7 @@ Now, whenever you need to query or mutate some data, just import your shiny new 
 new HTTPTransport(uri, fetchOptions, errorHandler)
 ```
 
-- `uri`: the location of your graphQL endpoint, defaults to '/graphql'
+- *`uri`: the location of your graphQL endpoint, defaults to '/graphql'
 - `fetchOptions`: Any details or headers used to pass into making the HTTP fetch
 - `errorHandler`: A custom function that takes any GraphQL `errors` and converts them into a single `error` for your Redux state
 
@@ -148,12 +148,12 @@ For this example, we'll use React and `react-redux`:
 ```js
 const mapStateToProps = (state, props) => {
   return {
-    cashay: cashay.query(queryString, options)
+    response: cashay.query(queryString, options)
   }
 };
 ```
 
-Following the example above, `this.props.cashay` will be an object that has the following:
+Following the example above, `this.props.response` will be an object that has the following:
 - `isComplete`: A Boolean telling you if the query came back with all requested information. This is useful if you want to use a loading spinner, etc.
 - `firstRun`: A Boolean telling you if this is the first time that the query type was run with these particular arguments (but not necessarily exactly these same fields). Internally, it's useful because it saves a few CPU cycle. Externally, you might use it for notifications on new queries. I don't know. Get creative!
 - `data`: The data object that you expect to get back when you call your GraphQL server.
@@ -180,7 +180,19 @@ Cashay mutations are pretty darn simple, too:
 cashay.mutate(mutationName, options)
 ```
 
-Cashay is smart. By default, it will go through all the `mutationHandlers` that are currently active, looking for any handlers for `mutationName`. Then, it intersects your mutation payload schema with the corresponding queries to automatically fetch all the fields you need. No fat queries, no mutation fragments in your queries, no problems. If two different queries need the same field but with different arguments (eg. `Query1` needs `profilePic(size:SMALL)` and `Query2` needs `profilePic(size:LARGE)`, it'll take care of that, too. For the curious, it does this by assigning a namespaced alias to all fields with args, in addition to namespacing the variables you passed in. Then when the result comes back, it de-namespaces it for the `mutationHandler`. Note: if you return a scalar variable at the highest level of your mutation payload schema, make sure the name in the mutation payload schema matches the name in the query to give Cashay a hint to grab it.
+Cashay is smart.
+By default, it will go through all the `mutationHandlers` that are currently active,
+looking for any handlers for `mutationName`.
+Then, it intersects your mutation payload schema with the corresponding queries to automatically fetch all the fields you need.
+No fat queries, no mutation fragments in your queries, no problems.
+If two different queries need the same field but with different arguments
+(eg. `Query1` needs `profilePic(size:SMALL)` and `Query2` needs `profilePic(size:LARGE)`,
+it'll take care of that, too.
+For the curious, it does this by assigning a namespaced alias to all fields with args,
+in addition to namespacing the variables you passed in.
+Then when the result comes back, it de-namespaces it for the `mutationHandler`.
+Note: if you return a scalar variable at the highest level of your mutation payload schema,
+make sure the name in the mutation payload schema matches the name in the query to give Cashay a hint to grab it.
 
 The options are as follows:
 - `variables`: The variables object to pass onto the GraphQL server. Make sure the variables have the same names as what your schema expects so Cashay can automatically create the mutation for you. For maximum efficiency, be sure to pass in all variables that you will possibly use (even if that means passing it in as `undefined`). If you can't do these 2 things, you can write a `customMutation` (and tell me your usecase, I'm curious!).
@@ -196,12 +208,13 @@ const components = {
   comments: postId,
   post: mutationAffectsPostComponent
 }
-cashay.mutate('deletComment', {variables: {commentId: postId}, components})
+cashay.mutate('deleteComment', {variables: {commentId: postId}, components})
 ```
 
 ## Recipes
 
 - [Pagination](./recipes/pagination.md)
+- [Multi-part queries](./recipes/multi-part.queries.md)
 - [Schema (without webpack)](./recipes/cashay-schema.md)
 
 ## Examples (PR to list yours)
