@@ -3,6 +3,7 @@ module.exports = function(content) {
   this.cacheable && this.cacheable();
   const callback = this.async();
   // Execute the supplied javascript, receive promise:
+  
   const doc = this.exec(content, this.resource);
   doc.then(function (schema) {
     // Await the yield of a cashay schema:

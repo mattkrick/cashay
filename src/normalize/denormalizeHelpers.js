@@ -1,6 +1,6 @@
 import {INLINE_FRAGMENT} from 'graphql/language/kinds';
 import {TypeKind} from 'graphql/type/introspection';
-import {ensureTypeFromNonNull} from '../utils';
+import {ensureTypeFromNonNull, NORM_DELIMITER} from '../utils';
 
 const {UNION, LIST, SCALAR} = TypeKind;
 
@@ -65,7 +65,9 @@ export const rebuildOriginalArgs = reqAST => {
   }
 };
 
-export const getDocFromNormalString = (normalString, entities) => {
-  const [typeName, docId] = normalString.split(':');
-  return entities[typeName][docId];
+export const getDocFromNormalString = (normalString) => {
+  const splitPoint = normalString.indexOf(NORM_DELIMITER);
+  const typeName = normalString.substr(0, splitPoint);
+  const docId = normalString.substr(splitPoint + NORM_DELIMITER.length);
+  return {typeName, docId};
 };

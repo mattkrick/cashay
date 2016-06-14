@@ -39,7 +39,7 @@ export const storeFromSortedArgs = {
     }
   },
   "result": {
-    "getLatestPost": "PostType:p126"
+    "getLatestPost": "PostType::p126"
   }
 };
 
