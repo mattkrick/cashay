@@ -165,8 +165,6 @@ export default class Cashay {
       }
     }
     const cashayDataState = this.getState().data;
-    // override singleton defaults with query-specific values
-    const variables = getVariables(options.variables, cashayDataState.variables[component], key);
 
     const transport = options.transport || this.transport;
 
@@ -181,6 +179,9 @@ export default class Cashay {
     }
     const cachedQuery = this.cachedQueries[component];
 
+    // override singleton defaults with query-specific values
+    const variables = getVariables(options.variables, cashayDataState, component, key, cachedQuery.response);
+    
     // create an AST that we can mutate
     const {paginationWords, idFieldName, schema} = this;
     const context = buildExecutionContext(cachedQuery.ast, {
@@ -205,9 +206,8 @@ export default class Cashay {
 
     // if we need more data, get it from the server
     if (!cachedResponse.isComplete) {
-      // given an operation enhanced with sendToServer flags, print minimal query
-      // const serverQueryString = (forceFetch || cachedResponse.firstRun) ?
-      //   queryString : printMinimalQuery(context.operation, idFieldName);
+      // if a variable is a function, it may need info that comes from the cachedResponse
+      context.variables = getVariables(options.variables, cashayDataState, component, key, cachedResponse);
 
       //  async query the server (no need to track the promise it returns, as it will change the redux state)
       this.queryServer(transport, context, component, key);
@@ -236,7 +236,7 @@ export default class Cashay {
     const {variables, operation, idFieldName, schema} = context;
     const {dispatch} = this.store;
     const minimizedQueryString = printMinimalQuery(operation, idFieldName, variables, component, schema);
-    const contextVariables = variables && clone(variables);
+    const contextVariables = clone(variables);
 
     // send minimizedQueryString to server and await minimizedQueryResponse
     const {error, data} = await transport.handleQuery({query: minimizedQueryString, variables});
@@ -288,7 +288,6 @@ export default class Cashay {
 
     // stick normalize data in store and recreate any invalidated denormalized structures
     const stateVariables = key ? {[component]: {[key]: contextVariables}} : {[component]: contextVariables};
-
     dispatch({
       type: INSERT_QUERY,
       payload: {
@@ -533,7 +532,7 @@ export default class Cashay {
       error: this.subscriptionError
     };
     const cashayDataState = this.getState().data;
-    const variables = getVariables(options.variables, cashayDataState.variables[component]);
+    // const variables = getVariables(options.variables, cashayDataState.variables[component]);
     return subscriber(subscriptionString, handlers, variables);
   }
 

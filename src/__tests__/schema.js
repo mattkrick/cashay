@@ -258,12 +258,12 @@ const Query = new GraphQLObjectType({
         return PostDB.length;
       }
     },
-    getLatestPost: {
-      type: PostType,
+    getLatestPostId: {
+      type: GraphQLString,
       description: "Latest post in the blog",
       resolve() {
         const sortedPosts = PostDB.sort((a, b) => b.createdAt - a.createdAt);
-        return sortedPosts[0];
+        return sortedPosts[0]._id;
       }
     },
     getRecentPosts: {

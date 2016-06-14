@@ -15,7 +15,7 @@ const getSuppliedArgs = (args, variables = {}, paginationWords) => {
     const arg = args[i];
     const argName = arg.name.value;
     let argValue = arg.value.kind === VARIABLE ? variables[arg.value.name.value] : arg.value.value;
-    if (argValue === undefined) return;
+    if (argValue === undefined) continue;
     let paginationMeaning = paginationWordKeys.find(pageWord => paginationWords[pageWord] === argName);
     if (paginationMeaning) {
       if (paginationMeaning === FIRST || paginationMeaning === LAST) {
