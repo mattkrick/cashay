@@ -27,36 +27,29 @@ Relay for the rest of us
 
 ### Creating the client schema
 
-Cashay requires a portion of GraphQL schema to reside on the client. The schema
-is extracted by executing a subset of the introspection query.
-Included are two convenient mechanisms for extracting this schema:
+Cashay uses a client-safe portion of your GraphQL schema,
+similar to [GraphiQL](https://github.com/graphql/graphiql), but _way_ smaller.
 
-1. `cashay-loader` – a webpack loader
-2. `cashay-schema` – a command-line utility
-
-#### cashay-loader
-
-If you're using [Webpack](https://webpack.github.io/), including the schema is
-made easy by using the `cashay-loader`. The joy of using the loader is your
-client schema is automatically rebuilt and is always kept in sync.
-You can include the schema information within your client
-(likely near the instantiation of your
-[Cashay singleton](#creating-the-singleton)) by using a `require()` statement:
+Since schemas change rapidly during development, Cashay includes a
+[Webpack](https://webpack.github.io/) loader to automatically refresh the schema on startup.
+You can include the schema on your client
+(likely near the instantiation of your [Cashay singleton](#creating-the-singleton))
+by using a `require()` statement:
 
 ```js
 const cashaySchema = require('cashay!../server/utils/getCashaySchema.js');
 ///            cashay-loader ^^^     ^^^ module returning promise for a schema
 ```
 
-**Note:** `cashay-loader` is included with Cashay. If you've installed
-cashay with `npm install -S cashay`, the loader will be located by
-Webpack automatically.
+**Note:** `cashay-loader` is automatically included with Cashay, just use it!
 
 All the loader needs is a module which exports a Promise for a schema that's
 been transformed by the Cashay's `transformSchema()` convenience function.
 Ours looks like this:
 
 ```js
+// getCashaySchema.js
+
 require('babel-register');
 require('babel-polyfill');
 const {transformSchema} = require('cashay');
@@ -64,31 +57,7 @@ const graphql = require('graphql').graphql;
 const rootSchema = require('../graphql/rootSchema');
 module.exports = transformSchema(rootSchema, graphql);
 ```
-
-#### cashay-schema
-
-The script takes an `input` and an `output`: - `input`: The relative path to
-your server schema. Alternatively, you can pass in the url to a GraphQL endpoint -
-`output`: The relative path to your output file. Defaults to
-`./clientSchema.json`
-
-Options: - `--production`: Removes whitespaces from the generated
-`clientSchema.json` - `--oncomplete`: A relative path to a callback to run after
-generation is complete. This is useful if you need to drain a DB connection
-pool:
-
-```js
-// drainPool.js
-import r from './rethinkDBDriver';
-export default () => {
-  r.getPoolMaster().drain();
-}
-```
-
-**Pro tip: Make it an npm script:**
-
-`"updateSchema": "cashay-schema src/schema.js src/clientSchema.json --oncomplete src/drainPool.js --production"`
-
+If you cannot use webpack, see the [cashay-schema](./recipes/cashay-schema.md) recipe.
 
 ### Adding the reducer
 
@@ -102,10 +71,11 @@ const store = createStore(rootReducer, {});
 
 ### Creating the singleton
 
-Cashay is front-end agnostic, so instead of passing it through React context or making you replace `react-redux` with something non-vanilla, you can just easily export your singleton from where you created it.
+Cashay is front-end agnostic, so instead of passing it through React context
+or making you replace `react-redux` with something non-vanilla,
+you can just export your singleton from where you created it.
 ```js
-import clientSchema from './clientSchema.json';
-// or use webpack: const clientSchema = require('cashay!../server/utils/getCashaySchema.babel.js');
+const clientSchema = require('cashay!../server/utils/getCashaySchema.js');
 import {Cashay, HTTPTransport} from 'cashay';
 export const cashay = new Cashay(paramsObject);
 ```
@@ -157,15 +127,20 @@ Options include:
 - `mutationHandlers` An object where each method is the name of a mutation that changes the query. See below.
 
 ```js
-mutationHandler(optimisticVariables, serverData, currentResponse, entities, invalidate)
+mutationHandler(optimisticVariables, serverData, currentResponse, getEntities, invalidate)
 ```
 
-A mutation handler is called twice per mutation: once with `optimisticVariables` (for optimistic updates), and again with `serverData` when the mutation response comes back. Return a value to change the state. Don't return anything & the state won't change.
+A mutation handler is called twice per mutation:
+once with `optimisticVariables` (for optimistic updates),
+and again with `serverData` when the mutation response comes back.
+
+If a return value is provided, it will be normalized & merged with the state.
+If there is no return value, the state won't change.
 
 - `optimisticVariables`: The variables you send to the server when you call a mutation. You can use this to optimistically update the UI. Is `null` when the function is called after receving a resonse from the server.
 - `serverData`: The data that came back from the server. The shape is identical to whatever the `type` is in your GraphQL schema for that mutation. It is `null` when optimistically updating.
 - `currentResponse`: The response you receive from your query. The shape follows whatever you entered in `queryString`. You can modify this and return it, Cashay will detect the differences.
-- `entities`: The entities stored in your redux state. This is useful in case you want to e.g. replace a deleted document with the next-best one you have locally.
+- `getEntites(typeName)`: A function that returns all the entities for a given GraphQL type (eg `typeName = PostType`) This is useful in case you want to replace a deleted document with the next-best doc you have locally.
 - `invalidate`: A function that you can call to retrigger the query (with `forceFetch = true`). This is useful if you want to guarantee that a query has accurate data after each mutation.
 
 
@@ -226,18 +201,30 @@ cashay.mutate('deletComment', {variables: {commentId: postId}, components})
 
 ## Recipes
 
-[See recipes](./RECIPES.md)
+- [Pagination](./recipes/pagination.md)
+- [Schema (without webpack)](./recipes/cashay-schema.md)
 
-## Example
+## Examples (PR to list yours)
 
-https://github.com/mattkrick/cashay-playground
+- [Cashay-playground](https://github.com/mattkrick/cashay-playground)
+- [Action by Parabol](https://github.com/ParabolInc/action/)
 
 ## Contributing
 
-Cashay is a young project, so there are sure to be plenty of bugs to squash and edge cases to capture. Bugs will be fixed with the following priority:
+Cashay is a young project, so there are sure to be plenty of bugs to squash and edge cases to capture.
+Bugs will be fixed with the following priority:
 - Submit an issue: LOW
 - Submit a PR with a failing test case: HIGH
 - Submit a PR with a passing test case (ie fix it yourself): SUPER HIGH HIGH FIVE!
+
+## Roadmap
+
+- Subscriptions
+- Fixing `getEntites` in the `mutationHandler`
+- Test coverage at 95%
+- Recipe for server-side rendering
+- Persisted data and TTL on documents
+- Support directives
 
 ##License
 

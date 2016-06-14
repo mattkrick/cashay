@@ -1,6 +1,4 @@
-# RECIPES
-
-## Pagination
+# Pagination
 
 Cashay uses cursor-based pagination.
 That means your backend queries should accept `last, before` and/or `first, after` arguments.
@@ -22,7 +20,7 @@ Cashay will see that you already have the first 10 and only request the next 10 
 Cashay enforces best practices and only supports querys that start from the beginning or end.
 It will throw an error if you try to use the cursor within your queries.
 
-### Ultra-efficient 2-part queries
+## Ultra-efficient 2-part queries
 
 Sometimes, it is preferable to sacrifice a round trip in exchange for a smaller payload.
 In such a case, you'd want to perform a 2-part query.
@@ -42,7 +40,7 @@ Since `IDs` will be falsy for the first pass, that query will be removed from in
 Then, after the response comes back, `getPostIds` will be removed from the second server request
 since that piece was returned locally.
 
-### Starting from the middle of a query
+## Starting from the middle of a query
 
 Rarely, you'll need to start from the middle of a query.
 For example, you have a chat search feature that returns the search result with the 10 chat lines above & below it.
@@ -52,7 +50,7 @@ Cashay currently offers 2 ways to accomplish this:
 This will fetch possibly redundant documents (especially if you return multiple search results)
 but an extra couple bytes is a fair trade for the speed & simplicity.
 
-### Detecting if all documents have been fetched
+## Detecting if all documents have been fetched
 
 When paginating, it is useful to detect when there are no additional new docs left on the server.
 Almost always, you can accomplish this by comparing the amount requested to the amount received.
