@@ -31,8 +31,39 @@ Cashay requires a portion of GraphQL schema to reside on the client. The schema
 is extracted by executing a subset of the introspection query.
 Included are two convenient mechanisms for extracting this schema:
 
-1. `cashay-schema` – a command-line utility
-2. `cashay-loader` – a webpack loader
+1. `cashay-loader` – a webpack loader
+2. `cashay-schema` – a command-line utility
+
+#### cashay-loader
+
+If you're using [Webpack](https://webpack.github.io/), including the schema is
+made easy by using the `cashay-loader`. The joy of using the loader is your
+client schema is automatically rebuilt and is always kept in sync.
+You can include the schema information within your client
+(likely near the instantiation of your
+[Cashay singleton](#creating-the-singleton)) by using a `require()` statement:
+
+```js
+const cashaySchema = require('cashay!../server/utils/getCashaySchema.js');
+///            cashay-loader ^^^     ^^^ module returning promise for a schema
+```
+
+**Note:** `cashay-loader` is included with Cashay. If you've installed
+cashay with `npm install -S cashay`, the loader will be located by
+Webpack automatically.
+
+All the loader needs is a module which exports a Promise for a schema that's
+been transformed by the Cashay's `transformSchema()` convenience function.
+Ours looks like this:
+
+```js
+require('babel-register');
+require('babel-polyfill');
+const {transformSchema} = require('cashay');
+const graphql = require('graphql').graphql;
+const rootSchema = require('../graphql/rootSchema');
+module.exports = transformSchema(rootSchema, graphql);
+```
 
 #### cashay-schema
 
@@ -57,42 +88,6 @@ export default () => {
 **Pro tip: Make it an npm script:**
 
 `"updateSchema": "cashay-schema src/schema.js src/clientSchema.json --oncomplete src/drainPool.js --production"`
-
-#### cashay-loader
-
-If you're using [Webpack](https://webpack.github.io/), including the schema is
-made even easier by using the `cashay-loader`. You can include the schema
-information within your client (likely near the instantiation of your
-[Cashay singleton](#creating-the-singleton)) by using a `require()` statement:
-
-```js
-const cashaySchema = require('cashay!../server/utils/getCashaySchema.babel.js');
-///            cashay-loader ^^^     ^^^ module returning promise for a schema
-```
-
-**Note:** `cashay-loader` is included with Cashay. If you've installed
-cashay with `npm install -S cashay`, the loader will be located by
-Webpack automatically.
-
-
-All the loader needs is a module that returns a Promise for a schema that's
-been transformed by the Cashay's `transformSchema()` convenience function.
-Ours looks like this:
-
-```js
-import rootSchema from '../graphql/rootSchema';
-import {transformSchema} from 'cashay';
-import rethinkExit from './rethinkExit';
-
-// side-step 'Error: Schema must be an instance of GraphQLSchema.'
-const graphql = require('graphql').graphql;
-
-export default async () => {
-  const schema = await transformSchema(rootSchema, graphql);
-  rethinkExit();
-  return schema;
-};
-```
 
 
 ### Adding the reducer
