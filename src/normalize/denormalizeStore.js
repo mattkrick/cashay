@@ -4,7 +4,8 @@ import {ensureRootType, ensureTypeFromNonNull, TYPENAME} from '../utils';
 import {
   calculateSendToServer,
   sendChildrenToServer,
-  handleMissingData
+  handleMissingData,
+  getDocFromNormalString
 } from './denormalizeHelpers';
 import getFieldState from './getFieldState';
 
@@ -47,7 +48,7 @@ const visitObject = (subState = {}, reqAST, subSchema, context, baseReduction = 
 };
 
 const visitNormalizedString = (subState, reqAST, subSchema, context) => {
-  const [typeName, docId] = subState.split(':');
+  const {typeName, docId} = getDocFromNormalString(subState);
   const doc = context.cashayDataState.entities[typeName][docId];
   const fieldSchema = context.schema.types[typeName];
   return visit(doc, reqAST, fieldSchema, context);

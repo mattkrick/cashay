@@ -45,10 +45,10 @@ export const fullPostStore = {
   "result": {
     "getRecentPosts": {
       "full": [
-        "PostType:p126",
-        "PostType:p125",
-        "PostType:p124",
-        "PostType:p123"
+        "PostType::p126",
+        "PostType::p125",
+        "PostType::p124",
+        "PostType::p123"
       ]
     }
   }
@@ -78,10 +78,10 @@ export const front4PostStore = {
   "result": {
     "getRecentPosts": {
       "front": [
-        "PostType:p126",
-        "PostType:p125",
-        "PostType:p124",
-        "PostType:p123"
+        "PostType::p126",
+        "PostType::p125",
+        "PostType::p124",
+        "PostType::p123"
       ]
     }
   }
@@ -111,10 +111,10 @@ export const back4PostStore = {
   "result": {
     "getRecentPosts": {
       "back": [
-        "PostType:p126",
-        "PostType:p125",
-        "PostType:p124",
-        "PostType:p123"
+        "PostType::p126",
+        "PostType::p125",
+        "PostType::p124",
+        "PostType::p123"
       ]
     }
   }
@@ -148,7 +148,7 @@ export const back1Store = {
   result: {
     getRecentPosts: {
       back: [
-        "PostType:p123"
+        "PostType::p123"
       ]
     }
   }
@@ -165,7 +165,7 @@ export const back1StoreNoCursor = {
   result: {
     getRecentPosts: {
       back: [
-        "PostType:p123"
+        "PostType::p123"
       ]
     }
   }
@@ -210,12 +210,12 @@ export const front3Back1Store = {
   result: {
     getRecentPosts: {
       back: [
-        "PostType:p123"
+        "PostType::p123"
       ],
       front: [
-        "PostType:p126",
-        "PostType:p125",
-        "PostType:p124"
+        "PostType::p126",
+        "PostType::p125",
+        "PostType::p124"
       ]
     }
   }
@@ -267,10 +267,10 @@ export const front4PostStoreNoCursors = {
   "result": {
     "getRecentPosts": {
       "front": [
-        "PostType:p126",
-        "PostType:p125",
-        "PostType:p124",
-        "PostType:p123"
+        "PostType::p126",
+        "PostType::p125",
+        "PostType::p124",
+        "PostType::p123"
       ]
     }
   }
@@ -299,10 +299,10 @@ export const back4PostStoreNoLastCursor = {
   "result": {
     "getRecentPosts": {
       "back": [
-        "PostType:p126",
-        "PostType:p125",
-        "PostType:p124",
-        "PostType:p123"
+        "PostType::p126",
+        "PostType::p125",
+        "PostType::p124",
+        "PostType::p123"
       ]
     }
   }

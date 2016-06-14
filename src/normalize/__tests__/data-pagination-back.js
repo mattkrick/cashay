@@ -45,9 +45,9 @@ export const back3Store = {
   "result": {
     "getRecentPosts": {
       "back": [
-        "PostType:p125",
-        "PostType:p124",
-        "PostType:p123"
+        "PostType::p125",
+        "PostType::p124",
+        "PostType::p123"
       ]
     }
   }
@@ -85,7 +85,7 @@ export const back2After3StoreFn = () => {
     "result": {
       "getRecentPosts": {
         "back": [
-          "PostType:p126"
+          "PostType::p126"
         ]
       }
     }
@@ -114,7 +114,7 @@ export const back1After3Store = {
   "result": {
     "getRecentPosts": {
       "back": [
-        "PostType:p126"
+        "PostType::p126"
       ]
     }
   }

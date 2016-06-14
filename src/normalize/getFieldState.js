@@ -102,12 +102,14 @@ const getBestCursor = (first, usefulArray, entities, doWarn) => {
   if (first) {
     for (i = usefulArray.length - 1; i >= 0; i--) {
       // given something like `Post:123`, return the document from the store
-      storedDoc = getDocFromNormalString(usefulArray[i], entities);
+      const {typeName, docId} = getDocFromNormalString(usefulArray[i]);
+      storedDoc = entities[typeName][docId];
       if (storedDoc.cursor) break;
     }
   } else {
     for (i = 0; i < usefulArray.length; i++) {
-      storedDoc = getDocFromNormalString(usefulArray[i], entities);
+      const {typeName, docId} = getDocFromNormalString(usefulArray[i]);
+      storedDoc = entities[typeName][docId];
       if (storedDoc.cursor) break;
     }
   }

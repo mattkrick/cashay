@@ -1,7 +1,7 @@
 import mergeStores from './mergeStores';
 import {separateArgs} from './separateArgs';
 import {getSubReqAST} from './getSubReqAST';
-import {ensureRootType, getRegularArgsKey, isObject, FULL, FRONT, BACK} from '../utils';
+import {ensureRootType, getRegularArgsKey, isObject, NORM_DELIMITER, FULL, FRONT, BACK} from '../utils';
 import {VARIABLE} from 'graphql/language/kinds';
 import {TypeKind} from 'graphql/type/introspection';
 
@@ -51,7 +51,7 @@ const visitEntity = (bag, subResponse, reqAST, subSchema, context, id) => {
   bag[entityKey][id] = bag[entityKey][id] || {};
   let normalized = visitObject(bag, subResponse, reqAST, subSchema, context);
   bag[entityKey][id] = mergeStores(bag[entityKey][id], normalized);
-  return `${entityKey}:${id}`;
+  return `${entityKey}${NORM_DELIMITER}${id}`;
 };
 
 const visitIterable = (bag, subResponse, reqAST, subSchema, context) => {

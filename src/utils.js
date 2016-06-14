@@ -7,6 +7,7 @@ const {NON_NULL} = TypeKind;
 export const TYPENAME = '__typename';
 export const CASHAY = 'CASHAY';
 export const DELIMITER = '_';
+export const NORM_DELIMITER = '::';
 
 // redux store array constants 
 export const FRONT = 'front';
