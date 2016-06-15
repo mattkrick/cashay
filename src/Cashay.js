@@ -126,6 +126,13 @@ export default class Cashay {
     this._willInvalidateListener = true;
   }
 
+  getTransport() {
+    return this.transport;
+  }
+
+  setTransport(transport) {
+    return this.transport = transport;
+  }
   /**
    * A method that accepts a GraphQL query and returns a result using only local data.
    * If it cannot complete the request on local data alone, it also asks the server for the data that it does not have.
@@ -166,22 +173,26 @@ export default class Cashay {
     }
     const cashayDataState = this.getState().data;
 
-    const transport = options.transport || this.transport;
-
     // save the query so we can call it from anywhere
     if (!fastResult) {
-      this.cachedQueries[component] = new CachedQuery(this.query, queryString, this.schema, this.idFieldName, {
-        transport,
-        forceFetch: true
-      });
+      const refetch = key => {
+        this.query(queryString, {
+          key,
+          forceFetch: true,
+          transport: options.transport || this.getTransport()
+        });
+      };
+      this.cachedQueries[component] = new CachedQuery(queryString, this.schema, this.idFieldName, refetch)
       invalidateMutationsOnNewQuery(component, this.cachedMutations);
-
     }
+
+    const transport = options.transport || this.transport;
+
     const cachedQuery = this.cachedQueries[component];
 
     // override singleton defaults with query-specific values
     const variables = getVariables(options.variables, cashayDataState, component, key, cachedQuery.response);
-    
+
     // create an AST that we can mutate
     const {paginationWords, idFieldName, schema} = this;
     const context = buildExecutionContext(cachedQuery.ast, {
@@ -345,7 +356,7 @@ export default class Cashay {
     this._processMutationHandlers(mutationName, cachedMutation.activeComponentsObj, null, variables);
 
     // async call the server
-    this._mutateServer(mutationName, cachedMutation.activeComponentsObj, cachedMutation.fullMutation, newOptions);
+    return this._mutateServer(mutationName, cachedMutation.activeComponentsObj, cachedMutation.fullMutation, newOptions);
   }
 
   _updateCachedMutation(mutationName, options) {
@@ -394,9 +405,15 @@ export default class Cashay {
     const {variables} = options;
     const transport = options.transport || this.transport;
     const docFromServer = await transport.handleQuery({query: mutationString, variables});
+    const {error, data} = docFromServer;
 
-    // update state with new doc from server
-    this._processMutationHandlers(mutationName, componentsToUpdateObj, docFromServer.data);
+    if (error) {
+      this.store.dispatch({type: SET_ERROR, error});
+    } else {
+      // update state with new doc from server
+      this._processMutationHandlers(mutationName, componentsToUpdateObj, data);
+    }
+    return docFromServer;
   }
 
   _processMutationHandlers(mutationName, componentsToUpdateObj, dataFromServer, variables) {

@@ -36,12 +36,9 @@ export class CachedSubscription {
 }
 
 export class CachedQuery {
-  constructor(queryFunction, queryString, schema, idFieldName, options) {
+  constructor(queryString, schema, idFieldName, refetch) {
     this.ast = parseAndInitializeQuery(queryString, schema, idFieldName);
-    this.refetch = key => {
-      let newOptions = key ? Object.assign({}, options, {key}) : options;
-      queryFunction(queryString, newOptions);
-    };
+    this.refetch = refetch;
     this.response = {};
   }
 
