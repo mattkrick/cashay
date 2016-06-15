@@ -26,26 +26,8 @@ const defaultPaginationWords = {
   last: 'last'
 };
 
-export default class Cashay {
-  constructor({store, transport, schema, getToState = defaultGetToState, paginationWords, idFieldName = 'id'}) {
-    // the redux store
-    this.store = store;
-
-    //the cashay state
-    this.getState = () => getToState(store);
-
-    // the reserved arguments for cusor-based pagination
-    this.paginationWords = Object.assign({}, defaultPaginationWords, paginationWords);
-
-    // the field that contains the UID
-    this.idFieldName = idFieldName;
-
-    // the default function to send the queryString to the server (usually HTTP or WS)
-    this.transport = transport;
-
-    // the client graphQL schema
-    this.schema = schema;
-
+class Cashay {
+  constructor() {
     // many mutations can share the same mutationName, making it hard to cache stuff without adding complexity
     // we can assume that a mutationName + the components it affects = a unique, reproduceable fullMutation
     // const example = {
@@ -118,6 +100,26 @@ export default class Cashay {
     this.normalizedDeps = {};
   }
 
+  create({store, transport, schema, getToState = defaultGetToState, paginationWords, idFieldName = 'id'}) {
+    // the redux store
+    this.store = store || this.store;
+
+    //the cashay state
+    this.getState = getToState ? () => getToState(store) : this.getState;
+
+    // the reserved arguments for cusor-based pagination
+    this.paginationWords = paginationWords ? Object.assign({}, defaultPaginationWords, paginationWords) : this.paginationWords;
+
+    // the field that contains the UID
+    this.idFieldName = idFieldName || this.idFieldName;
+
+    // the default function to send the queryString to the server (usually HTTP or WS)
+    this.transport = transport || this.transport;
+
+    // the client graphQL schema
+    this.schema = schema || this.schema;
+  }
+
   /**
    * a method given to a mutation callback that turns on a global.
    * if true, then we know to queue up a requery
@@ -133,6 +135,7 @@ export default class Cashay {
   setTransport(transport) {
     return this.transport = transport;
   }
+
   /**
    * A method that accepts a GraphQL query and returns a result using only local data.
    * If it cannot complete the request on local data alone, it also asks the server for the data that it does not have.
@@ -519,7 +522,7 @@ export default class Cashay {
       }
 
       const componentState = cashayDataState.variables[component];
-      // TODO using stateVars is wrong because vars could be static in the query, instead we need to check the schema + varDefs + vars 
+      // TODO using stateVars is wrong because vars could be static in the query, instead we need to check the schema + varDefs + vars
       const stateVars = key ? componentState[key] : componentState;
       if (!stateVars) {
         return rawState;
@@ -574,11 +577,11 @@ export default class Cashay {
   }
 
   subscriptionRemove(idToRemove) {
-    // 
+    //
   }
 
 }
-
+export default new Cashay();
 // const subscriber = (subscriptionString, handlers, variables) => {
 //   let baseChannel;
 //   for (let [key, value] of channelLookupMap.entries()) {
@@ -614,3 +617,4 @@ export default class Cashay {
 //       id,
 //     }
 //   }`]]);
+

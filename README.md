@@ -73,22 +73,25 @@ const store = createStore(rootReducer, {});
 
 Cashay is front-end agnostic, so instead of passing it through React context
 or making you replace `react-redux` with something non-vanilla,
-you can just export your singleton from where you created it.
+you can just import the singleton. This means it works well in SSR apps, too.
 ```js
+// in your client index.js
 const clientSchema = require('cashay!../server/utils/getCashaySchema.js');
-import {Cashay, HTTPTransport} from 'cashay';
-export const cashay = new Cashay(paramsObject);
+import {cashay, HTTPTransport} from 'cashay';
+cashay.create(paramsObject);
+
+// in a Component.js
+import {cashay} from 'cashay';
+cashay.query(...);
 ```
 
-The params that you can pass in are as follows (*required):
+The params that you can pass into the `create` method are as follows (*required):
 - *`store`: Your redux store
 - *`schema`: your client schema that cashay helped you make
 - *`transport`: An instance of `HTTPTransport` used to send off the query + variables to your GraphQL server.
 - `idFieldName`: Defaults to `id`, but you can call it whatever it is in your DB (eg Mongo uses `_id`)
 - `paginationWords`: The reserved words that you use for pagination. Defaults to an object with 4 properties: `first, last, after, before`. If, for example, your backend uses `count` instead of `first`, you'd send in `{first: 'count'}`.
 - `getToState`: A function to get to the cashay sub-state inside the redux state. Defaults to `store => store.getState().cashay`
-
-
 
 Now, whenever you need to query or mutate some data, just import your shiny new singleton!
 
