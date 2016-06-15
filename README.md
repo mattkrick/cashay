@@ -83,7 +83,7 @@ export const cashay = new Cashay(paramsObject);
 The params that you can pass in are as follows (*required):
 - *`store`: Your redux store
 - *`schema`: your client schema that cashay helped you make
-- *`transport`: An instance of `HTTPTransport` used to send off the query + variables to your GraphQL server.
+- *`transport`: An instance of `HTTPTransport` used to send off the query + variables to your GraphQL server. 
 - `idFieldName`: Defaults to `id`, but you can call it whatever it is in your DB (eg Mongo uses `_id`)
 - `paginationWords`: The reserved words that you use for pagination. Defaults to an object with 4 properties: `first, last, after, before`. If, for example, your backend uses `count` instead of `first`, you'd send in `{first: 'count'}`.
 - `getToState`: A function to get to the cashay sub-state inside the redux state. Defaults to `store => store.getState().cashay`
@@ -110,6 +110,9 @@ import {HTTPTransport} from 'cashay';
 const Authorization = `Bearer ${authToken}`;
 const transport = new HTTPTransport('/myEndpoint', {headers: {Authorization}});
 ```
+
+If you'd like to replace the global `cashay.transport`, you can call `cashay.setTransport(newTransport)`.
+This is useful if you use custom `fetchOptions` that include an authorization token and you need to change it.
 
 ### Queries
 
@@ -177,7 +180,7 @@ const {setVariables} = this.props.cashay;
 Cashay mutations are pretty darn simple, too:
 
 ```js
-cashay.mutate(mutationName, options)
+await cashay.mutate(mutationName, options)
 ```
 
 Cashay is smart.
@@ -188,9 +191,7 @@ No fat queries, no mutation fragments in your queries, no problems.
 If two different queries need the same field but with different arguments
 (eg. `Query1` needs `profilePic(size:SMALL)` and `Query2` needs `profilePic(size:LARGE)`,
 it'll take care of that, too.
-For the curious, it does this by assigning a namespaced alias to all fields with args,
-in addition to namespacing the variables you passed in.
-Then when the result comes back, it de-namespaces it for the `mutationHandler`.
+This method conveniently returns a `Promise` so you can trigger side effects like redirects and localStorage caching, too.
 Note: if you return a scalar variable at the highest level of your mutation payload schema,
 make sure the name in the mutation payload schema matches the name in the query to give Cashay a hint to grab it.
 
