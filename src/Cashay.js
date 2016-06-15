@@ -132,10 +132,6 @@ class Cashay {
     return this.transport;
   }
 
-  setTransport(transport) {
-    return this.transport = transport;
-  }
-
   /**
    * A method that accepts a GraphQL query and returns a result using only local data.
    * If it cannot complete the request on local data alone, it also asks the server for the data that it does not have.

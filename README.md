@@ -116,7 +116,7 @@ const Authorization = `Bearer ${authToken}`;
 const transport = new HTTPTransport('/myEndpoint', {headers: {Authorization}});
 ```
 
-If you'd like to replace the global `cashay.transport`, you can call `cashay.setTransport(newTransport)`.
+If you'd like to replace the global `cashay.transport`, you can call just call `cashay.create({transport: newTransport})`.
 This is useful if you use custom `fetchOptions` that include an authorization token and you need to change it.
 
 ### Queries
