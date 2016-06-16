@@ -59,7 +59,7 @@ const graphql = require('graphql').graphql;
 const rootSchema = require('../graphql/rootSchema');
 const r = require('../database/rethinkDriver');
 module.exports = (params) => {
-  if (params === '?exitRethink') {
+  if (params === '?stopRethink') {
     // optional pool draining if your schema starts a DB connection pool
     r.getPoolMaster().drain();
   }
