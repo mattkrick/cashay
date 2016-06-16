@@ -108,7 +108,7 @@ class Cashay {
     this.getState = getToState ? () => getToState(store) : this.getState;
 
     // the reserved arguments for cusor-based pagination
-    this.paginationWords = paginationWords ? Object.assign({}, defaultPaginationWords, paginationWords) : this.paginationWords;
+    this.paginationWords = Object.assign({}, defaultPaginationWords, paginationWords);
 
     // the field that contains the UID
     this.idFieldName = idFieldName || this.idFieldName;
@@ -171,7 +171,7 @@ class Cashay {
       }
     }
     const cashayDataState = this.getState().data;
-
+    
     // save the query so we can call it from anywhere
     if (!fastResult) {
       const refetch = key => {
@@ -246,6 +246,8 @@ class Cashay {
     const {variables, operation, idFieldName, schema} = context;
     const {dispatch} = this.store;
     const minimizedQueryString = printMinimalQuery(operation, idFieldName, variables, component, schema);
+    // bail if we can't do anything with the variables that we were given
+    if (!minimizedQueryString) return;
     const contextVariables = clone(variables);
 
     // send minimizedQueryString to server and await minimizedQueryResponse
@@ -353,7 +355,6 @@ class Cashay {
 
     // optimistcally update
     this._processMutationHandlers(mutationName, cachedMutation.activeComponentsObj, null, variables);
-
     // async call the server
     return this._mutateServer(mutationName, cachedMutation.activeComponentsObj, cachedMutation.fullMutation, newOptions);
   }
@@ -438,7 +439,6 @@ class Cashay {
       // for the denormalized response, mutate it in place or return undefined if no mutation was made
       const getType = this._getTypeFactory(component, key);
       if (dataFromServer) {
-
         // if it's from the server, send the doc we got back
         const normalizedDataFromServer = removeNamespacing(dataFromServer, component);
         modifiedResponse = componentHandler(null, normalizedDataFromServer, cachedResponseData, getType, this._invalidate);
@@ -460,11 +460,15 @@ class Cashay {
       }
 
       // create a new object to make sure react-redux's updateStatePropsIfNeeded returns true
+      // also remove any existing errors since we've now had a successful operation
       if (key) {
-        cachedResult.response[key] = {...cachedResult.response[key]};
+        const {error, ...cachedResponse} = cachedResult.response[key];
+        cachedResult.response[key] = cachedResponse;
       } else {
-        cachedResult.response = {...cachedResult.response}
+        const {error, ...cachedResponse} = cachedResult.response;
+        cachedResult.response = cachedResponse;
       }
+
       const {schema, paginationWords, idFieldName} = this;
       let contextVars;
       if (key) {

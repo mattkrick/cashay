@@ -62,8 +62,8 @@ const namespaceAndInlineFrags = (fieldSelections, typeSchema, context) => {
     }
     if (selection.selectionSet) {
       const fieldType = ensureRootType(fieldSchema.type);
-      typeSchema = context.schema.types[fieldType.name];
-      namespaceAndInlineFrags(selection.selectionSet.selections, typeSchema, context);
+      const subSchema = context.schema.types[fieldType.name];
+      namespaceAndInlineFrags(selection.selectionSet.selections, subSchema, context);
     }
   }
 };

@@ -8,7 +8,7 @@ export default function removeNamespacing(dataObj, componentId) {
     const normalizedProp = normalizedData[queryKey];
     if (isObject(normalizedProp)) {
       if (Array.isArray(normalizedProp)) {
-        normalizedData[queryKey] = normalizedProp.map(prop => removeNamespacing(normalizedProp, componentId));
+        normalizedData[queryKey] = normalizedProp.map(prop => removeNamespacing(prop, componentId));
       } else {
         normalizedData[queryKey] = removeNamespacing(normalizedProp, componentId)
       }

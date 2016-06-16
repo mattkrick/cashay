@@ -7,6 +7,7 @@ import {NON_NULL_TYPE} from 'graphql/language/kinds';
 export const shortenNormalizedResponse = (normalizedResponse, cashayDataStore) => {
   // TODO what if a forceFetched result is the same as what's already in the store? Need to handle results, too.
   const {entities} = normalizedResponse;
+  if (!entities) return;
   const typeKeys = Object.keys(entities);
   for (let i = 0; i < typeKeys.length; i++) {
     const typeName = typeKeys[i];
