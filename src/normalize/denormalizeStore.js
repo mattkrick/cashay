@@ -28,6 +28,9 @@ const visitObject = (subState = {}, reqAST, subSchema, context, baseReduction = 
       const fieldName = field.name.value;
       const aliasOrFieldName = field.alias && field.alias.value || fieldName;
       const fieldSchema = subSchema.fields[fieldName];
+      if (!fieldSchema) {
+        throw new Error(`No schema found for field: ${fieldName}. Did you update your schema?`)
+      }
       const hasData = subState.hasOwnProperty(fieldName);
 
       if (hasData) {
