@@ -100,12 +100,12 @@ class Cashay {
     this.normalizedDeps = {};
   }
 
-  create({store, transport, schema, getToState = defaultGetToState, paginationWords, idFieldName = 'id'}) {
+  create({store, transport, schema, getToState, paginationWords, idFieldName = 'id'}) {
     // the redux store
     this.store = store || this.store;
 
-    //the cashay state
-    this.getState = getToState ? () => getToState(store) : this.getState;
+    // if a user-defined function is supplied, use it. otherwise, use what we already have (or the deafult)
+    this.getState = getToState ? () => getToState(store) : this.getState || (() => defaultGetToState(store));
 
     // the reserved arguments for cusor-based pagination
     this.paginationWords = Object.assign({}, defaultPaginationWords, paginationWords);
@@ -170,8 +170,11 @@ class Cashay {
         return fastResult.response[key];
       }
     }
-    const cashayDataState = this.getState().data;
-    
+    const transport = options.transport || this.transport;
+    // Make sure we got everything we need
+    if (!this.store || !this.schema || !transport) {
+      throw new Error('Cashay requires a store, schema, and transport')
+    }
     // save the query so we can call it from anywhere
     if (!fastResult) {
       const refetch = key => {
@@ -181,14 +184,13 @@ class Cashay {
           transport: options.transport || this.getTransport()
         });
       };
-      this.cachedQueries[component] = new CachedQuery(queryString, this.schema, this.idFieldName, refetch)
+      this.cachedQueries[component] = new CachedQuery(queryString, this.schema, this.idFieldName, refetch);
       invalidateMutationsOnNewQuery(component, this.cachedMutations);
     }
 
-    const transport = options.transport || this.transport;
-
     const cachedQuery = this.cachedQueries[component];
 
+    const cashayDataState = this.getState().data;
     // override singleton defaults with query-specific values
     const variables = getVariables(options.variables, cashayDataState, component, key, cachedQuery.response);
 
