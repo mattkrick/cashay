@@ -236,7 +236,7 @@ Bugs will be fixed with the following priority:
 - Submit a PR with a failing test case: HIGH
 - Submit a PR with a passing test case (ie fix it yourself): SUPER HIGH HIGH FIVE!
 
-## Roadmap
+## Roadmap to 1.0
 
 - Subscriptions
 - Fixing `getEntites` in the `mutationHandler`
@@ -244,6 +244,22 @@ Bugs will be fixed with the following priority:
 - Recipe for server-side rendering
 - Persisted data and TTL on documents
 - Support directives
+
+## Deviations from the GraphQL spec
+
+The following edge cases are valid per the GraphQL spec, but are not supported in Cashay:
+- List of Lists (eg `GraphQLList(GraphQLList(Foo))`). I can't think of a good reason to ever do this. Storing a 2D graph like this is wrong. 
+- Multi-part mutations. Combine them into 1 mutation, or call them separately. Below is an example of what not to do.
+```
+ mutation {
+  changeFoo(foo: $foo) {  // one is fine
+    foo
+  }
+  changebar(bar: $bar) { // this one will get ignored
+    bar
+  }
+}
+```
 
 ##License
 
