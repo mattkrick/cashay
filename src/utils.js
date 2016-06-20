@@ -73,16 +73,12 @@ export const teardownDocumentAST = queryAST => {
 
 export const getVariables = (variables = {}, cashayDataState, component, key, cachedResponse) => {
   const componentVars = cashayDataState.variables[component];
-  let stateVars;
-  if (componentVars) {
-    stateVars = key ? componentVars[key] : componentVars;
-  }
+  const stateVars = componentVars && key ? componentVars[key] : componentVars;
   return resolveVariables(cashayDataState, stateVars, variables, key, cachedResponse);
 };
 
 const resolveVariables = (cashayDataState, stateVars, variables, key, cachedResponse) => {
   const variableNames = Object.keys(variables);
-  // if (!variableNames.length) return stateVars;
   const response = key ? cachedResponse[key] : cachedResponse;
   const newVariables = {};
   for (let i = 0; i < variableNames.length; i++) {

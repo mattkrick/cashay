@@ -93,8 +93,7 @@ export const invalidateMutationsOnNewQuery = (component, cachedMutations) => {
     const mutation = cachedMutations[mutationName];
     // TODO handle logic for keys?
     if (mutation.activeComponentsObj[component]) {
-      mutation.fullMutation = '';
-      mutation.variableEnhancers = [];
+      mutation.clear();
     }
   }
 };

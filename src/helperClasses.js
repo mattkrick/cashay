@@ -23,8 +23,17 @@ export class CachedMutation {
   constructor() {
     this.fullMutation = undefined;
     this.activeComponentsObj = {};
-    this.singles = {};
     this.variableEnhancers = [];
+    this.variableSet = new Set();
+    this.singles = {};
+  }
+  clear(clearSingles) {
+    this.fullMutation = undefined;
+    this.variableEnhancers = [];
+    this.variableSet.clear();
+    if (clearSingles) {
+      this.singles = {};
+    }
   }
 }
 

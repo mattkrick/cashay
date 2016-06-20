@@ -5,7 +5,7 @@ export const SET_ERROR = '@@cashay/SET_ERROR';
 import mergeStores from './mergeStores';
 
 const initialState = {
-  error: {},
+  error: null,
   data: {
     entities: {},
     result: {},
@@ -17,7 +17,7 @@ export default function reducer(state = initialState, action) {
   if (action.type === INSERT_QUERY) {
     const {variables, response} = action.payload;
     const newMergedState = mergeStores(state.data, response);
-    return variables ? newStateWithVars(state, newMergedState, action.payload) : {...state, data: newMergedState};
+    return variables ? newStateWithVars(state, newMergedState, action.payload) : {...state, data: newMergedState, error: null};
   } else if (action.type === INSERT_MUTATION) {
     const newMergedState = mergeStores(state.data, action.payload.response, true);
     return newStateWithVars(state, newMergedState, action.payload);
@@ -32,6 +32,7 @@ export default function reducer(state = initialState, action) {
 
 const newStateWithVars = (state, newDataState, {variables}) => {
   return Object.assign({}, state, {
+    error: null,
     data: Object.assign(newDataState, {
       variables: Object.assign({}, state.data.variables, variables)
     })

@@ -108,6 +108,7 @@ const detectCashayArray = (src, allSrcKeys) => {
 
 export default function mergeStores(state, src, isMutation) {
   // first shallow copy the state as a simple way to get the primitives, we'll later overwrite the pointers
+  if (!src) return state;
   const target = {...state};
   const srcKeys = Object.keys(src);
   const isCashayArray = detectCashayArray(src, srcKeys);
