@@ -31,20 +31,22 @@ Cashay uses a client-safe portion of your GraphQL schema,
 similar to [GraphiQL](https://github.com/graphql/graphiql), but _way_ smaller.
 
 Since schemas change rapidly during development, Cashay includes a
-[Webpack](https://webpack.github.io/) loader to automatically refresh the schema on startup.
-You can include the schema on your client
+[Webpack](https://webpack.github.io/) loader to automatically refresh the schema
+on startup. You can include the schema on your client
 (likely near the instantiation of your [Cashay singleton](#creating-the-singleton))
 by using a `require()` statement:
 
 ```js
 const cashaySchema = require('cashay!../server/utils/getCashaySchema.js');
-///            cashay-loader ^^^     ^^^ module returning promise for a schema
+///            cashay-loader ^^^     ^^^ returns function for promise for schema
 ```
 
 **Note:** `cashay-loader` is automatically included with Cashay, just use it!
 
-All the loader needs is a module which exports a Promise for a schema that's
-been transformed by the Cashay's `transformSchema()` convenience function.
+All the loader needs is a module which exports a function that will return a
+Promise for a schema that's been transformed by the Cashay's
+`transformSchema()` convenience function.
+
 Ours looks like this:
 
 ```js
@@ -56,10 +58,16 @@ const {transformSchema} = require('cashay');
 const graphql = require('graphql').graphql;
 const rootSchema = require('../graphql/rootSchema');
 const r = require('../database/rethinkDriver');
-r.getPoolMaster().drain(); // optional pool draining if your schema starts a DB connection pool
-module.exports = transformSchema(rootSchema, graphql);
+module.exports = (params) => {
+  if (params === '?exitRethink') {
+    // optional pool draining if your schema starts a DB connection pool
+    r.getPoolMaster().drain();
+  }
+  return transformSchema(rootSchema, graphql);
+}
 ```
-If you cannot use webpack, see the [cashay-schema](./recipes/cashay-schema.md) recipe.
+If you cannot use webpack, see the [cashay-schema](./recipes/cashay-schema.md)
+recipe.
 
 ### Adding the reducer
 
@@ -90,7 +98,7 @@ cashay.query(...);
 The params that you can pass into the `create` method are as follows (*required):
 - *`store`: Your redux store
 - *`schema`: your client schema that cashay helped you make
-- *`transport`: An instance of `HTTPTransport` used to send off the query + variables to your GraphQL server. 
+- *`transport`: An instance of `HTTPTransport` used to send off the query + variables to your GraphQL server.
 - `idFieldName`: Defaults to `id`, but you can call it whatever it is in your DB (eg Mongo uses `_id`)
 - `paginationWords`: The reserved words that you use for pagination. Defaults to an object with 4 properties: `first, last, after, before`. If, for example, your backend uses `count` instead of `first`, you'd send in `{first: 'count'}`.
 - `getToState`: A function to get to the cashay sub-state inside the redux state. Defaults to `store => store.getState().cashay`
@@ -236,7 +244,7 @@ Bugs will be fixed with the following priority:
 - Submit a PR with a failing test case: HIGH
 - Submit a PR with a passing test case (ie fix it yourself): SUPER HIGH HIGH FIVE!
 
-## Roadmap
+## Roadmap to 1.0
 
 - Subscriptions
 - Fixing `getEntites` in the `mutationHandler`
@@ -244,6 +252,22 @@ Bugs will be fixed with the following priority:
 - Recipe for server-side rendering
 - Persisted data and TTL on documents
 - Support directives
+
+## Deviations from the GraphQL spec
+
+The following edge cases are valid per the GraphQL spec, but are not supported in Cashay:
+- List of Lists (eg `GraphQLList(GraphQLList(Foo))`). I can't think of a good reason to ever do this. Storing a 2D graph like this is wrong. 
+- Multi-part mutations. Combine them into 1 mutation, or call them separately. Below is an example of what not to do.
+```
+ mutation {
+  changeFoo(foo: $foo) {  // one is fine
+    foo
+  }
+  changebar(bar: $bar) { // this one will get ignored
+    bar
+  }
+}
+```
 
 ##License
 

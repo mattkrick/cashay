@@ -11,7 +11,8 @@ class MockLoaderParent {
   async() { return this.callback; }
   cacheable() { return; }
   exec(content, resource) {
-    return new Promise((resolve) => resolve({ querySchema: "test document" }));
+    return () =>
+      new Promise((resolve) => resolve({ querySchema: "test document" }));
   }
   load(testContent) { return this.loader(testContent); }
 }

@@ -4,7 +4,7 @@ module.exports = function(content) {
   const callback = this.async();
   // Execute the supplied javascript, receive promise:
   const doc = this.exec(content, this.resource);
-  doc.then(function (schema) {
+  doc(this.resourceQuery).then(function (schema) {
     // Await the yield of a cashay schema:
     callback(null, "module.exports = " + JSON.stringify(schema));
   });
