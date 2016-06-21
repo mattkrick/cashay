@@ -1,4 +1,6 @@
 import {NON_NULL_TYPE} from 'graphql/language/kinds';
+import {isObject} from '../utils';
+
 /*
  * reduce the fields to merge into the state
  * doing this here means a smaller flushSet and fewer invalidations
@@ -111,3 +113,16 @@ export const getMissingRequiredVariables = (variableDefinitions, variables) => {
   }
   return missingVars;
 };
+
+export const equalPendingQueries = (baseQuery, {component, key, variables}) => {
+  const {component: baseComponent, key: baseKey, variables: baseVariables} = baseQuery;
+  if (baseComponent !== component) return false;
+  if (key !== baseKey) return false;
+  const baseVariablesKeys = Object.keys(baseVariables);
+  const variablesKeys = Object.keys(variables);
+  if (baseVariablesKeys.length !== variablesKeys.length) return false;
+  // this is just a heuristic that doesn't check variable values.
+  // that's OK because unique queries with unique variables shouldn't share the same component name
+  // Also, calling a query twice before you get the results of the first is an unsupported anti-pattern
+  return true;
+}

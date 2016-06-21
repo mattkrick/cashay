@@ -18,10 +18,10 @@ export default class ActiveComponentsObj {
   }
 
   makeDefaultComponentsToUpdate(cachedQueries, mutationName, mutationHandlers) {
-    const mutationHandlerObj = mutationHandlers[mutationName];
-    if (!mutationHandlerObj) {
-      throw new Error(`Did you forget to add mutation handlers to your queries for ${mutationName}?`)
-    }
+    const mutationHandlerObj = mutationHandlers[mutationName] || {};
+    // if (!mutationHandlerObj) {
+    //   throw new Error(`Did you forget to add mutation handlers to your queries for ${mutationName}?`)
+    // }
     const handlerComponents = Object.keys(mutationHandlerObj);
     for (let i = 0; i < handlerComponents.length; i++) {
       const component = handlerComponents[i];

@@ -3,8 +3,8 @@ import denormalizeStore from './normalize/denormalizeStore';
 import {rebuildOriginalArgs} from './normalize/denormalizeHelpers';
 import normalizeResponse from './normalize/normalizeResponse';
 import {printMinimalQuery} from './query/printMinimalQuery';
-import {shortenNormalizedResponse, invalidateMutationsOnNewQuery} from './query/queryHelpers';
-import {isObject, checkMutationInSchema} from './utils';
+import {shortenNormalizedResponse, invalidateMutationsOnNewQuery, equalPendingQueries} from './query/queryHelpers';
+import {checkMutationInSchema} from './utils';
 import mergeStores from './normalize/mergeStores';
 import {CachedMutation, CachedQuery, MutationShell} from './helperClasses';
 import flushDependencies from './query/flushDependencies';
@@ -257,9 +257,13 @@ class Cashay {
     const minimizedQueryString = printMinimalQuery(operation, idFieldName, variables, component, schema);
     // bail if we can't do anything with the variables that we were given
     if (!minimizedQueryString) return;
-    if (this.pendingQueries[minimizedQueryString]) {
-      // bounce identical queries
-      this.pendingQueries[minimizedQueryString].push({component, key, variables: clone(variables)});
+    const basePendingQuery = this.pendingQueries[minimizedQueryString];
+    if (basePendingQuery) {
+      if (!equalPendingQueries(basePendingQuery, {component, key, variables})) {
+        // bounce identical queries for different components
+        this.pendingQueries[minimizedQueryString].push({component, key, variables: clone(variables)});
+      }
+      // if it's the same component, it'll get updates when they come
       return;
     }
     const pendingQuery = this.pendingQueries[minimizedQueryString] = [{component, key, variables: clone(variables)}];
@@ -327,6 +331,8 @@ class Cashay {
         }
       });
     }
+
+    this.pendingQueries[minimizedQueryString] = undefined;
   }
 
   _prepareMutations(component, componentStateVars, {mutationHandlers, customMutations}) {
@@ -377,7 +383,7 @@ class Cashay {
 
     // optimistcally update
     this._processMutationHandlers(mutationName, cachedMutation.activeComponentsObj, null, variables);
-    if (options.localOnly) return;
+    // if (options.localOnly) return;
 
     // async call the server
     const {variableEnhancers} = this.cachedMutations[mutationName];
