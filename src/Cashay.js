@@ -8,7 +8,7 @@ import {checkMutationInSchema} from './utils';
 import mergeStores from './normalize/mergeStores';
 import {CachedMutation, CachedQuery, MutationShell} from './helperClasses';
 import flushDependencies from './query/flushDependencies';
-import {parse, buildExecutionContext, getVariables, clone} from './utils';
+import {parse, buildExecutionContext, getVariables, clone, ensureRootType} from './utils';
 import namespaceMutation from './mutate/namespaceMutation';
 import createMutationFromQuery from './mutate/createMutationFromQuery';
 import removeNamespacing from './mutate/removeNamespacing';
@@ -17,6 +17,7 @@ import addDeps from './normalize/addDeps';
 import mergeMutations from './mutate/mergeMutations';
 import {print} from 'graphql/language/printer';
 import ActiveComponentsObj from './mutate/ActiveComponentsObj';
+import makeArgsFromVars from './mutate/makeArgsFromVars';
 
 const defaultGetToState = store => store.getState().cashay;
 const defaultPaginationWords = {
@@ -268,7 +269,7 @@ class Cashay {
     }
     const pendingQuery = this.pendingQueries[minimizedQueryString] = [{component, key, variables: clone(variables)}];
 
-    
+
     // send minimizedQueryString to server and await minimizedQueryResponse
     const {error, data} = await transport.handleQuery({query: minimizedQueryString, variables});
 
@@ -292,7 +293,7 @@ class Cashay {
     const normalizedServerResponse = normalizeResponse(data, context);
 
     // reset the variables that normalizeResponse mutated TODO no longer necessary?
-    context.variables = pendingQuery[pendingQuery.length-1].variables;
+    context.variables = pendingQuery[pendingQuery.length - 1].variables;
 
     // now, remove the objects that look identical to the ones already in the state
     // that way, if the incoming entity (eg Person.123) looks exactly like the one already in the store
@@ -406,37 +407,50 @@ class Cashay {
 
     const componentsToUpdateKeys = Object.keys(cachedMutation.activeComponentsObj);
 
-    if (componentsToUpdateKeys.length === 0) {
-      // for mutations that dont affect the client (eg analytics)
-      cachedMutation.fullMutation = print(new MutationShell(mutationName, null, null, true));
-    } else {
-      this._createMutationsFromQueries(mutationName, componentsToUpdateKeys, variables);
-    }
+    // if (componentsToUpdateKeys.length === 0) {
+    // for mutations that dont affect the client (eg analytics)
+    // cachedMutation.fullMutation = print(new MutationShell(mutationName, null, null, true));
+    // debugger
+    // } else {
+    debugger
+    this._createMutationsFromQueries(mutationName, componentsToUpdateKeys, variables);
+    // }
   }
 
   _createMutationsFromQueries(mutationName, componentsToUpdateKeys, variables) {
     const cachedSingles = this.cachedMutations[mutationName].singles;
     const cachedSinglesASTs = [];
     const newVariableEnhancers = [];
-    for (let i = 0; i < componentsToUpdateKeys.length; i++) {
-      const component = componentsToUpdateKeys[i];
-      if (!cachedSingles[component]) {
-        const queryOperation = this.cachedQueries[component].ast.definitions[0];
-        const mutationAST = createMutationFromQuery(queryOperation, mutationName, variables, this.schema);
-        const componentStateVars = this.getState().data.variables[component];
-        const {namespaceAST, variableEnhancers} = namespaceMutation(mutationAST, component, componentStateVars, this.schema);
-        cachedSingles[component] = {
-          ast: namespaceAST,
-          variableEnhancers
+    if (componentsToUpdateKeys.length) {
+      for (let i = 0; i < componentsToUpdateKeys.length; i++) {
+        const component = componentsToUpdateKeys[i];
+        if (!cachedSingles[component]) {
+          const queryOperation = this.cachedQueries[component].ast.definitions[0];
+          const mutationAST = createMutationFromQuery(queryOperation, mutationName, variables, this.schema);
+          const componentStateVars = this.getState().data.variables[component];
+          const {namespaceAST, variableEnhancers} = namespaceMutation(mutationAST, component, componentStateVars, this.schema);
+          cachedSingles[component] = {
+            ast: namespaceAST,
+            variableEnhancers
+          }
         }
+        const {ast, variableEnhancers} = cachedSingles[component];
+        cachedSinglesASTs.push(ast);
+        newVariableEnhancers.push(...variableEnhancers);
       }
-      const {ast, variableEnhancers} = cachedSingles[component];
-      cachedSinglesASTs.push(ast);
-      newVariableEnhancers.push(...variableEnhancers);
+      const cachedMutation = this.cachedMutations[mutationName];
+      cachedMutation.fullMutation = mergeMutations(cachedSinglesASTs);
+      cachedMutation.variableEnhancers.push(...newVariableEnhancers);
+    } else {
+      // TODO DEAD CODE UNTIL https://github.com/graphql/graphql-js/issues/410
+      // TODO clean this up & makeArgsFromVars
+      // if we don't want anything to come back to the client
+      const cachedMutation = this.cachedMutations[mutationName];
+      const mutationFieldSchema = this.schema.mutationSchema.fields[mutationName];
+      const mutationArgs = makeArgsFromVars(mutationFieldSchema, variables);
+      const mutationAST = new MutationShell(mutationName, mutationArgs, undefined, true);
+      cachedMutation.fullMutation = print(mutationAST);
     }
-    const cachedMutation = this.cachedMutations[mutationName];
-    cachedMutation.fullMutation = mergeMutations(cachedSinglesASTs);
-    cachedMutation.variableEnhancers.push(...newVariableEnhancers);
   };
 
   async _mutateServer(mutationName, componentsToUpdateObj, mutationString, options) {

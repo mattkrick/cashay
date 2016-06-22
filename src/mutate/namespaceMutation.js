@@ -22,7 +22,9 @@ export default function namespaceMutation(mutationAST, component, componentState
   operation.variableDefinitions = variableDefinitions;
   const rootSchemaType = ensureRootType(fieldSchema.type);
   const subSchema = schema.types[rootSchemaType.name];
-  namespaceAndInlineFrags(mainMutation.selectionSet.selections, subSchema, context);
+  if (mainMutation.selectionSet) {
+    namespaceAndInlineFrags(mainMutation.selectionSet.selections, subSchema, context);
+  }
 
   // just take the operation & leave behind the fragment spreads, since we inlined them
   mutationAST.definitions = [operation];

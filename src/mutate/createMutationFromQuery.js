@@ -1,9 +1,9 @@
 import {ensureRootType, clone} from '../utils';
-import {MutationShell, RequestArgument, Field} from '../helperClasses';
+import {MutationShell, Field} from '../helperClasses';
 import {mergeSelections} from './mergeMutations';
-import {VARIABLE} from 'graphql/language/kinds';
 import {TypeKind} from 'graphql/type/introspection';
 import findTypeInQuery from './findTypeInQuery';
+import makeArgsFromVars from './makeArgsFromVars';
 
 const {SCALAR} = TypeKind;
 
@@ -83,20 +83,6 @@ const flattenFoundSelections = selectionsInQuery => {
     allSelections.push(...selections);
   }
   return allSelections;
-};
-
-const makeArgsFromVars = (mutationFieldSchema, variables) => {
-  const mutationArgs = [];
-  const argKeys = Object.keys(mutationFieldSchema.args);
-  for (let i = 0; i < argKeys.length; i++) {
-    const argKey = argKeys[i];
-    const schemaArg = mutationFieldSchema.args[argKey];
-    if (variables.hasOwnProperty(schemaArg.name)) {
-      const newArg = new RequestArgument(schemaArg.name, VARIABLE, schemaArg.name);
-      mutationArgs.push(newArg);
-    }
-  }
-  return mutationArgs;
 };
 
 const createMergedCopy = allSelections => {

@@ -124,17 +124,17 @@ export class Field {
   }
 }
 export class MutationShell {
-  constructor(mutationName, mutationArgs, variableDefinitions = [], isEmpty) {
+  constructor(mutationName, mutationArgs = [], variableDefinitions = [], isEmpty) {
     this.kind = DOCUMENT;
     this.definitions = [{
       kind: OPERATION_DEFINITION,
       operation: 'mutation',
       variableDefinitions,
       directives: [],
-      selectionSet: isEmpty ? null : new SelectionSet([new Field({
+      selectionSet: new SelectionSet([new Field({
         args: mutationArgs,
         name: mutationName,
-        selections: []
+        selections: isEmpty ? null : []
       })])
     }]
   }

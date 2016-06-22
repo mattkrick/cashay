@@ -36,11 +36,24 @@ export default class HTTPTransport {
   }
 }
 
-const defaultHandleErrors = (request, errors) => {
-  if (!errors) return;
-  const error = errors[0].message;
-  if (!error || error.indexOf('{"_error"') === -1) {
-    return {errors};
+const tryParse = str => {
+  let obj;
+  try {
+    obj = JSON.parse(str);
+  } catch (e) {
+    return false;
   }
-  return JSON.parse(error);
+  return obj;
+};
+
+const defaultHandleErrors = (request, errors, duckField = '_error') => {
+  if (!errors) return;
+  // expect a human to put an end-user-safe message in the message field
+  const firstErrorMessage = errors[0].message;
+  if (!firstErrorMessage) return {errors};
+  const parsedError = tryParse(firstErrorMessage);
+  if (parsedError && parsedError.hasOwnProperty(duckField)) {
+    return parsedError;
+  }
+  return {errors};
 };
