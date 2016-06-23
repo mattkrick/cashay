@@ -5,25 +5,20 @@ import {Name} from '../helperClasses';
 import createVariableDefinitions from '../createVariableDefinitions';
 
 export default function namespaceMutation(mutationAST, component, componentStateVars, schema) {
-  const variableEnhancers = [];
   const {operation, fragments} = teardownDocumentAST(mutationAST);
-  const variableDefinitions = [];
   const mainMutation = operation.selectionSet.selections[0];
   const fieldSchema = schema.mutationSchema.fields[mainMutation.name.value];
-  const context = {
-    variableDefinitions,
-    componentStateVars,
-    component,
-    fragments,
-    schema,
-    variableEnhancers
-  };
-  createVariableDefinitions(mainMutation.arguments, fieldSchema, false, context);
-  operation.variableDefinitions = variableDefinitions;
+  const startingContext = {component, componentStateVars, schema, fragments, initialVariableDefinitions: []};
+  // query-level fields are joined, not namespaced, so we have to treat them differently
+  const {variableDefinitions: initialVariableDefinitions, variableEnhancers} =
+    createVariableDefinitions(mainMutation.arguments, fieldSchema, false, startingContext);
+  const context = {...startingContext, fragments, initialVariableDefinitions};
+  operation.variableDefinitions = initialVariableDefinitions;
   const rootSchemaType = ensureRootType(fieldSchema.type);
   const subSchema = schema.types[rootSchemaType.name];
   if (mainMutation.selectionSet) {
-    namespaceAndInlineFrags(mainMutation.selectionSet.selections, subSchema, context);
+    // MUTATES SELECTIONS, CONTEXT VARIABLE DEFS, AND VARIABLE ENHANCERS. AND IT'S REALLY HARD TO MAKE IT FUNCTIONAL & PERFORMANT
+    namespaceAndInlineFrags(mainMutation.selectionSet.selections, subSchema, variableEnhancers, context);
   }
 
   // just take the operation & leave behind the fragment spreads, since we inlined them
@@ -31,7 +26,7 @@ export default function namespaceMutation(mutationAST, component, componentState
   return {namespaceAST: mutationAST, variableEnhancers}
 };
 
-const namespaceAndInlineFrags = (fieldSelections, typeSchema, context) => {
+const namespaceAndInlineFrags = (fieldSelections, typeSchema, variableEnhancers, context) => {
   for (let i = 0; i < fieldSelections.length; i++) {
     let selection = fieldSelections[i];
     if (selection.kind === FRAGMENT_SPREAD) {
@@ -45,7 +40,7 @@ const namespaceAndInlineFrags = (fieldSelections, typeSchema, context) => {
         // since we're pushing to the looped array, going in reverse won't save us from not having to change i
         fieldSelections.splice(i--, 1);
       } else {
-        namespaceAndInlineFrags(selection.selectionSet.selections, typeSchema, context);
+        namespaceAndInlineFrags(selection.selectionSet.selections, typeSchema, variableEnhancers, context);
       }
       continue;
     }
@@ -56,7 +51,9 @@ const namespaceAndInlineFrags = (fieldSelections, typeSchema, context) => {
       const aliasOrFieldName = selection.alias && selection.alias.value || selection.name.value;
       const namespaceAlias = makeNamespaceString(context.component, aliasOrFieldName);
       selection.alias = new Name(namespaceAlias);
-      createVariableDefinitions(selection.arguments, fieldSchema, true, context);
+      const mutations = createVariableDefinitions(selection.arguments, fieldSchema, true, context);
+      context.initialVariableDefinitions.push(...mutations.variableDefinitions);
+      variableEnhancers.push(...mutations.variableEnhancers);
     } else {
       // guarantee that props without args are also without aliases
       // that way, we can share fields across mutations & not make the server repeat the same action twice
@@ -65,7 +62,7 @@ const namespaceAndInlineFrags = (fieldSelections, typeSchema, context) => {
     if (selection.selectionSet) {
       const fieldType = ensureRootType(fieldSchema.type);
       const subSchema = context.schema.types[fieldType.name];
-      namespaceAndInlineFrags(selection.selectionSet.selections, subSchema, context);
+      namespaceAndInlineFrags(selection.selectionSet.selections, subSchema, variableEnhancers, context);
     }
   }
 };

@@ -8,7 +8,7 @@ export const printMinimalQuery = (reqAST, idFieldName, variables, component, sch
   const context = {
     component,
     schema,
-    variableDefinitions: []
+    initialVariableDefinitions: []
   };
   minimizeQueryAST(reqAST, idFieldName, variables, schema.querySchema, context);
   reqAST.variableDefinitions = context.variableDefinitions;
@@ -24,7 +24,8 @@ const minimizeQueryAST = (reqAST, idFieldName, variables, subSchema, context) =>
       const fieldSchema = subSchema.fields[field.name.value];
       if (field.arguments && field.arguments.length) {
         const cachedVariableDefinitions = clone(context.variableDefinitions);
-        createVariableDefinitions(field.arguments, fieldSchema, false, context);
+        const {variableDefinitions} = createVariableDefinitions(field.arguments, fieldSchema, false, context);
+        context.variableDefinitions = variableDefinitions;
         const missingRequiredVars = getMissingRequiredVariables(context.variableDefinitions, variables);
         const hasMissingVar = findMissingVar(field.arguments, missingRequiredVars);
         if (hasMissingVar) {

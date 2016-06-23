@@ -97,29 +97,18 @@ import {
   createPostWithPostId,createCommentWithId2
 } from './src/mutate/__tests__/mergeMutations-data';
 const idFieldName = '_id';
-const queryPostWithInlineFieldVars = `
-  query($first: Int!, $defaultLanguage: String, $secondaryLanguage: String) {
-    getRecentPosts(count: $first) {
-      ... on PostType {
-        title(language: $defaultLanguage),
-        secondaryTitle: title(language: $secondaryLanguage)
-      }
-    }
-  }`;
-const mutatePostWithInlineFieldVars = `
+const expectedRaw = `
   mutation {
-    createPost {
+    createPost(newPost: {_id: "129"}) {
       post {
-        ... on PostType {
-          title(language: $defaultLanguage),
-          secondaryTitle: title(language: $secondaryLanguage)
-        }
+        CASHAY_component1_title: title(language:"spanish"),
+        CASHAY_component1_englishTitle: title(language:"english")
       }
     }
   }`;
-const queryAST = parse(queryPostWithInlineFieldVars);
-const expected = parseSortPrint(mutatePostWithInlineFieldVars);
-const actualAST = createMutationFromQuery(queryAST.definitions[0], 'createPost', {}, clientSchema);
-const actual = sortPrint(actualAST);
+const expected = parseSortPrint(expectedRaw);
+const mutationAST = parse(postSpanishTitle);
+const {namespaceAST} = namespaceMutation(mutationAST, 'component1', {}, clientSchema);
+const actual = sortPrint(namespaceAST);
 fs.writeFileSync('./actualResult.json', JSON.stringify(actual, null, 2));
 fs.writeFileSync('./expectedResult.json', JSON.stringify(expected, null, 2));

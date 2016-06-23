@@ -6,18 +6,17 @@ import {printMinimalQuery} from './query/printMinimalQuery';
 import {shortenNormalizedResponse, invalidateMutationsOnNewQuery, equalPendingQueries} from './query/queryHelpers';
 import {checkMutationInSchema} from './utils';
 import mergeStores from './normalize/mergeStores';
-import {CachedMutation, CachedQuery, MutationShell} from './helperClasses';
+import {CachedMutation, CachedQuery} from './helperClasses';
 import flushDependencies from './query/flushDependencies';
-import {parse, buildExecutionContext, getVariables, clone, ensureRootType} from './utils';
+import {parse, buildExecutionContext, getVariables, clone} from './utils';
 import namespaceMutation from './mutate/namespaceMutation';
 import createMutationFromQuery from './mutate/createMutationFromQuery';
 import removeNamespacing from './mutate/removeNamespacing';
 import makeFriendlyStore from './mutate/makeFriendlyStore';
 import addDeps from './normalize/addDeps';
 import mergeMutations from './mutate/mergeMutations';
-import {print} from 'graphql/language/printer';
 import ActiveComponentsObj from './mutate/ActiveComponentsObj';
-import makeArgsFromVars from './mutate/makeArgsFromVars';
+import createBasicMutation from './mutate/createBasicMutation';
 
 const defaultGetToState = store => store.getState().cashay;
 const defaultPaginationWords = {
@@ -411,7 +410,8 @@ class Cashay {
   }
 
   _createMutationsFromQueries(mutationName, componentsToUpdateKeys, variables) {
-    const cachedSingles = this.cachedMutations[mutationName].singles;
+    const cachedMutation = this.cachedMutations[mutationName];
+    const cachedSingles = cachedMutation.singles;
     const cachedSinglesASTs = [];
     const newVariableEnhancers = [];
     if (componentsToUpdateKeys.length) {
@@ -431,19 +431,10 @@ class Cashay {
         cachedSinglesASTs.push(ast);
         newVariableEnhancers.push(...variableEnhancers);
       }
-      const cachedMutation = this.cachedMutations[mutationName];
       cachedMutation.fullMutation = mergeMutations(cachedSinglesASTs);
       cachedMutation.variableEnhancers.push(...newVariableEnhancers);
     } else {
-      // TODO DEAD CODE UNTIL https://github.com/graphql/graphql-js/issues/410
-      // TODO clean this up & makeArgsFromVars
-
-      // if we don't want anything to come back to the client
-      const cachedMutation = this.cachedMutations[mutationName];
-      const mutationFieldSchema = this.schema.mutationSchema.fields[mutationName];
-      const mutationArgs = makeArgsFromVars(mutationFieldSchema, variables);
-      const mutationAST = new MutationShell(mutationName, mutationArgs, undefined, true);
-      cachedMutation.fullMutation = print(mutationAST);
+      cachedMutation.fullMutation = createBasicMutation(mutationName, this.schema, variables);
     }
   };
 
@@ -452,11 +443,11 @@ class Cashay {
     const transport = options.transport || this.transport;
     const docFromServer = await transport.handleQuery({query: mutationString, variables});
     const {error, data} = docFromServer;
-    // each mutation should return only 1 response, but it may be aliased
-    const queryResponse = data[mutationName] || data[Object.keys(data)[0]];
     if (error) {
       this.store.dispatch({type: SET_ERROR, error});
     } else {
+      // each mutation should return only 1 response, but it may be aliased
+      const queryResponse = data[mutationName] || data[Object.keys(data)[0]];
       // update state with new doc from server
       this._processMutationHandlers(mutationName, componentsToUpdateObj, queryResponse);
     }
