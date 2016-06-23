@@ -143,7 +143,7 @@ Options include:
 - `mutationHandlers` An object where each method is the name of a mutation that changes the query. See below.
 
 ```js
-mutationHandler(optimisticVariables, serverData, currentResponse, getEntities, invalidate)
+mutationHandler(optimisticVariables, queryResponse, currentResponse, getEntities, invalidate)
 ```
 
 A mutation handler is called twice per mutation:
@@ -154,7 +154,7 @@ If a return value is provided, it will be normalized & merged with the state.
 If there is no return value, the state won't change.
 
 - `optimisticVariables`: The variables you send to the server when you call a mutation. You can use this to optimistically update the UI. Is `null` when the function is called after receving a resonse from the server.
-- `serverData`: The data that came back from the server. The shape is identical to whatever the `type` is in your GraphQL schema for that mutation. It is `null` when optimistically updating.
+- `queryResponse`: The data that came back from the server. The shape is identical to whatever the `type` is in your GraphQL schema for that mutation. It is `null` when optimistically updating.
 - `currentResponse`: The response you receive from your query. The shape follows whatever you entered in `queryString`. You can modify this and return it, Cashay will detect the differences.
 - `getEntites(typeName)`: A function that returns all the entities for a given GraphQL type (eg `typeName = PostType`) This is useful in case you want to replace a deleted document with the next-best doc you have locally.
 - `invalidate`: A function that you can call to retrigger the query (with `forceFetch = true`). This is useful if you want to guarantee that a query has accurate data after each mutation.

@@ -1,6 +1,9 @@
 import {isObject, CASHAY, DELIMITER} from '../utils';
 
 export default function removeNamespacing(dataObj, componentId) {
+  if (!isObject(dataObj)) {
+    return dataObj;
+  }
   const normalizedData = removeNamespacedFields(dataObj, componentId);
   const queryKeys = Object.keys(normalizedData);
   for (let i = 0; i < queryKeys.length; i++) {

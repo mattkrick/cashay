@@ -458,17 +458,18 @@ class Cashay {
     const transport = options.transport || this.transport;
     const docFromServer = await transport.handleQuery({query: mutationString, variables});
     const {error, data} = docFromServer;
-
+    // each mutation should return only 1 response, but it may be aliased
+    const queryResponse = data[mutationName] || data[Object.keys(data)[0]];
     if (error) {
       this.store.dispatch({type: SET_ERROR, error});
     } else {
       // update state with new doc from server
-      this._processMutationHandlers(mutationName, componentsToUpdateObj, data);
+      this._processMutationHandlers(mutationName, componentsToUpdateObj, queryResponse);
     }
     return docFromServer;
   }
 
-  _processMutationHandlers(mutationName, componentsToUpdateObj, dataFromServer, variables) {
+  _processMutationHandlers(mutationName, componentsToUpdateObj, queryResponse, variables) {
     const componentHandlers = this.mutationHandlers[mutationName];
     const cashayDataState = this.getState().data;
     let allNormalizedChanges = {};
@@ -490,10 +491,10 @@ class Cashay {
 
       // for the denormalized response, mutate it in place or return undefined if no mutation was made
       const getType = this._getTypeFactory(component, key);
-      if (dataFromServer) {
+      if (queryResponse) {
         // if it's from the server, send the doc we got back
-        const normalizedDataFromServer = removeNamespacing(dataFromServer, component);
-        modifiedResponse = componentHandler(null, normalizedDataFromServer, cachedResponseData, getType, this._invalidate);
+        const normalizedQueryResponse = removeNamespacing(queryResponse, component);
+        modifiedResponse = componentHandler(null, normalizedQueryResponse, cachedResponseData, getType, this._invalidate);
       } else {
 
         // otherwise, treat it as an optimistic update
