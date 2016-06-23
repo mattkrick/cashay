@@ -38,8 +38,9 @@ const getSchema = async inputArg => {
     if (status >= 200 && status < 300) {
       resJSON = await res.json();
     } else {
-      return console.log(`Could not reach your GraphQL server: ${inputArg}.
+      console.log(`Could not reach your GraphQL server: ${inputArg}.
         Error: ${statusText}`);
+      return
     }
     if (resJSON.errors) {
       console.log(`The graphQL endpoint returned the following errors: ${JSON.stringify(resJSON.errors)}`);

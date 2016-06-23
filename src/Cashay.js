@@ -407,14 +407,7 @@ class Cashay {
 
     const componentsToUpdateKeys = Object.keys(cachedMutation.activeComponentsObj);
 
-    // if (componentsToUpdateKeys.length === 0) {
-    // for mutations that dont affect the client (eg analytics)
-    // cachedMutation.fullMutation = print(new MutationShell(mutationName, null, null, true));
-    // debugger
-    // } else {
-    debugger
     this._createMutationsFromQueries(mutationName, componentsToUpdateKeys, variables);
-    // }
   }
 
   _createMutationsFromQueries(mutationName, componentsToUpdateKeys, variables) {
@@ -444,6 +437,7 @@ class Cashay {
     } else {
       // TODO DEAD CODE UNTIL https://github.com/graphql/graphql-js/issues/410
       // TODO clean this up & makeArgsFromVars
+
       // if we don't want anything to come back to the client
       const cachedMutation = this.cachedMutations[mutationName];
       const mutationFieldSchema = this.schema.mutationSchema.fields[mutationName];
