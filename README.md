@@ -250,9 +250,7 @@ cashay.mutate('deleteComment', {variables: {commentId: postId}, components})
 
 ## Recipes
 
-- [Pagination](./recipes/pagination.md)
-- [Multi-part queries](./recipes/multi-part.queries.md)
-- [Schema (without webpack)](./recipes/cashay-schema.md)
+[See recipes](./recipes/index.md)
 
 ## Examples (PR to list yours)
 
@@ -272,7 +270,6 @@ Bugs will be fixed with the following priority:
 - Subscriptions
 - Fixing `getEntites` in the `mutationHandler`
 - Test coverage at 95%
-- Recipe for server-side rendering
 - Persisted data and TTL on documents
 - Support directives
 
