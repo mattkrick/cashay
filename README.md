@@ -127,6 +127,29 @@ const transport = new HTTPTransport('/myEndpoint', {headers: {Authorization}});
 If you'd like to replace the global `cashay.transport`, you can call just call `cashay.create({transport: newTransport})`.
 This is useful if you use custom `fetchOptions` that include an authorization token and you need to change it.
 
+### ServerSideTransport
+
+```js
+new ServerSideTransport(graphQLHandler, errorHandler)
+```
+
+- *`graphQLHandler({query, variables})`: a Promise that takes a `query` and `variables` prop, and returns the output from
+a `graphql` call.
+- `errorHandler`: A custom function that takes any GraphQL `errors` and converts them into a single `error` for your Redux state
+
+Example:
+```js
+import {graphql} from 'graphql';
+import Schema from './rootSchema';
+import {ServerSideTransport} from 'cashay';
+const graphQLHandler = function({query, variables}) => {
+  return graphql(Schema, query, null, null, variables);
+}
+const transport = new ServerSideTransport(graphQLHandler);
+```
+This is useful if you use your server for both graphql and server-side rendering
+and don't want cashay to make an HTTP roundtrip to itself.
+
 ### Queries
 
 ```js
@@ -227,9 +250,7 @@ cashay.mutate('deleteComment', {variables: {commentId: postId}, components})
 
 ## Recipes
 
-- [Pagination](./recipes/pagination.md)
-- [Multi-part queries](./recipes/multi-part.queries.md)
-- [Schema (without webpack)](./recipes/cashay-schema.md)
+[See recipes](./recipes/index.md)
 
 ## Examples (PR to list yours)
 
@@ -249,7 +270,6 @@ Bugs will be fixed with the following priority:
 - Subscriptions
 - Fixing `getEntites` in the `mutationHandler`
 - Test coverage at 95%
-- Recipe for server-side rendering
 - Persisted data and TTL on documents
 - Support directives
 

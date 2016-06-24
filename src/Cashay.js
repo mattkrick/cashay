@@ -6,7 +6,7 @@ import {printMinimalQuery} from './query/printMinimalQuery';
 import {shortenNormalizedResponse, invalidateMutationsOnNewQuery, equalPendingQueries} from './query/queryHelpers';
 import {checkMutationInSchema} from './utils';
 import mergeStores from './normalize/mergeStores';
-import {CachedMutation, CachedQuery} from './helperClasses';
+import {CachedMutation, CachedQuery, CachedSubscription} from './helperClasses';
 import flushDependencies from './query/flushDependencies';
 import {parse, buildExecutionContext, getVariables, clone} from './utils';
 import namespaceMutation from './mutate/namespaceMutation';
@@ -99,6 +99,7 @@ class Cashay {
     // }
     this.normalizedDeps = {};
 
+    // a Set of minimized query strings. Identical strings are ignored
     this.pendingQueries = new Set();
   }
 
@@ -580,9 +581,14 @@ class Cashay {
    */
   subscribe(subscriptionString, subscriber, options) {
     const component = options.component || subscriptionString;
-    if (!this.cachedSubscriptions[component]) {
+    const fastCachedSub = this.cachedSubscriptions[component];
+    // TODO add support for keys
+    if (fastCachedSub) {
+      return fastCachedSub.response;
+    } else {
       this.cachedSubscriptions[component] = new CachedSubscription(subscriptionString);
     }
+    const cachedSubscription = this.cachedSubscriptions[component];
     const handlers = {
       add: this.subscriptionAdd,
       update: this.subscriptionUpdate,
@@ -590,7 +596,7 @@ class Cashay {
       error: this.subscriptionError
     };
     const cashayDataState = this.getState().data;
-    // const variables = getVariables(options.variables, cashayDataState.variables[component]);
+    const variables = getVariables(options.variables, cashayDataState, component, key, cachedSubscription.response);
     return subscriber(subscriptionString, handlers, variables);
   }
 
