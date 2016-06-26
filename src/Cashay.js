@@ -17,6 +17,8 @@ import addDeps from './normalize/addDeps';
 import mergeMutations from './mutate/mergeMutations';
 import ActiveComponentsObj from './mutate/ActiveComponentsObj';
 import createBasicMutation from './mutate/createBasicMutation';
+import setSubVariablesFactory from './subscribe/setSubVariablesFactory';
+import hasMatchingVariables from './mutate/hasMatchingVariables';
 
 const defaultGetToState = store => store.getState().cashay;
 const defaultPaginationWords = {
@@ -156,8 +158,8 @@ class Cashay {
    */
   query(queryString, options = {}) {
     //if you call forceFetch in a mapStateToProps, you're gonna have a bad time (it'll refresh on EVERY dispatch)
-    const {key} = options;
-    const forceFetch = Boolean(options.forceFetch);
+    const {key, forceFetch} = options;
+    // const forceFetch = Boolean(options.forceFetch);
 
     // Each component can have only 1 unique queryString/variable combo. This keeps memory use minimal.
     // if 2 components have the same queryString/variable but a different component, it'll fetch twice
@@ -589,53 +591,86 @@ class Cashay {
       this.cachedSubscriptions[component] = new CachedSubscription(subscriptionString);
     }
     const cachedSubscription = this.cachedSubscriptions[component];
-    const handlers = {
-      add: this.subscriptionAdd,
-      update: this.subscriptionUpdate,
-      remove: this.subscriptionRemove,
-      error: this.subscriptionError
-    };
     const cashayDataState = this.getState().data;
     const variables = getVariables(options.variables, cashayDataState, component, key, cachedSubscription.response);
-    return subscriber(subscriptionString, handlers, variables);
+
+    const subscriptionHandlers = this.makeSubscriptionHandlers(component);
+    const startSubscription = subVars => subscriber(subscriptionString, subscriptionHandlers, subVars);
+
+    return cachedSubscription.response =
+    {
+      ...cachedSubscription.response,
+      setVariables: setSubVariablesFactory(component, key, this.store.dispatch, this.getState, cachedSubscription, startSubscription),
+      unsubscribe: startSubscription(variables),
+      status: 'active'
+    };
   }
 
-  subscriptionAdd(document, fastMode = true) {
-    // normalize data
-    // compare the normalized data to the state data, removing anything that has the same data
-    // merge entities shortenedNormalizedData
-    // if cashayDataState.result[subscriptionName][?variables].full is an array
-    // then add the newState.result.... to the end of it
-    // also, add the new data to the end of the denormalizedResponse (so fast!) if fastMode = true
-    // make sure to recreate the response object so react-redux picks up the change
-    // call dispatch(insert_normalized)
+  makeSubscriptionHandlers(component) {
+    return {
+      subscriptionAdd(document) {
+        const cachedSubscription = this.cachedSubscriptions[component];
+        const cashayDataState = this.getState().data;
+        const {paginationWords, idFieldName, schema} = this;
+        const context = buildExecutionContext(cachedSubscription.ast, {
+          cashayDataState,
+          variables,
+          paginationWords,
+          idFieldName,
+          schema
+        });
+        const cachedResult = cachedSubscription.response.data;
+        cachedSubscription.response.data = [...cachedSubscription.response.data, cachedResult];
+        const normalizedDoc = normalizeResponse(document, context);
+        const normalizedDocForStore = shortenNormalizedResponse(normalizedDoc, cashayDataState);
+        if (!normalizedDocForStore) return;
+
+        // remove the responses from this.cachedQueries where necessary
+        flushDependencies(normalizedDocForStore.entities, component, key, this.denormalizedDeps, this.cachedQueries);
+
+        // stick normalize data in store and recreate any invalidated denormalized structures
+        const stateVariables = key ? {[component]: {[key]: variables}} : {[component]: variables};
+        this.store.dispatch({
+          type: INSERT_QUERY,
+          payload: {
+            response: normalizedDocForStore,
+            variables: stateVariables
+          }
+        });
+
+        // normalize data
+        // compare the normalized data to the state data, removing anything that has the same data
+        // merge entities shortenedNormalizedData
+        // add Deps and flush deps
+        // if cashayDataState.result[subscriptionName][?variables].full is an array
+        // then add the newState.result.... to the end of it
+        // also, add the new data to the end of the denormalizedResponse (so fast!) if fastMode = true
+        // make sure to recreate the response object so react-redux picks up the change
+        // call dispatch(insert_normalized)
+      },
+
+      subscriptionUpdate(document) {
+        // normalize data
+        // compare the normalized data to the state data, removing anything that has the same data
+        // merge entities shortenedNormalizedData
+        // update the new data in denormalizedResponse (so fast!)
+        // make sure to recreate the response object so react-redux picks up the change
+        // call dispatch(insert_normalized)
+      },
+
+      subscriptionRemove(idToRemove) {
+        //
+      },
+
+      subscriptionError(error) {
+
+      }
+    }
   }
 
-  subscriptionUpdate(document) {
-    // normalize data
-    // compare the normalized data to the state data, removing anything that has the same data
-    // merge entities shortenedNormalizedData
-    // update the new data in denormalizedResponse (so fast!)
-    // make sure to recreate the response object so react-redux picks up the change
-    // call dispatch(insert_normalized)
-  }
-
-  subscriptionRemove(idToRemove) {
-    //
-  }
 
 }
 export default new Cashay();
-
-const hasMatchingVariables = (variables = {}, matchingSet) => {
-  const varKeys = Object.keys(variables);
-  if (varKeys.length !== matchingSet.size) return false;
-  for (let i = 0; i < varKeys.length; i++) {
-    const varKey = varKeys[i];
-    if (!matchingSet.has(varKey)) return false;
-  }
-  return true;
-};
 
 
 // const subscriber = (subscriptionString, handlers, variables) => {
