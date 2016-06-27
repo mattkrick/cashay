@@ -5,7 +5,7 @@ import {ensureTypeFromNonNull, NORM_DELIMITER} from '../utils';
 const {UNION, LIST, SCALAR} = TypeKind;
 
 export const handleMissingData = (visit, aliasOrFieldName, field, fieldSchema, context) => {
-  field.sendToServer = true;
+  sendChildrenToServer(field);
   const fieldType = ensureTypeFromNonNull(fieldSchema.type);
   if (fieldType.kind === SCALAR) {
     return null;

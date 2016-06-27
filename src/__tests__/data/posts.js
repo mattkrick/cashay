@@ -8,7 +8,8 @@ export default [
     category: 'hot stuff',
     karma: 2,
     createdAt: 1411111111111,
-    cursor: '1411111111111' + 'chikachikow'
+    cursor: '1411111111111' + 'chikachikow',
+    keywordsMentioned: []
   },
   {
     _id: 'p124',
@@ -19,7 +20,8 @@ export default [
     category: 'hot stuff',
     karma: 2,
     createdAt: 1422222222222,
-    cursor: '1422222222222' + 'chikachikow'
+    cursor: '1422222222222' + 'chikachikow',
+    keywordsMentioned: []
   },
   {
     _id: 'p125',
@@ -30,7 +32,8 @@ export default [
     category: 'ice cold',
     karma: 2,
     createdAt: 1433333333333,
-    cursor: '1433333333333' + 'chikachikow'
+    cursor: '1433333333333' + 'chikachikow',
+    keywordsMentioned: []
   },
   {
     _id: 'p126',
@@ -41,6 +44,14 @@ export default [
     category: 'hot stuff',
     karma: 2,
     createdAt: 1444444444444,
-    cursor: '1444444444444' + 'chikachikow'
+    cursor: '1444444444444' + 'chikachikow',
+    keywordsMentioned: [
+      {
+        word: 'cashay'
+      },
+      {
+        word: 'neat'
+      }
+    ]
   }
 ]

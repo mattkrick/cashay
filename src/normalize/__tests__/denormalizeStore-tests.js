@@ -144,6 +144,24 @@ test('request an array that does not exist in the state', t => {
   const expected = {"getRecentPosts": []};
   t.deepEqual(actual, expected);
 });
-// get subset of pagination docs saved
 
-// get 3 pagination results when only 2 are local
+test('flag sendToServer = true for array of objects', t => {
+  const rawQuery = `
+  query {
+    getPostById (_id: "p126") {
+      _id
+      keywordsMentioned {
+        word
+      }
+    }
+  }`;
+  const queryAST = parseAndInitializeQuery(rawQuery, clientSchema, idFieldName);
+  const context = buildExecutionContext(queryAST, {
+    cashayDataState: emptyInitialState,
+    idFieldName,
+    schema: clientSchema
+  });
+  denormalizeStore(context);
+  //                                    getPostById ->           keywordsMentioned ->       word
+  t.true(context.operation.selectionSet.selections[0].selectionSet.selections[1].selectionSet.selections[0].sendToServer);
+});
