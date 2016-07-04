@@ -470,8 +470,10 @@ class Cashay {
 
       // find current cached result for this particular component
       const cachedResult = this.cachedQueries[component];
-
       const {ast, refetch, response} = cachedResult;
+      if (!response) {
+        throw new Error(`Cache went stale & wasn't recreated. Did you forget to put a redux subscriber on ${component}?`)
+      }
       const cachedResponseData = key ? response[key].data : response.data;
       let modifiedResponse;
 
@@ -636,40 +638,3 @@ const hasMatchingVariables = (variables = {}, matchingSet) => {
   }
   return true;
 };
-
-
-// const subscriber = (subscriptionString, handlers, variables) => {
-//   let baseChannel;
-//   for (let [key, value] of channelLookupMap.entries()) {
-//     if (value === subscriptionString) {
-//       baseChannel = key;
-//       break;
-//     }
-//   }
-//   const channelName = `${baseChannel}/${variables.userId}`
-//   const socket = socketCluster.connect({authTokenName});
-//   const {add, update, remove, error} = handlers;
-//   socket.subscribe(channelName, {waitForAuth: true});
-//   socket.on(channelName, data => {
-//     if (!data.old_val) {
-//       add(data.new_val);
-//     } else if (!data.new_val) {
-//       remove(data.old_val.id);
-//     } else {
-//       update(data.new_val);
-//     }
-//   });
-//   socket.on('unsubscribe', unsubChannel => {
-//     if (unsubChannel === channelName) {
-//       console.log(`unsubbed from ${unsubChannel}`);
-//     }
-//   });
-//   return () => socket.unsubscribe(channelName)
-// };
-//
-// const channelLookupMap = new Map([['meeting',
-//   `subscription($meetingId: ID!) {
-//     subToPosts(meetingId: $meetingId) {
-//       id,
-//     }
-//   }`]]);
