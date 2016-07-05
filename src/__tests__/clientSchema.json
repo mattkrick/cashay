@@ -20,6 +20,13 @@
           "name": "PostType"
         }
       },
+      "getLatestPostId": {
+        "name": "getLatestPostId",
+        "type": {
+          "kind": "SCALAR",
+          "name": "String"
+        }
+      },
       "getRecentPosts": {
         "name": "getRecentPosts",
         "args": {
@@ -238,6 +245,16 @@
             "name": "AuthorType"
           }
         },
+        "keywordsMentioned": {
+          "name": "keywordsMentioned",
+          "type": {
+            "kind": "LIST",
+            "ofType": {
+              "kind": "OBJECT",
+              "name": "KeywordMentioned"
+            }
+          }
+        },
         "cursor": {
           "name": "cursor",
           "type": {
@@ -414,6 +431,19 @@
     "Float": {
       "kind": "SCALAR",
       "name": "Float"
+    },
+    "KeywordMentioned": {
+      "kind": "OBJECT",
+      "name": "KeywordMentioned",
+      "fields": {
+        "word": {
+          "name": "word",
+          "type": {
+            "kind": "SCALAR",
+            "name": "String"
+          }
+        }
+      }
     },
     "Group": {
       "kind": "OBJECT",

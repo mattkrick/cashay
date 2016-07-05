@@ -48,5 +48,11 @@ const getSchema = async inputArg => {
     return resJSON.data;
   }
   const relativeInputPath = path.join(process.cwd(), inputArg);
-  return require(relativeInputPath);
+  let rootSchema;
+  try {
+    rootSchema = require(relativeInputPath).default;
+  } catch (e) {
+    console.log('Error requiring schema', e);
+  }
+  return rootSchema;
 };

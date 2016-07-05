@@ -137,6 +137,12 @@ const MemberType = new GraphQLUnionType({
   types: [GroupType, AuthorType]
 });
 
+const KeywordMentioned = new GraphQLObjectType({
+  name: 'KeywordMentioned',
+  fields: () => ({
+    word: {type: GraphQLString, description: 'a word mentioned in the title'}
+  })
+});
 
 const PostType = new GraphQLObjectType({
   name: "PostType",
@@ -191,6 +197,10 @@ const PostType = new GraphQLObjectType({
       resolve: function({author}) {
         return AuthorDB.find(doc => doc._id === author);
       }
+    },
+    keywordsMentioned: {
+      type: new GraphQLList(KeywordMentioned),
+      description: 'a list of objects with a word prop for testing arrays of non-entity objects'
     },
     cursor: {type: GraphQLString}
   })
@@ -258,9 +268,17 @@ const Query = new GraphQLObjectType({
         return PostDB.length;
       }
     },
+    getLatestPost: {
+      type: PostType,
+      description: "Latest post in the blog",
+      resolve() {
+        const sortedPosts = PostDB.sort((a, b) => b.createdAt - a.createdAt);
+        return sortedPosts[0];
+      }
+    },
     getLatestPostId: {
       type: GraphQLString,
-      description: "Latest post in the blog",
+      description: "Latest post id in the blog",
       resolve() {
         const sortedPosts = PostDB.sort((a, b) => b.createdAt - a.createdAt);
         return sortedPosts[0]._id;
