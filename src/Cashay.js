@@ -8,7 +8,7 @@ import {checkMutationInSchema} from './utils';
 import mergeStores from './normalize/mergeStores';
 import {CachedMutation, CachedQuery, CachedSubscription} from './helperClasses';
 import flushDependencies from './query/flushDependencies';
-import {parse, buildExecutionContext, getVariables, clone} from './utils';
+import {parse, buildExecutionContext, getVariables, clone, shallowPlus1Clone, makeErrorFreeResponse} from './utils';
 import namespaceMutation from './mutate/namespaceMutation';
 import createMutationFromQuery from './mutate/createMutationFromQuery';
 import removeNamespacing from './mutate/removeNamespacing';
@@ -475,18 +475,18 @@ class Cashay {
         throw new Error(`Cache went stale & wasn't recreated. Did you forget to put a redux subscriber on ${component}?`)
       }
       const cachedResponseData = key ? response[key].data : response.data;
-      let modifiedResponse;
+      let modifiedResponseData;
 
       // for the denormalized response, mutate it in place or return undefined if no mutation was made
       const getType = this._getTypeFactory(component, key);
       if (queryResponse) {
         // if it's from the server, send the doc we got back
         const normalizedQueryResponse = removeNamespacing(queryResponse, component);
-        modifiedResponse = componentHandler(null, normalizedQueryResponse, cachedResponseData, getType, this._invalidate);
+        modifiedResponseData = componentHandler(null, normalizedQueryResponse, cachedResponseData, getType, this._invalidate);
       } else {
 
         // otherwise, treat it as an optimistic update
-        modifiedResponse = componentHandler(variables, null, cachedResponseData, getType, this._invalidate);
+        modifiedResponseData = componentHandler(variables, null, cachedResponseData, getType, this._invalidate);
       }
 
       // there's a possible 3 updates: optimistic, doc from server, full array from server (invalidated)
@@ -496,18 +496,16 @@ class Cashay {
       }
 
       // this must come back after the invalidateListener check because they could invalidate without returning something
-      if (!modifiedResponse) {
+      if (!modifiedResponseData) {
         continue;
       }
 
       // create a new object to make sure react-redux's updateStatePropsIfNeeded returns true
       // also remove any existing errors since we've now had a successful operation
       if (key) {
-        const {error, ...cachedResponse} = cachedResult.response[key];
-        cachedResult.response[key] = cachedResponse;
+        cachedResult.response[key] = makeErrorFreeResponse(cachedResult.response[key]);
       } else {
-        const {error, ...cachedResponse} = cachedResult.response;
-        cachedResult.response = cachedResponse;
+        cachedResult.response = makeErrorFreeResponse(cachedResult.response);
       }
 
       const {schema, paginationWords, idFieldName} = this;
@@ -532,7 +530,7 @@ class Cashay {
         cashayDataState
       });
 
-      const normalizedModifiedResponse = normalizeResponse(modifiedResponse, context);
+      const normalizedModifiedResponse = normalizeResponse(modifiedResponseData, context);
       allNormalizedChanges = mergeStores(allNormalizedChanges, normalizedModifiedResponse);
       allVariables = {...allVariables, ...contextVars};
 

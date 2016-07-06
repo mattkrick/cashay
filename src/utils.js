@@ -30,6 +30,29 @@ export const isObject = val => val && typeof val === 'object';
 
 export const clone = obj => JSON.parse(JSON.stringify(obj));
 
+// export const scalarSafeClone = maybeObj => isObject(maybeObj) ? clone(maybeObj) : maybeObj;
+
+export const shallowPlus1Clone = obj => {
+  if (!isObject(obj)) return obj;
+  const dataKeys = Object.keys(obj);
+  const newObj = {};
+  for (let i = 0; i < dataKeys.length; i++) {
+    const key = dataKeys[i];
+    newObj[key] = {...obj[key]};
+  }
+  return newObj;
+};
+
+export const makeErrorFreeResponse = cachedResponse => {
+  const {isComplete, firstRun, setVariables} = cachedResponse;
+  return {
+    isComplete,
+    firstRun,
+    setVariables,
+    data: shallowPlus1Clone(cachedResponse.data)
+  }
+};
+
 export const checkMutationInSchema = (rootMutation, mutationName) => {
   const mutationSchema = rootMutation.fields[mutationName];
   if (!mutationSchema) {
