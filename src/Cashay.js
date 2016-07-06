@@ -19,6 +19,7 @@ import ActiveComponentsObj from './mutate/ActiveComponentsObj';
 import createBasicMutation from './mutate/createBasicMutation';
 import setSubVariablesFactory from './subscribe/setSubVariablesFactory';
 import hasMatchingVariables from './mutate/hasMatchingVariables';
+import {addDenormalizedData, updateDenormalizedData}from './subscribe/getNewDenormalizedData';
 
 const defaultGetToState = store => store.getState().cashay;
 const defaultPaginationWords = {
@@ -273,6 +274,7 @@ class Cashay {
 
 
     // send minimizedQueryString to server and await minimizedQueryResponse
+    console.log('minimizedStr to server', minimizedQueryString);
     const {error, data} = await transport.handleQuery({query: minimizedQueryString, variables});
 
     // handle errors coming back from the server
@@ -583,6 +585,7 @@ class Cashay {
    */
   subscribe(subscriptionString, subscriber, options) {
     const component = options.component || subscriptionString;
+    const {key} = options;
     const fastCachedSub = this.cachedSubscriptions[component];
     // TODO add support for keys
     if (fastCachedSub) {
@@ -594,21 +597,21 @@ class Cashay {
     const cashayDataState = this.getState().data;
     const variables = getVariables(options.variables, cashayDataState, component, key, cachedSubscription.response);
 
-    const subscriptionHandlers = this.makeSubscriptionHandlers(component);
+    const subscriptionHandlers = this.makeSubscriptionHandlers(component, key, variables);
     const startSubscription = subVars => subscriber(subscriptionString, subscriptionHandlers, subVars);
-
-    return cachedSubscription.response =
-    {
+    const unsubscribe = startSubscription(variables);
+    return cachedSubscription.response = {
       ...cachedSubscription.response,
       setVariables: setSubVariablesFactory(component, key, this.store.dispatch, this.getState, cachedSubscription, startSubscription),
-      unsubscribe: startSubscription(variables),
+      unsubscribe,
       status: 'active'
     };
   }
 
-  makeSubscriptionHandlers(component) {
+  makeSubscriptionHandlers(component, key, variables) {
     return {
-      subscriptionAdd(document) {
+      add: (document, options = {}) => {
+        const {patch, operationName} = options;
         const cachedSubscription = this.cachedSubscriptions[component];
         const cashayDataState = this.getState().data;
         const {paginationWords, idFieldName, schema} = this;
@@ -619,9 +622,19 @@ class Cashay {
           idFieldName,
           schema
         });
-        const cachedResult = cachedSubscription.response.data;
-        cachedSubscription.response.data = [...cachedSubscription.response.data, cachedResult];
-        const normalizedDoc = normalizeResponse(document, context);
+        const operations = context.operation.selectionSet.selections;
+        if (operations.length > 1 && !operationName) {
+          throw new Error(`Your subscription for ${component} has ${operations.length} queries.
+           Please include an operationName`);
+        }
+        const typeName = operationName || operations[0].name.value;
+        const newData = addDenormalizedData(typeName, schema, cachedSubscription.response, document, patch, idFieldName);
+        cachedSubscription.response = {
+          ...cachedSubscription.response,
+          data: newData
+        };
+        const normDoc = {[typeName]: document};
+        const normalizedDoc = normalizeResponse(normDoc, context, true);
         const normalizedDocForStore = shortenNormalizedResponse(normalizedDoc, cashayDataState);
         if (!normalizedDocForStore) return;
 
@@ -637,19 +650,46 @@ class Cashay {
             variables: stateVariables
           }
         });
-
-        // normalize data
-        // compare the normalized data to the state data, removing anything that has the same data
-        // merge entities shortenedNormalizedData
-        // add Deps and flush deps
-        // if cashayDataState.result[subscriptionName][?variables].full is an array
-        // then add the newState.result.... to the end of it
-        // also, add the new data to the end of the denormalizedResponse (so fast!) if fastMode = true
-        // make sure to recreate the response object so react-redux picks up the change
-        // call dispatch(insert_normalized)
       },
 
-      subscriptionUpdate(document) {
+      update: (document, removeKeys = [], operationName) => {
+        if (!Array.isArray(removeKeys)) {
+          throw new Error(`removeKeys should be undefined or an array, got ${removeKeys}`);
+        }
+        const cachedSubscription = this.cachedSubscriptions[component];
+        const cashayDataState = this.getState().data;
+        const {paginationWords, idFieldName, schema} = this;
+        const context = buildExecutionContext(cachedSubscription.ast, {
+          cashayDataState,
+          variables,
+          paginationWords,
+          idFieldName,
+          schema
+        });
+        const operations = context.operation.selectionSet.selections;
+        const typeName = operationName || operations[0].name.value;
+        const newData = updateDenormalizedData(typeName, schema, cachedSubscription.response, document, removeKeys, idFieldName);
+        cachedSubscription.response = {
+          ...cachedSubscription.response,
+          data: newData
+        };
+        const normDoc = {[typeName]: document};
+        const normalizedDoc = normalizeResponse(normDoc, context, true);
+        const normalizedDocForStore = shortenNormalizedResponse(normalizedDoc, cashayDataState);
+        if (!normalizedDocForStore) return;
+
+        // remove the responses from this.cachedQueries where necessary
+        flushDependencies(normalizedDocForStore.entities, component, key, this.denormalizedDeps, this.cachedQueries);
+
+        // stick normalize data in store and recreate any invalidated denormalized structures
+        const stateVariables = key ? {[component]: {[key]: variables}} : {[component]: variables};
+        this.store.dispatch({
+          type: INSERT_MUTATION,
+          payload: {
+            response: normalizedDocForStore,
+            variables: stateVariables
+          }
+        });
         // normalize data
         // compare the normalized data to the state data, removing anything that has the same data
         // merge entities shortenedNormalizedData
@@ -658,53 +698,14 @@ class Cashay {
         // call dispatch(insert_normalized)
       },
 
-      subscriptionRemove(idToRemove) {
+      remove(idToRemove) {
         //
       },
 
-      subscriptionError(error) {
+      error(error) {
 
       }
     }
   }
-
-
 }
 export default new Cashay();
-
-
-// const subscriber = (subscriptionString, handlers, variables) => {
-//   let baseChannel;
-//   for (let [key, value] of channelLookupMap.entries()) {
-//     if (value === subscriptionString) {
-//       baseChannel = key;
-//       break;
-//     }
-//   }
-//   const channelName = `${baseChannel}/${variables.userId}`
-//   const socket = socketCluster.connect({authTokenName});
-//   const {add, update, remove, error} = handlers;
-//   socket.subscribe(channelName, {waitForAuth: true});
-//   socket.on(channelName, data => {
-//     if (!data.old_val) {
-//       add(data.new_val);
-//     } else if (!data.new_val) {
-//       remove(data.old_val.id);
-//     } else {
-//       update(data.new_val);
-//     }
-//   });
-//   socket.on('unsubscribe', unsubChannel => {
-//     if (unsubChannel === channelName) {
-//       console.log(`unsubbed from ${unsubChannel}`);
-//     }
-//   });
-//   return () => socket.unsubscribe(channelName)
-// };
-//
-// const channelLookupMap = new Map([['meeting',
-//   `subscription($meetingId: ID!) {
-//     subToPosts(meetingId: $meetingId) {
-//       id,
-//     }
-//   }`]]);

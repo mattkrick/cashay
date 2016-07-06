@@ -93,3 +93,15 @@ const resolveVariables = (cashayDataState, stateVars, variables, key, cachedResp
 const safeValue = (response, cb, cashayDataState) => response && response.data && cb(response.data, cashayDataState);
 
 export const makeNamespaceString = (component, name, d = DELIMITER) => `${CASHAY}${d}${component}${d}${name}`;
+
+export const without = (obj, exclusions) => {
+  const objKeys = Object.keys(obj);
+  const newObj = {};
+  for (let i = 0; i < objKeys.length; i++) {
+    const key = objKeys[i];
+    if (!exclusions.includes(key)) {
+      newObj[key] = obj[key];
+    }
+  }
+  return newObj;
+};

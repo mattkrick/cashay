@@ -115,9 +115,10 @@ const visit = (bag, subResponse, reqAST, subSchema, context) => {
 
 };
 
-export default (response, context) => {
+export default (response, context, isSubscription) => {
+  const schema = isSubscription ? context.schema.subscriptionSchema : context.schema.querySchema;
   const entities = {};
-  const result = visit(entities, response, context.operation, context.schema.querySchema, context);
+  const result = visit(entities, response, context.operation, schema, context);
   return {
     entities,
     result
