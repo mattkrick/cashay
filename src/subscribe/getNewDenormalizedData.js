@@ -5,40 +5,72 @@ import {without} from '../utils';
 
 const {LIST, OBJECT, SCALAR} = TypeKind;
 
-const mergeError = (patch, field, reduction) => {
-  return new Error(`Cannot merge patch: ${patch} because ${field} does not exist in ${reduction}`)
+const mergeError = (path, field, reduction) => {
+  return new Error(`Cannot merge path: ${path} because ${field} does not exist in ${reduction}`)
 };
 
-const walkDenormalizedSubscription = (document, stack, subSchema) => {
-  
-}
-export const addDenormalizedData = (typeName, schema, cachedResponse, document, patch, idFieldName) => {
-  const subscriptionType = schema.subscriptionSchema.fields[typeName].type;
-  const subscriptionTypeNN = ensureTypeFromNonNull(subscriptionType);
-  
-  const returnType = getReturnType(typeName, schema);
-  if (returnType === LIST) {
-    const cachedResult = cachedResponse.data || [];
-    if (!patch) {
-      return [...cachedResult, document]
+const walkPath = (cachedResult, pathArray, idFieldName) => {
+  const newResult = {...cachedResult};
+  const field = pathArray.shift();
+
+  const subResponse = pathArray.reduce((reduction, field) => {
+    if (field.startsWith('[')) {
+      const id = field.substr(1, field.length - 2);
+      return reduction.find(doc => doc[idFieldName] === id);
     }
-    const stack = patch.split('.');
-    const field = stack.pop();
-    const parentDoc = stack.reducer((reduction, field) => {
-      if (Array.isArray(reduction)) {
-        const subField = reduction.find(doc => doc[idFieldName] === field);
-        if (!subField) throw mergeError(patch, field, reduction);
-        return subField;
-      }
-      if (!reduction.hasOwnProperty(field)) throw mergeError(patch, field, reduction);
-      return reduction[field];
-    }, document);
-    if (!parentDoc.hasOwnProperty(field)) throw mergeError(patch, field, parentDoc);
-    
-    
+    return reduction[field];
+  }, cachedResult);
+  return {field, subResponse};
+};
+
+const splitPath = path => {
+  if (!path) return;
+  const fields = path.split('.');
+  const fieldsAndArrays = [];
+  for (let i = 0; i < fields.length; i++) {
+    const fieldWithMaybeArray = fields[i];
+    const values = fieldWithMaybeArray.split('[');
+    fieldsAndArrays.push(values[0]);
+    if (values[1]) {
+      fieldsAndArrays.push(`[${values[1]}`)
+    }
   }
-  if (returnType === OBJECT || returnType === SCALAR) {
+  return fieldsAndArrays;
+};
+
+export const addDenormalizedData = (schema, cachedResult, document, pathArray, idFieldName) => {
+  let subResult = cachedResult;
+  while (pathArray.length >1) {
+    const nextLocation = pathArray.shift();
+    if (nextLocation.startsWith('[')) {
+      const id = nextLocation.substr(1, nextLocation.length - 2);
+      subResult = subResult.find(doc => doc[idFieldName] === id);
+    } else {
+      subResult = subResult[nextLocation];
+    }
+  }
+  const lastLocation = pathArray.shift();
+  if (Array.isArray(subResult[lastLocation])) {
+
+  }
+  if (path) {
+
+  } else {
+
+    if (returnType === LIST) {
+      if (path) {
+        const pathArray = splitPath(path);
+        // get rid of the entity, since we just care about which document in the array
+        pathArray.shift();
+        const {field, subResponse} = walkPath(cachedResponse, path, idFieldName);
+
+      }
+      const cachedResult = cachedResponse.data || [];
+      return [...cachedResult, document];
+    }
+    // if (returnType === OBJECT || returnType === SCALAR) {
     return document;
+    // }
   }
 };
 

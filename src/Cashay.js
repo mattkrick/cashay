@@ -595,23 +595,31 @@ class Cashay {
     }
     const cachedSubscription = this.cachedSubscriptions[component];
     const cashayDataState = this.getState().data;
+    const {paginationWords, idFieldName, schema} = this;
     const variables = getVariables(options.variables, cashayDataState, component, key, cachedSubscription.response);
+    const context = buildExecutionContext(cachedSubscription.ast, {
+      cashayDataState,
+      variables,
+      paginationWords,
+      idFieldName,
+      schema
+    });
 
     const subscriptionHandlers = this.makeSubscriptionHandlers(component, key, variables);
     const startSubscription = subVars => subscriber(subscriptionString, subscriptionHandlers, subVars);
     const unsubscribe = startSubscription(variables);
+    const {data} = denormalizeStore(context);
     return cachedSubscription.response = {
-      ...cachedSubscription.response,
+      data,
       setVariables: setSubVariablesFactory(component, key, this.store.dispatch, this.getState, cachedSubscription, startSubscription),
-      unsubscribe,
-      status: 'active'
+      unsubscribe
     };
   }
 
   makeSubscriptionHandlers(component, key, variables) {
     return {
       add: (document, options = {}) => {
-        const {patch, operationName} = options;
+        const {path} = options;
         const cachedSubscription = this.cachedSubscriptions[component];
         const cashayDataState = this.getState().data;
         const {paginationWords, idFieldName, schema} = this;
@@ -623,12 +631,14 @@ class Cashay {
           schema
         });
         const operations = context.operation.selectionSet.selections;
-        if (operations.length > 1 && !operationName) {
-          throw new Error(`Your subscription for ${component} has ${operations.length} queries.
-           Please include an operationName`);
+        const cachedResult = cachedSubscription.response.data;
+        const subscriptionNames = Object.keys(cachedResult);
+        if (subscriptionNames.length > 1 && !path) {
+          throw new Error(`Your subscription for ${component} has multiple operations, but no path to determine how to 
+          patch in the incoming data.`);
         }
-        const typeName = operationName || operations[0].name.value;
-        const newData = addDenormalizedData(typeName, schema, cachedSubscription.response, document, patch, idFieldName);
+        const pathArray = path ? splitPath(path) : subscriptionNames[0];
+        const newData = addDenormalizedData(schema, cachedResult, document, pathArray, idFieldName);
         cachedSubscription.response = {
           ...cachedSubscription.response,
           data: newData
