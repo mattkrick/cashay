@@ -163,7 +163,8 @@ Options include:
 - `transport`: A function to override the singleton transport. Useful if this particular component needs different credentials, or uses websockets, etc.
 - `variables`: the variables object to pass onto the GraphQL server
 - `customMutations`: Cashay writes mutations for you and guarantees no over/under fetching. But if you don't trust it, you can write your own here.
-- `mutationHandlers` An object where each method is the name of a mutation that changes the query. See below.
+- `mutationHandlers`: An object where each method is the name of a mutation that changes the query. See below.
+- `localOnly`: A Boolean to only fetch data from the local state. Defaults to `false`. Useful if you only want a mutation to update the query data.
 
 ```js
 mutationHandler(optimisticVariables, queryResponse, currentResponse, getEntities, invalidate)

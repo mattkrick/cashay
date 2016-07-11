@@ -7,7 +7,7 @@ import {print} from 'graphql/language/printer';
 
 export default function mergeMutations(cachedSingles) {
   const firstSingle = cachedSingles.pop();
-  
+
   // deep copy to create the base AST (slow, but faster than a parse!)
   const mergedAST = clone(firstSingle);
   const mainOperation = mergedAST.definitions[0];
