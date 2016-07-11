@@ -17,6 +17,7 @@ import addDeps from './normalize/addDeps';
 import mergeMutations from './mutate/mergeMutations';
 import ActiveComponentsObj from './mutate/ActiveComponentsObj';
 import createBasicMutation from './mutate/createBasicMutation';
+import isMutationResponseScalar from './mutate/isMutationResponseScalar';
 
 const defaultGetToState = store => store.getState().cashay;
 const defaultPaginationWords = {
@@ -420,24 +421,28 @@ class Cashay {
     const cachedSinglesASTs = [];
     const newVariableEnhancers = [];
     if (componentsToUpdateKeys.length) {
-      for (let i = 0; i < componentsToUpdateKeys.length; i++) {
-        const component = componentsToUpdateKeys[i];
-        if (!cachedSingles[component]) {
-          const queryOperation = this.cachedQueries[component].ast.definitions[0];
-          const mutationAST = createMutationFromQuery(queryOperation, mutationName, variables, this.schema);
-          const componentStateVars = this.getState().data.variables[component];
-          const {namespaceAST, variableEnhancers} = namespaceMutation(mutationAST, component, componentStateVars, this.schema);
-          cachedSingles[component] = {
-            ast: namespaceAST,
-            variableEnhancers
+      if (isMutationResponseScalar(this.schema, mutationName)){
+        cachedMutation.fullMutation = createBasicMutation(mutationName, this.schema, variables);
+      } else {
+        for (let i = 0; i < componentsToUpdateKeys.length; i++) {
+          const component = componentsToUpdateKeys[i];
+          if (!cachedSingles[component]) {
+            const queryOperation = this.cachedQueries[component].ast.definitions[0];
+            const mutationAST = createMutationFromQuery(queryOperation, mutationName, variables, this.schema);
+            const componentStateVars = this.getState().data.variables[component];
+            const {namespaceAST, variableEnhancers} = namespaceMutation(mutationAST, component, componentStateVars, this.schema);
+            cachedSingles[component] = {
+              ast: namespaceAST,
+              variableEnhancers
+            }
           }
+          const {ast, variableEnhancers} = cachedSingles[component];
+          cachedSinglesASTs.push(ast);
+          newVariableEnhancers.push(...variableEnhancers);
         }
-        const {ast, variableEnhancers} = cachedSingles[component];
-        cachedSinglesASTs.push(ast);
-        newVariableEnhancers.push(...variableEnhancers);
+        cachedMutation.fullMutation = mergeMutations(cachedSinglesASTs);
+        cachedMutation.variableEnhancers.push(...newVariableEnhancers);
       }
-      cachedMutation.fullMutation = mergeMutations(cachedSinglesASTs);
-      cachedMutation.variableEnhancers.push(...newVariableEnhancers);
     } else {
       cachedMutation.fullMutation = createBasicMutation(mutationName, this.schema, variables);
     }
