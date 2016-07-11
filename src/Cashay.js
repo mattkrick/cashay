@@ -20,6 +20,7 @@ import createBasicMutation from './mutate/createBasicMutation';
 import setSubVariablesFactory from './subscribe/setSubVariablesFactory';
 import hasMatchingVariables from './mutate/hasMatchingVariables';
 import {addDenormalizedData, updateDenormalizedData}from './subscribe/getNewDenormalizedData';
+import splitPath from './subscribe/splitPath';
 
 const defaultGetToState = store => store.getState().cashay;
 const defaultPaginationWords = {
@@ -638,13 +639,12 @@ class Cashay {
           patch in the incoming data.`);
         }
         const pathArray = path ? splitPath(path) : subscriptionNames[0];
-        const newData = addDenormalizedData(schema, cachedResult, document, pathArray, idFieldName);
+        const newData = addDenormalizedData(cachedResult, pathArray, {document, schema, idFieldName});
         cachedSubscription.response = {
           ...cachedSubscription.response,
           data: newData
         };
-        const normDoc = {[typeName]: document};
-        const normalizedDoc = normalizeResponse(normDoc, context, true);
+        const normalizedDoc = normalizeResponse(newData, context, true);
         const normalizedDocForStore = shortenNormalizedResponse(normalizedDoc, cashayDataState);
         if (!normalizedDocForStore) return;
 
