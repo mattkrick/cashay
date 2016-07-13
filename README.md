@@ -98,57 +98,17 @@ cashay.query(...);
 The params that you can pass into the `create` method are as follows (*required):
 - *`store`: Your redux store
 - *`schema`: your client schema that cashay helped you make
-- *`transport`: An instance of `HTTPTransport` used to send off the query + variables to your GraphQL server.
+- *`transport`: An instance of a [Transport](./recipes/transports.md) to send off the query + variables to your GraphQL server.
 - `idFieldName`: Defaults to `id`, but you can call it whatever it is in your DB (eg Mongo uses `_id`)
-- `paginationWords`: The reserved words that you use for pagination. Defaults to an object with 4 properties: `first, last, after, before`. If, for example, your backend uses `count` instead of `first`, you'd send in `{first: 'count'}`.
-- `getToState`: A function to get to the cashay sub-state inside the redux state. Defaults to `store => store.getState().cashay`
+- `paginationWords`: The reserved words that you use for pagination. Defaults to an object with 4 properties:
+`first, last, after, before`.
+If, for example, your backend uses `count` instead of `first`, you'd send in `{first: 'count'}`.
+- `getToState`: A function to get to the cashay sub-state inside the redux state.
+Defaults to `store => store.getState().cashay`
 
 Now, whenever you need to query or mutate some data, just import your shiny new singleton!
 
 ## API
-
-### HTTPTransport
-
-```js
-new HTTPTransport(uri, fetchOptions, errorHandler)
-```
-
-- *`uri`: the location of your graphQL endpoint, defaults to '/graphql'
-- `fetchOptions`: Any details or headers used to pass into making the HTTP fetch
-- `errorHandler`: A custom function that takes any GraphQL `errors` and converts them into a single `error` for your Redux state
-
-Example:
-```js
-import {HTTPTransport} from 'cashay';
-const Authorization = `Bearer ${authToken}`;
-const transport = new HTTPTransport('/myEndpoint', {headers: {Authorization}});
-```
-
-If you'd like to replace the global `cashay.transport`, you can call just call `cashay.create({transport: newTransport})`.
-This is useful if you use custom `fetchOptions` that include an authorization token and you need to change it.
-
-### ServerSideTransport
-
-```js
-new ServerSideTransport(graphQLHandler, errorHandler)
-```
-
-- *`graphQLHandler({query, variables})`: a Promise that takes a `query` and `variables` prop, and returns the output from
-a `graphql` call.
-- `errorHandler`: A custom function that takes any GraphQL `errors` and converts them into a single `error` for your Redux state
-
-Example:
-```js
-import {graphql} from 'graphql';
-import Schema from './rootSchema';
-import {ServerSideTransport} from 'cashay';
-const graphQLHandler = function({query, variables}) => {
-  return graphql(Schema, query, null, null, variables);
-}
-const transport = new ServerSideTransport(graphQLHandler);
-```
-This is useful if you use your server for both graphql and server-side rendering
-and don't want cashay to make an HTTP roundtrip to itself.
 
 ### Queries
 

@@ -618,7 +618,7 @@ class Cashay {
     const subscriptionHandlers = this.makeSubscriptionHandlers(component, key, variables);
     const startSubscription = subVars => subscriber(subscriptionString, subscriptionHandlers, subVars);
     const unsubscribe = startSubscription(variables);
-    const {data} = denormalizeStore(context);
+    const {data} = denormalizeStore(context, true);
     return cachedSubscription.response = {
       data,
       setVariables: setSubVariablesFactory(component, key, this.store.dispatch, this.getState, cachedSubscription, startSubscription),
@@ -647,7 +647,7 @@ class Cashay {
           throw new Error(`Your subscription for ${component} has multiple operations, but no path to determine how to 
           patch in the incoming data.`);
         }
-        const pathArray = path ? splitPath(path) : subscriptionNames[0];
+        const pathArray = path ? splitPath(path) : subscriptionNames;
         const newData = addDenormalizedData(cachedResult, pathArray, {document, schema, idFieldName});
         cachedSubscription.response = {
           ...cachedSubscription.response,

@@ -5,34 +5,44 @@ import {without, ensureTypeFromNonNull} from '../utils';
 
 const {LIST, OBJECT, SCALAR} = TypeKind;
 
+const getFieldAndKind = (cachedResult, rawFieldName, idFieldName) => {
+  if (rawFieldName.startsWith('[')) {
+    const id = rawFieldName.substr(1, rawFieldName.length - 2);
+    return {
+      field: cachedResult.find(doc => doc[idFieldName] === id),
+      isArray: true
+    }
+  }
+  return {
+    field: cachedResult[rawFieldName],
+    isArray: false
+  }
+};
+
 const walkPath = (cachedResult, pathArray, context) => {
+  const {document, schema, idFieldName} = context;
+  const subSchema = schema.subscriptionSchema;
   const walkPathRecursion = (cachedResult, pathArray, subSchema) => {
     const rawFieldName = pathArray[0];
-    let field;
-    if (rawFieldName.startsWith('[')) {
-      const id = rawFieldName.substr(1, rawFieldName.length - 2);
-      field = cachedResult.find(doc => doc[idFieldName] === id);
-    } else {
-      field = cachedResult[rawFieldName];
-    }
-
-    const fieldSchema = subSchema.fields[field];
-    const fieldSchemaType = ensureTypeFromNonNull(fieldSchema.type);
-
-    if (pathArray.length === 0) {
-      if (fieldSchemaType.kind === LIST) {
-        field = field || [];
-        return [...field, document];
+    const {field, isArray} = getFieldAndKind(cachedResult, rawFieldName, idFieldName);
+    if (pathArray.length === 1) {
+      if (isArray) {
+        // TODO
+      } else {
+        const fieldSchema = subSchema.fields[rawFieldName];
+        const fieldSchemaType = ensureTypeFromNonNull(fieldSchema.type);
+        if (fieldSchemaType.kind === LIST) {
+          const returnField = field || [];
+          return [...returnField, document];
+        }
+        return {[rawFieldName]: document};
       }
-      return document;
     }
     const typeSchema = schema.types[fieldSchemaType.name];
     const fieldResult = walkPath(document, field, pathArray.slice(1), typeSchema, schema, idFieldName);
     return Array.isArray(field) ? [...field, ...fieldResult] : {...field, ...fieldResult};
   };
-  const {document, schema, idFieldName} = context;
-  const subSchema = schema.subscriptionSchema;
-    walkPathRecursion(cachedResult, pathArray, subSchema);
+  return walkPathRecursion(cachedResult, pathArray, subSchema);
 };
 
 export const addDenormalizedData = (cachedResult, pathArray, context) => {
