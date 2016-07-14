@@ -109,7 +109,7 @@ class Cashay {
   }
 
 
-  create({store, transport, schema, getToState, paginationWords, idFieldName = 'id', debug}) {
+  create({store, httpTransport, priorityTransport, schema, getToState, paginationWords, idFieldName = 'id', debug}) {
     // the redux store
     this.store = store || this.store;
 
@@ -122,8 +122,9 @@ class Cashay {
     // the field that contains the UID
     this.idFieldName = idFieldName || this.idFieldName;
 
-    // the default function to send the queryString to the server (usually HTTP or WS)
-    this.transport = transport || this.transport;
+    // the functions to send the queryString to the server (usually HTTP or websockets)
+    this.httpTransport = httpTransport || this.httpTransport;
+    this.priorityTransport = priorityTransport || this.priorityTransport;
 
     // the client graphQL schema
     this.schema = schema || this.schema;
@@ -137,8 +138,8 @@ class Cashay {
     this._willInvalidateListener = true;
   }
 
-  getTransport() {
-    return this.transport;
+  getTransport(specificTransport) {
+    return specificTransport || this.priorityTransport || this.httpTransport;
   }
 
   /**
@@ -192,7 +193,7 @@ class Cashay {
         this.query(queryString, {
           key,
           forceFetch: true,
-          transport: options.transport || this.getTransport()
+          transport: this.getTransport(options.transport)
         });
       };
       this.cachedQueries[component] = new CachedQuery(queryString, this.schema, this.idFieldName, refetch);
@@ -233,7 +234,7 @@ class Cashay {
       context.variables = getVariables(options.variables, cashayDataState, component, key, cachedResponse);
 
       //  async query the server (no need to track the promise it returns, as it will change the redux state)
-      const transport = options.transport || this.transport;
+      const transport = this.getTransport(options.transport);
       if (!transport) {
         throw new Error('Cashay requires a transport to query the server. If you want to query locally, use `localOnly: true`');
       }
@@ -455,7 +456,7 @@ class Cashay {
 
   async _mutateServer(mutationName, componentsToUpdateObj, mutationString, options) {
     const {variables} = options;
-    const transport = options.transport || this.transport;
+    const transport = this.getTransport(options.transport);
     const docFromServer = await transport.handleQuery({query: mutationString, variables});
     const {error, data} = docFromServer;
     if (error) {

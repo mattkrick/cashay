@@ -87,7 +87,7 @@ you can just import the singleton. This means it works well in SSR apps, too.
 ```js
 // in your client index.js
 const clientSchema = require('cashay!../server/utils/getCashaySchema.js');
-import {cashay, HTTPTransport} from 'cashay';
+import {cashay} from 'cashay';
 cashay.create(paramsObject);
 
 // in a Component.js
@@ -98,7 +98,8 @@ cashay.query(...);
 The params that you can pass into the `create` method are as follows (*required):
 - *`store`: Your redux store
 - *`schema`: your client schema that cashay helped you make
-- *`transport`: An instance of a [Transport](./recipes/transports.md) to send off the query + variables to your GraphQL server.
+- *`httpTransport`: An instance of an [HTTPTransport](./recipes/transports.md) to send off the query + variables to your GraphQL server.
+- `priorityTransport`: An instance of a [Transport](./recipes/transports.md). If it exists, Cashay will use this over the `httpTransport`.
 - `idFieldName`: Defaults to `id`, but you can call it whatever it is in your DB (eg Mongo uses `_id`)
 - `paginationWords`: The reserved words that you use for pagination. Defaults to an object with 4 properties:
 `first, last, after, before`.
