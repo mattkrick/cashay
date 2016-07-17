@@ -63,7 +63,7 @@ export class CachedQuery {
     const response = {
       data,
       firstRun,
-      isComplete: forceFetch === undefined ? true : !forceFetch && !context.operation.sendToServer,
+      isComplete: !forceFetch && !context.operation.sendToServer,
       setVariables: this.setVariablesFactory(component, key, dispatch, getState)
     };
     if (!key) {

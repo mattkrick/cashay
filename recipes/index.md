@@ -5,3 +5,4 @@
 - [Persisted state](./persisted-state.md)
 - [Schema (without webpack)](./cashay-schema.md)
 - [Server-side rendering](./SSR.md)
+- [Transports](./transports.md)

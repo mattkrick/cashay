@@ -1,25 +1,30 @@
 /**
  * walk the normalized response & grab the deps for each entity. put em all in a Set & flush it down the toilet
  */
-export default (entities, component, key, denormalizedDeps, cachedQueries) => {
+export default function flushDependencies(entities, component, key, denormalizedDeps, cachedQueries) {
   const {keyFlush, componentFlushSet} = makeFlushSet(entities, component, key, denormalizedDeps);
   for (let flushedComponentId of componentFlushSet) {
-    cachedQueries[flushedComponentId].response = undefined;
+    const componentQuery = cachedQueries[flushedComponentId];
+    // it might be a subscription, so wrap in a conditional
+    if (componentQuery) {
+      componentQuery.response = undefined;
+    }
   }
   const componentKeys = Object.keys(keyFlush);
   for (let componentKey of componentKeys) {
     const keysToFlush = keyFlush[componentKey];
     const cachedComponentQuery = cachedQueries[componentKey];
-    for (let flushedKey of keysToFlush) {
-      cachedComponentQuery.response[flushedKey] = undefined;
+    if (cachedComponentQuery) {
+      for (let flushedKey of keysToFlush) {
+        cachedComponentQuery.response[flushedKey] = undefined;
+      }
     }
   }
 }
 
 /**
  * Crawl the dependency tree snagging up everything that will be invalidated
- * No safety checks required.
- * The tree is guaranteed to have everything we look for because of addDeps
+ * No safety checks required if just using query, but since subs might be included, we'll have to code defensively
  *
  */
 const makeFlushSet = (entities, component, key, denormalizedDeps) => {
@@ -29,11 +34,13 @@ const makeFlushSet = (entities, component, key, denormalizedDeps) => {
   for (let i = 0; i < typeKeys.length; i++) {
     const typeName = typeKeys[i];
     const typeInDependencyTree = denormalizedDeps[typeName];
+    if (!typeInDependencyTree) continue;
     const newType = entities[typeName];
     const entityKeys = Object.keys(newType);
     for (let j = 0; j < entityKeys.length; j++) {
       const entityName = entityKeys[j];
       const entityInDependencyTree = typeInDependencyTree[entityName];
+      if (!entityInDependencyTree) continue;
       if (key) {
         const componentInDependencyTree = entityInDependencyTree[component];
         keyFlush[component] = keyFlush[component] || new Set();

@@ -17,6 +17,10 @@ import addDeps from './normalize/addDeps';
 import mergeMutations from './mutate/mergeMutations';
 import ActiveComponentsObj from './mutate/ActiveComponentsObj';
 import createBasicMutation from './mutate/createBasicMutation';
+import setSubVariablesFactory from './subscribe/setSubVariablesFactory';
+import hasMatchingVariables from './mutate/hasMatchingVariables';
+import createNewData from './subscribe/getNewDenormalizedData';
+import splitPath from './subscribe/splitPath';
 import isMutationResponseScalar from './mutate/isMutationResponseScalar';
 
 const defaultGetToState = store => store.getState().cashay;
@@ -105,7 +109,7 @@ class Cashay {
   }
 
 
-  create({store, transport, schema, getToState, paginationWords, idFieldName = 'id', debug}) {
+  create({store, httpTransport, priorityTransport, schema, getToState, paginationWords, idFieldName = 'id', debug}) {
     // the redux store
     this.store = store || this.store;
 
@@ -118,8 +122,9 @@ class Cashay {
     // the field that contains the UID
     this.idFieldName = idFieldName || this.idFieldName;
 
-    // the default function to send the queryString to the server (usually HTTP or WS)
-    this.transport = transport || this.transport;
+    // the functions to send the queryString to the server (usually HTTP or websockets)
+    this.httpTransport = httpTransport === undefined ? this.httpTransport : httpTransport;
+    this.priorityTransport = priorityTransport === undefined ? this.priorityTransport : priorityTransport;
 
     // the client graphQL schema
     this.schema = schema || this.schema;
@@ -133,8 +138,8 @@ class Cashay {
     this._willInvalidateListener = true;
   }
 
-  getTransport() {
-    return this.transport;
+  getTransport(specificTransport) {
+    return specificTransport || this.priorityTransport || this.httpTransport;
   }
 
   /**
@@ -158,8 +163,8 @@ class Cashay {
    */
   query(queryString, options = {}) {
     //if you call forceFetch in a mapStateToProps, you're gonna have a bad time (it'll refresh on EVERY dispatch)
-    const {key} = options;
-    const forceFetch = Boolean(options.forceFetch);
+    const {key, forceFetch} = options;
+    // const forceFetch = Boolean(options.forceFetch);
 
     // Each component can have only 1 unique queryString/variable combo. This keeps memory use minimal.
     // if 2 components have the same queryString/variable but a different component, it'll fetch twice
@@ -188,7 +193,7 @@ class Cashay {
         this.query(queryString, {
           key,
           forceFetch: true,
-          transport: options.transport || this.getTransport()
+          transport: this.getTransport(options.transport)
         });
       };
       this.cachedQueries[component] = new CachedQuery(queryString, this.schema, this.idFieldName, refetch);
@@ -229,7 +234,7 @@ class Cashay {
       context.variables = getVariables(options.variables, cashayDataState, component, key, cachedResponse);
 
       //  async query the server (no need to track the promise it returns, as it will change the redux state)
-      const transport = options.transport || this.transport;
+      const transport = this.getTransport(options.transport);
       if (!transport) {
         throw new Error('Cashay requires a transport to query the server. If you want to query locally, use `localOnly: true`');
       }
@@ -450,7 +455,7 @@ class Cashay {
 
   async _mutateServer(mutationName, componentsToUpdateObj, mutationString, options) {
     const {variables} = options;
-    const transport = options.transport || this.transport;
+    const transport = this.getTransport(options.transport);
     const docFromServer = await transport.handleQuery({query: mutationString, variables});
     const {error, data} = docFromServer;
     if (error) {
@@ -590,6 +595,7 @@ class Cashay {
    */
   subscribe(subscriptionString, subscriber, options) {
     const component = options.component || subscriptionString;
+    const {key} = options;
     const fastCachedSub = this.cachedSubscriptions[component];
     // TODO add support for keys
     if (fastCachedSub) {
@@ -598,50 +604,95 @@ class Cashay {
       this.cachedSubscriptions[component] = new CachedSubscription(subscriptionString);
     }
     const cachedSubscription = this.cachedSubscriptions[component];
-    const handlers = {
-      add: this.subscriptionAdd,
-      update: this.subscriptionUpdate,
-      remove: this.subscriptionRemove,
-      error: this.subscriptionError
-    };
     const cashayDataState = this.getState().data;
+    const {paginationWords, idFieldName, schema} = this;
     const variables = getVariables(options.variables, cashayDataState, component, key, cachedSubscription.response);
-    return subscriber(subscriptionString, handlers, variables);
+    const context = buildExecutionContext(cachedSubscription.ast, {
+      cashayDataState,
+      variables,
+      paginationWords,
+      idFieldName,
+      schema
+    });
+
+    const getCachedResult = () => cachedSubscription.response.data;
+    const subscriptionHandlers = this.makeSubscriptionHandlers(component, key, variables);
+    const startSubscription = (subVars) => subscriber(subscriptionString, subVars, subscriptionHandlers, getCachedResult);
+    const unsubscribe = startSubscription(variables, cachedSubscription.response.data);
+    const {data} = denormalizeStore(context, true);
+    return cachedSubscription.response = {
+      data,
+      setVariables: setSubVariablesFactory(component, key, this.store.dispatch, this.getState, cachedSubscription, startSubscription),
+      unsubscribe
+    };
   }
 
-  subscriptionAdd(document, fastMode = true) {
-    // normalize data
-    // compare the normalized data to the state data, removing anything that has the same data
-    // merge entities shortenedNormalizedData
-    // if cashayDataState.result[subscriptionName][?variables].full is an array
-    // then add the newState.result.... to the end of it
-    // also, add the new data to the end of the denormalizedResponse (so fast!) if fastMode = true
-    // make sure to recreate the response object so react-redux picks up the change
-    // call dispatch(insert_normalized)
-  }
+  makeSubscriptionHandlers(component, key, variables) {
+    const handleCreateNewData = (handler, path, document) => {
+      const cachedSubscription = this.cachedSubscriptions[component];
+      const cashayDataState = this.getState().data;
+      const {paginationWords, idFieldName, schema} = this;
+      const context = buildExecutionContext(cachedSubscription.ast, {
+        cashayDataState,
+        variables,
+        paginationWords,
+        idFieldName,
+        schema
+      });
+      const operations = context.operation.selectionSet.selections;
+      const cachedResult = cachedSubscription.response.data;
+      const subscriptionNames = Object.keys(cachedResult);
+      if (subscriptionNames.length > 1 && !path) {
+        throw new Error(`Your subscription for ${component} has multiple operations, but no path to determine how to 
+          patch in the incoming data.`);
+      }
+      const pathArray = path ? splitPath(path) : subscriptionNames;
+      const newData = createNewData(handler, cachedResult, pathArray, {document, schema, idFieldName});
+      return {newData, context};
+    };
 
-  subscriptionUpdate(document) {
-    // normalize data
-    // compare the normalized data to the state data, removing anything that has the same data
-    // merge entities shortenedNormalizedData
-    // update the new data in denormalizedResponse (so fast!)
-    // make sure to recreate the response object so react-redux picks up the change
-    // call dispatch(insert_normalized)
-  }
+    const mergeNewData = ({newData, context}) => {
+      const cachedSubscription = this.cachedSubscriptions[component];
+      const cashayDataState = this.getState().data;
+      cachedSubscription.response = {
+        ...cachedSubscription.response,
+        data: newData
+      };
+      const normalizedDoc = normalizeResponse(newData, context, true);
+      const normalizedDocForStore = shortenNormalizedResponse(normalizedDoc, cashayDataState);
+      if (!normalizedDocForStore) return;
 
-  subscriptionRemove(idToRemove) {
-    //
-  }
+      // remove the responses from this.cachedQueries where necessary
+      flushDependencies(normalizedDocForStore.entities, component, key, this.denormalizedDeps, this.cachedQueries);
 
+      // stick normalize data in store and recreate any invalidated denormalized structures
+      const stateVariables = key ? {[component]: {[key]: variables}} : {[component]: variables};
+      this.store.dispatch({
+        type: INSERT_QUERY,
+        payload: {
+          response: normalizedDocForStore,
+          variables: stateVariables
+        }
+      });
+    };
+
+    return {
+      add: (document, options = {}) => {
+        const newDataAndContext = handleCreateNewData('ADD', options.path, document);
+        mergeNewData(newDataAndContext)
+      },
+      update: (document, removeKeys = [], options = {}) => {
+        const newDataAndContext = handleCreateNewData('UPDATE', options.path, document);
+        mergeNewData(newDataAndContext)
+      },
+      remove: (idToRemove, options = {}) => {
+        const newDataAndContext = handleCreateNewData('REMOVE', options.path, idToRemove);
+        mergeNewData(newDataAndContext)
+      },
+      error(error) {
+
+      }
+    }
+  }
 }
 export default new Cashay();
-
-const hasMatchingVariables = (variables = {}, matchingSet) => {
-  const varKeys = Object.keys(variables);
-  if (varKeys.length !== matchingSet.size) return false;
-  for (let i = 0; i < varKeys.length; i++) {
-    const varKey = varKeys[i];
-    if (!matchingSet.has(varKey)) return false;
-  }
-  return true;
-};
