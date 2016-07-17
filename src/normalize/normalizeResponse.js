@@ -30,7 +30,7 @@ const visitObject = (bag, subResponse, reqAST, subSchema, context) => {
     const name = subReqAST.name.value;
     const field = subSchema.fields[name];
     if (!field) {
-      throw new Error(`No field exists for ${field}. Did you update your schema?`)
+      throw new Error(`No field exists for ${name}. Did you update your schema?`)
     }
     const fieldType = ensureRootType(field.type);
     let fieldSchema = context.schema.types[fieldType.name];
@@ -115,9 +115,10 @@ const visit = (bag, subResponse, reqAST, subSchema, context) => {
 
 };
 
-export default (response, context) => {
+export default (response, context, isSubscription) => {
+  const schema = isSubscription ? context.schema.subscriptionSchema : context.schema.querySchema;
   const entities = {};
-  const result = visit(entities, response, context.operation, context.schema.querySchema, context);
+  const result = visit(entities, response, context.operation, schema, context);
   return {
     entities,
     result

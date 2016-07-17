@@ -105,12 +105,12 @@ const visit = (subState, reqAST, subSchema, context) => {
   }
 };
 
-export default function denormalizeStore(context) {
+export default function denormalizeStore(context, isSubscription) {
   // if we have nothing in the local state for this query, send it right to the server
   let firstRun = true;
 
   // Lookup the root schema for the queryType (hardcoded name in the return of the introspection query)
-  const {querySchema} = context.schema;
+  const schema = isSubscription ? context.schema.subscriptionSchema : context.schema.querySchema;
 
   // a query operation can have multiple queries, gotta catch 'em all
   const queryReduction = context.operation.selectionSet.selections.reduce((reduction, selection) => {
@@ -120,7 +120,7 @@ export default function denormalizeStore(context) {
     const aliasOrName = selection.alias && selection.alias.value || queryName;
 
     // get the query schema to know the expected type and args
-    let queryFieldSchema = querySchema.fields[queryName];
+    let queryFieldSchema = schema.fields[queryName];
 
     // look into the current redux state to see if we can borrow any data from it
     let queryInState = context.cashayDataState.result[queryName];
