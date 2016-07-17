@@ -30,7 +30,7 @@ const visitObject = (bag, subResponse, reqAST, subSchema, context) => {
     const name = subReqAST.name.value;
     const field = subSchema.fields[name];
     if (!field) {
-      throw new Error(`No field exists for ${field}. Did you update your schema?`)
+      throw new Error(`No field exists for ${name}. Did you update your schema?`)
     }
     const fieldType = ensureRootType(field.type);
     let fieldSchema = context.schema.types[fieldType.name];

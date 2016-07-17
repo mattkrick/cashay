@@ -76,7 +76,7 @@ import {socket} from './myCustomSocketDriver';
 
 const sendToServer = request => {
   return new Promise((resolve) => {
-    socket.emit('graphql', request, response => {
+    socket.emit('graphql', request, (error, response) => {
       resolve(response);
     });
   });

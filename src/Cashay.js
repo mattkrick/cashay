@@ -19,7 +19,7 @@ import ActiveComponentsObj from './mutate/ActiveComponentsObj';
 import createBasicMutation from './mutate/createBasicMutation';
 import setSubVariablesFactory from './subscribe/setSubVariablesFactory';
 import hasMatchingVariables from './mutate/hasMatchingVariables';
-import {addDenormalizedData, updateDenormalizedData}from './subscribe/getNewDenormalizedData';
+import createNewData from './subscribe/getNewDenormalizedData';
 import splitPath from './subscribe/splitPath';
 import isMutationResponseScalar from './mutate/isMutationResponseScalar';
 
@@ -123,8 +123,8 @@ class Cashay {
     this.idFieldName = idFieldName || this.idFieldName;
 
     // the functions to send the queryString to the server (usually HTTP or websockets)
-    this.httpTransport = httpTransport || this.httpTransport;
-    this.priorityTransport = priorityTransport || this.priorityTransport;
+    this.httpTransport = httpTransport === undefined ? this.httpTransport : httpTransport;
+    this.priorityTransport = priorityTransport === undefined ? this.priorityTransport : priorityTransport;
 
     // the client graphQL schema
     this.schema = schema || this.schema;
@@ -616,9 +616,10 @@ class Cashay {
       schema
     });
 
+    const getCachedResult = () => cachedSubscription.response.data;
     const subscriptionHandlers = this.makeSubscriptionHandlers(component, key, variables);
-    const startSubscription = subVars => subscriber(subscriptionString, subscriptionHandlers, subVars);
-    const unsubscribe = startSubscription(variables);
+    const startSubscription = (subVars) => subscriber(subscriptionString, subVars, subscriptionHandlers, getCachedResult);
+    const unsubscribe = startSubscription(variables, cachedSubscription.response.data);
     const {data} = denormalizeStore(context, true);
     return cachedSubscription.response = {
       data,
@@ -628,99 +629,67 @@ class Cashay {
   }
 
   makeSubscriptionHandlers(component, key, variables) {
+    const handleCreateNewData = (handler, path, document) => {
+      const cachedSubscription = this.cachedSubscriptions[component];
+      const cashayDataState = this.getState().data;
+      const {paginationWords, idFieldName, schema} = this;
+      const context = buildExecutionContext(cachedSubscription.ast, {
+        cashayDataState,
+        variables,
+        paginationWords,
+        idFieldName,
+        schema
+      });
+      const operations = context.operation.selectionSet.selections;
+      const cachedResult = cachedSubscription.response.data;
+      const subscriptionNames = Object.keys(cachedResult);
+      if (subscriptionNames.length > 1 && !path) {
+        throw new Error(`Your subscription for ${component} has multiple operations, but no path to determine how to 
+          patch in the incoming data.`);
+      }
+      const pathArray = path ? splitPath(path) : subscriptionNames;
+      const newData = createNewData(handler, cachedResult, pathArray, {document, schema, idFieldName});
+      return {newData, context};
+    };
+
+    const mergeNewData = ({newData, context}) => {
+      const cachedSubscription = this.cachedSubscriptions[component];
+      const cashayDataState = this.getState().data;
+      cachedSubscription.response = {
+        ...cachedSubscription.response,
+        data: newData
+      };
+      const normalizedDoc = normalizeResponse(newData, context, true);
+      const normalizedDocForStore = shortenNormalizedResponse(normalizedDoc, cashayDataState);
+      if (!normalizedDocForStore) return;
+
+      // remove the responses from this.cachedQueries where necessary
+      flushDependencies(normalizedDocForStore.entities, component, key, this.denormalizedDeps, this.cachedQueries);
+
+      // stick normalize data in store and recreate any invalidated denormalized structures
+      const stateVariables = key ? {[component]: {[key]: variables}} : {[component]: variables};
+      this.store.dispatch({
+        type: INSERT_QUERY,
+        payload: {
+          response: normalizedDocForStore,
+          variables: stateVariables
+        }
+      });
+    };
+
     return {
       add: (document, options = {}) => {
-        const {path} = options;
-        const cachedSubscription = this.cachedSubscriptions[component];
-        const cashayDataState = this.getState().data;
-        const {paginationWords, idFieldName, schema} = this;
-        const context = buildExecutionContext(cachedSubscription.ast, {
-          cashayDataState,
-          variables,
-          paginationWords,
-          idFieldName,
-          schema
-        });
-        const operations = context.operation.selectionSet.selections;
-        const cachedResult = cachedSubscription.response.data;
-        const subscriptionNames = Object.keys(cachedResult);
-        if (subscriptionNames.length > 1 && !path) {
-          throw new Error(`Your subscription for ${component} has multiple operations, but no path to determine how to 
-          patch in the incoming data.`);
-        }
-        const pathArray = path ? splitPath(path) : subscriptionNames;
-        const newData = addDenormalizedData(cachedResult, pathArray, {document, schema, idFieldName});
-        cachedSubscription.response = {
-          ...cachedSubscription.response,
-          data: newData
-        };
-        const normalizedDoc = normalizeResponse(newData, context, true);
-        const normalizedDocForStore = shortenNormalizedResponse(normalizedDoc, cashayDataState);
-        if (!normalizedDocForStore) return;
-
-        // remove the responses from this.cachedQueries where necessary
-        flushDependencies(normalizedDocForStore.entities, component, key, this.denormalizedDeps, this.cachedQueries);
-
-        // stick normalize data in store and recreate any invalidated denormalized structures
-        const stateVariables = key ? {[component]: {[key]: variables}} : {[component]: variables};
-        this.store.dispatch({
-          type: INSERT_QUERY,
-          payload: {
-            response: normalizedDocForStore,
-            variables: stateVariables
-          }
-        });
+        const newDataAndContext = handleCreateNewData('ADD', options.path, document);
+        mergeNewData(newDataAndContext)
       },
-
-      update: (document, removeKeys = [], operationName) => {
-        if (!Array.isArray(removeKeys)) {
-          throw new Error(`removeKeys should be undefined or an array, got ${removeKeys}`);
-        }
-        const cachedSubscription = this.cachedSubscriptions[component];
-        const cashayDataState = this.getState().data;
-        const {paginationWords, idFieldName, schema} = this;
-        const context = buildExecutionContext(cachedSubscription.ast, {
-          cashayDataState,
-          variables,
-          paginationWords,
-          idFieldName,
-          schema
-        });
-        const operations = context.operation.selectionSet.selections;
-        const typeName = operationName || operations[0].name.value;
-        const newData = updateDenormalizedData(typeName, schema, cachedSubscription.response, document, removeKeys, idFieldName);
-        cachedSubscription.response = {
-          ...cachedSubscription.response,
-          data: newData
-        };
-        const normDoc = {[typeName]: document};
-        const normalizedDoc = normalizeResponse(normDoc, context, true);
-        const normalizedDocForStore = shortenNormalizedResponse(normalizedDoc, cashayDataState);
-        if (!normalizedDocForStore) return;
-
-        // remove the responses from this.cachedQueries where necessary
-        flushDependencies(normalizedDocForStore.entities, component, key, this.denormalizedDeps, this.cachedQueries);
-
-        // stick normalize data in store and recreate any invalidated denormalized structures
-        const stateVariables = key ? {[component]: {[key]: variables}} : {[component]: variables};
-        this.store.dispatch({
-          type: INSERT_MUTATION,
-          payload: {
-            response: normalizedDocForStore,
-            variables: stateVariables
-          }
-        });
-        // normalize data
-        // compare the normalized data to the state data, removing anything that has the same data
-        // merge entities shortenedNormalizedData
-        // update the new data in denormalizedResponse (so fast!)
-        // make sure to recreate the response object so react-redux picks up the change
-        // call dispatch(insert_normalized)
+      update: (document, removeKeys = [], options = {}) => {
+        const newDataAndContext = handleCreateNewData('UPDATE', options.path, document);
+        mergeNewData(newDataAndContext)
       },
-      remove(idToRemove) {
-        //
+      remove: (idToRemove, options = {}) => {
+        const newDataAndContext = handleCreateNewData('REMOVE', options.path, idToRemove);
+        mergeNewData(newDataAndContext)
       },
-
       error(error) {
 
       }

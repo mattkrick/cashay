@@ -8,28 +8,27 @@ export default class HTTPTransport extends Transport {
     this.uri = uri;
     this.init = init;
     this.handleErrors = handleErrors;
-  }
-
-  async sendToServer(request) {
-    const payload = {
-      ...this.init,
-      body: JSON.stringify(request),
-      headers: {
-        ...this.init.headers,
-        'Accept': '*/*',
-        'Content-Type': 'application/json'
-      },
-      method: 'POST'
-    };
-    const result = await fetch(this.uri, payload);
-    const {status, statusText} = result;
-    if (status >= 200 && status < 300) {
-      return await result.json();
-    } else {
-      return {
-        data: null,
-        errors: [{_error: statusText, status}]
+    this.sendToServer =  async (request) => {
+      const payload = {
+        ...this.init,
+        body: JSON.stringify(request),
+        headers: {
+          ...this.init.headers,
+          'Accept': '*/*',
+          'Content-Type': 'application/json'
+        },
+        method: 'POST'
       };
+      const result = await fetch(this.uri, payload);
+      const {status, statusText} = result;
+      if (status >= 200 && status < 300) {
+        return await result.json();
+      } else {
+        return {
+          data: null,
+          errors: [{_error: statusText, status}]
+        };
+      }
     }
   }
 }
