@@ -281,7 +281,6 @@ class Cashay {
 
 
     // send minimizedQueryString to server and await minimizedQueryResponse
-    console.log('minimizedStr to server', minimizedQueryString);
     const {error, data} = await transport.handleQuery({query: minimizedQueryString, variables});
 
     // handle errors coming back from the server
