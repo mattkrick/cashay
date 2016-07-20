@@ -8,7 +8,7 @@ export const printMinimalQuery = (reqAST, idFieldName, variables, component, sch
   const context = {
     component,
     schema,
-    initialVariableDefinitions: []
+    variableDefinitions: []
   };
   minimizeQueryAST(reqAST, idFieldName, variables, schema.querySchema, context);
   reqAST.variableDefinitions = context.variableDefinitions;
