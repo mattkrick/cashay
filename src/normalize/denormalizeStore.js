@@ -120,7 +120,12 @@ export default function denormalizeStore(context, isSubscription) {
     const aliasOrName = selection.alias && selection.alias.value || queryName;
 
     // get the query schema to know the expected type and args
-    let queryFieldSchema = schema.fields[queryName];
+    const queryFieldSchema = schema.fields[queryName];
+    if (!queryFieldSchema) {
+      throw new Error(`Could not find ${isSubscription ? 'subscription' : 'query'} for ${queryName}.
+      Did you add it to your GraphQL schema?`)
+    }
+
 
     // look into the current redux state to see if we can borrow any data from it
     let queryInState = context.cashayDataState.result[queryName];
