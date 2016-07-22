@@ -2,20 +2,19 @@ import {print} from 'graphql/language/printer';
 import {VARIABLE} from 'graphql/language/kinds';
 import {getMissingRequiredVariables} from './queryHelpers';
 import createVariableDefinitions from '../createVariableDefinitions';
-import {ensureRootType, clone} from '../utils';
+import {ensureRootType} from '../utils';
 
 export const printMinimalQuery = (reqAST, idFieldName, variables, component, schema) => {
   const context = {
     component,
-    schema,
-    variableDefinitions: []
+    schema
   };
-  minimizeQueryAST(reqAST, idFieldName, variables, schema.querySchema, context);
-  reqAST.variableDefinitions = context.variableDefinitions;
+  reqAST.variableDefinitions = minimizeQueryAST(reqAST, idFieldName, variables, schema.querySchema, [], context);
   return print(reqAST)
 };
 
-const minimizeQueryAST = (reqAST, idFieldName, variables, subSchema, context) => {
+// mutates initialVariableDefinitions
+const minimizeQueryAST = (reqAST, idFieldName, variables, subSchema, initialVariableDefinitions = [], context) => {
   const {selections} = reqAST.selectionSet;
   for (let i = 0; i < selections.length; i++) {
     const field = selections[i];
@@ -23,22 +22,25 @@ const minimizeQueryAST = (reqAST, idFieldName, variables, subSchema, context) =>
     if (field.sendToServer) {
       const fieldSchema = subSchema.fields[field.name.value];
       if (field.arguments && field.arguments.length) {
-        const cachedVariableDefinitions = clone(context.variableDefinitions);
-        const {variableDefinitions} = createVariableDefinitions(field.arguments, fieldSchema, false, context);
-        context.variableDefinitions = variableDefinitions;
-        const missingRequiredVars = getMissingRequiredVariables(context.variableDefinitions, variables);
+        const createVarDefContext = {...context, initialVariableDefinitions};
+        const {variableDefinitions} = createVariableDefinitions(field.arguments, fieldSchema, false, createVarDefContext);
+        const allVarDefs = [...initialVariableDefinitions, ...variableDefinitions];
+        const missingRequiredVars = getMissingRequiredVariables(allVarDefs, variables);
         const hasMissingVar = findMissingVar(field.arguments, missingRequiredVars);
         if (hasMissingVar) {
           // remove fields that aren't given the vars they need to be successful
           selections[i] = undefined;
-          context.variableDefinitions = cachedVariableDefinitions;
           continue;
+        } else {
+          // MUTATIVE
+          initialVariableDefinitions.push(...variableDefinitions);
         }
       }
       if (field.selectionSet) {
         const fieldSchemaType = ensureRootType(fieldSchema.type);
         const nextSchema = context.schema.types[fieldSchemaType.name];
-        minimizeQueryAST(field, idFieldName, variables, nextSchema, context);
+        // mutates initialVariableDefinitions
+        minimizeQueryAST(field, idFieldName, variables, nextSchema, initialVariableDefinitions, context);
       }
     } else if (field.name.value !== idFieldName) {
       selections[i] = undefined;
@@ -55,6 +57,8 @@ const minimizeQueryAST = (reqAST, idFieldName, variables, subSchema, context) =>
   } else {
     reqAST.selectionSet.selections = minimizedFields;
   }
+  // length will be >= than how it started
+  return initialVariableDefinitions;
 };
 
 const findMissingVar = (fieldArgs, missingRequiredVars) => {
