@@ -2,7 +2,7 @@ import {INLINE_FRAGMENT} from 'graphql/language/kinds';
 import {TypeKind} from 'graphql/type/introspection';
 import {ensureTypeFromNonNull, NORM_DELIMITER} from '../utils';
 
-const {UNION, LIST, SCALAR} = TypeKind;
+const {UNION, LIST, SCALAR, ENUM} = TypeKind;
 
 export const handleMissingData = (visit, aliasOrFieldName, field, fieldSchema, context) => {
   sendChildrenToServer(field);
@@ -11,6 +11,8 @@ export const handleMissingData = (visit, aliasOrFieldName, field, fieldSchema, c
     return null;
   } else if (fieldType.kind === LIST) {
     return [];
+  } else if (fieldType.kind === ENUM) {
+    return '';
   } else {
     const newFieldSchema = context.schema.types[fieldType.name];
     if (fieldType.kind === UNION) {
