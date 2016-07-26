@@ -42,13 +42,23 @@ export default function createNewData(handler, cachedResult, pathArray, context)
           const idxToRemove = returnField.findIndex(field => field[idFieldName] === document);
           const newReturnField = returnField.slice();
           if (idxToRemove !== -1) {
-            newReturnField.splice(idxToRemove,1);
+            newReturnField.splice(idxToRemove, 1);
           }
           return {[rawFieldName]: newReturnField};
         }
         return {[rawFieldName]: undefined};
       }
-
+      if (handler === 'UPDATE') {
+        if (fieldSchemaType.kind === LIST) {
+          // TODO
+        }
+        return {
+          [rawFieldName]: {
+            ...field,
+            ...document
+          }
+        }
+      }
     }
     const typeSchema = schema.types[fieldSchemaType.name];
     const fieldResult = walkPathRecursion(field, pathArray.slice(1), typeSchema);
