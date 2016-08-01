@@ -20,7 +20,6 @@ import createBasicMutation from './mutate/createBasicMutation';
 import setSubVariablesFactory from './subscribe/setSubVariablesFactory';
 import hasMatchingVariables from './mutate/hasMatchingVariables';
 import createNewData from './subscribe/getNewDenormalizedData';
-import splitPath from './subscribe/splitPath';
 import isMutationResponseScalar from './mutate/isMutationResponseScalar';
 
 const defaultGetToState = store => store.getState().cashay;
@@ -628,7 +627,7 @@ class Cashay {
   }
 
   makeSubscriptionHandlers(component, key, variables) {
-    const handleCreateNewData = (handler, path, document) => {
+    const handleCreateNewData = (handler, document, {path, removeKeys = []}) => {
       const cachedSubscription = this.cachedSubscriptions[component];
       const cashayDataState = this.getState().data;
       const {paginationWords, idFieldName, schema} = this;
@@ -643,11 +642,11 @@ class Cashay {
       const cachedResult = cachedSubscription.response.data;
       const subscriptionNames = Object.keys(cachedResult);
       if (subscriptionNames.length > 1 && !path) {
-        throw new Error(`Your subscription for ${component} has multiple operations, but no path to determine how to 
-          patch in the incoming data.`);
+        throw new Error(`Your subscription for ${component} has multiple operations, but no path.
+         Include a 'path' option to determine how to patch in the incoming data.`);
       }
-      const pathArray = path ? splitPath(path) : subscriptionNames;
-      const newData = createNewData(handler, cachedResult, pathArray, {document, schema, idFieldName});
+      const pathArray = path ? path.split('.') : subscriptionNames;
+      const newData = createNewData(handler, cachedResult, pathArray, {document, schema, idFieldName, removeKeys});
       return {newData, context};
     };
 
@@ -656,7 +655,8 @@ class Cashay {
       const cashayDataState = this.getState().data;
       cachedSubscription.response = {
         ...cachedSubscription.response,
-        data: newData
+        // handle multiple sub operations inside the same sub
+        data: {...cachedSubscription.response.data, ...newData}
       };
       const normalizedDoc = normalizeResponse(newData, context, true);
       const normalizedDocForStore = shortenNormalizedResponse(normalizedDoc, cashayDataState);
@@ -678,15 +678,15 @@ class Cashay {
 
     return {
       add: (document, options = {}) => {
-        const newDataAndContext = handleCreateNewData('ADD', options.path, document);
+        const newDataAndContext = handleCreateNewData('ADD', document, options);
         mergeNewData(newDataAndContext)
       },
-      update: (document, removeKeys = [], options = {}) => {
-        const newDataAndContext = handleCreateNewData('UPDATE', options.path, document);
+      update: (document, options = {}) => {
+        const newDataAndContext = handleCreateNewData('UPDATE', document, options);
         mergeNewData(newDataAndContext)
       },
       remove: (idToRemove, options = {}) => {
-        const newDataAndContext = handleCreateNewData('REMOVE', options.path, idToRemove);
+        const newDataAndContext = handleCreateNewData('REMOVE', idToRemove, options);
         mergeNewData(newDataAndContext)
       },
       error(error) {
