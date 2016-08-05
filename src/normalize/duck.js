@@ -1,3 +1,6 @@
+export const ADD_SUBSCRIPTION = '@@cashay/ADD_SUBSCRIPTION';
+export const UPDATE_SUBSCRIPTION = '@@cashay/UPDATE_SUBSCRIPTION';
+export const REMOVE_SUBSCRIPTION = '@@cashay/REMOVE_SUBSCRIPTION';
 export const INSERT_QUERY = '@@cashay/INSERT_QUERY';
 export const INSERT_MUTATION = '@@cashay/INSERT_MUTATION';
 export const SET_VARIABLES = '@@cashay/SET_VARIABLES';
@@ -14,7 +17,10 @@ const initialState = {
 };
 
 export default function reducer(state = initialState, action) {
-  if (action.type === INSERT_QUERY) {
+  if (action.type === INSERT_QUERY ||
+    action.type === ADD_SUBSCRIPTION ||
+    action.type === UPDATE_SUBSCRIPTION ||
+    action.type === REMOVE_SUBSCRIPTION) {
     const {variables, response} = action.payload;
     const newMergedState = mergeStores(state.data, response);
     return variables ? newStateWithVars(state, newMergedState, action.payload) : {...state, data: newMergedState, error: null};

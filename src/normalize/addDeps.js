@@ -5,16 +5,10 @@ export default function addDeps(normalizedResponse, component, key, normalizedDe
   // create a Set of normalized locations in entities (eg 'Post.123')
   const newNormalizedDeps = makeNormalizedDeps(normalizedResponse.entities);
   let oldNormalizedDeps;
-  if (key) {
-    normalizedDeps[component] = normalizedDeps[component] || {};
-    const componentDeps = normalizedDeps[component];
-    oldNormalizedDeps = componentDeps[key];
-    componentDeps[key] = newNormalizedDeps;
-  } else {
-    oldNormalizedDeps = normalizedDeps[component];
-    normalizedDeps[component] = newNormalizedDeps;
-  }
-
+  normalizedDeps[component] = normalizedDeps[component] || {};
+  const componentDeps = normalizedDeps[component];
+  oldNormalizedDeps = componentDeps[key];
+  componentDeps[key] = newNormalizedDeps;
   let newUniques;
   if (!oldNormalizedDeps) {
     newUniques = newNormalizedDeps;
@@ -33,11 +27,7 @@ export default function addDeps(normalizedResponse, component, key, normalizedDe
     for (let dep of oldNormalizedDeps) {
       const [typeName, entityName] = dep.split(_);
       const entityDep = denormalizedDeps[typeName][entityName];
-      if (key) {
-        entityDep[component].delete(key);
-      } else {
-        entityDep.delete(component);
-      }
+      entityDep[component].delete(key);
     }
   }
 
@@ -45,14 +35,9 @@ export default function addDeps(normalizedResponse, component, key, normalizedDe
   for (let dep of newUniques) {
     const [typeName, entityName] = dep.split(_);
     denormalizedDeps[typeName] = denormalizedDeps[typeName] || {};
-    if (key) {
-      denormalizedDeps[typeName][entityName] = denormalizedDeps[typeName][entityName] || {};
-      denormalizedDeps[typeName][entityName][component] = denormalizedDeps[typeName][entityName][component] || new Set();
-      denormalizedDeps[typeName][entityName][component].add(key);
-    } else {
-      denormalizedDeps[typeName][entityName] = denormalizedDeps[typeName][entityName] || new Set();
-      denormalizedDeps[typeName][entityName].add(component);
-    }
+    denormalizedDeps[typeName][entityName] = denormalizedDeps[typeName][entityName] || {};
+    denormalizedDeps[typeName][entityName][component] = denormalizedDeps[typeName][entityName][component] || new Set();
+    denormalizedDeps[typeName][entityName][component].add(key);
   }
 }
 

@@ -27,7 +27,7 @@ export default class ActiveComponentsObj {
       const component = handlerComponents[i];
       if (cachedQueries[component]) {
         // duck-type to see whether we should dive into the key or not
-        if (typeof cachedQueries[component].response.setVariables === "function") {
+        if (cachedQueries[component].responses['']) {
           this[component] = true;
         } else {
           throw new Error(`${component} has more than 1 instance.
