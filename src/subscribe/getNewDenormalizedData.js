@@ -1,5 +1,5 @@
 import {TypeKind} from 'graphql/type/introspection';
-import {isObject, ensureTypeFromNonNull, ensureRootType} from '../utils';
+import {isObject, ensureTypeFromNonNull, ensureRootType, ADD, UPDATE, REMOVE} from '../utils';
 
 const {LIST} = TypeKind;
 
@@ -22,7 +22,7 @@ export default function createNewData(handler, cachedResult, pathArray, context)
     }
     if (pathArray.length === 1) {
       // if length is 1, we're in the operation object, so we always return an object full of subscription types
-      if (handler === 'ADD') {
+      if (handler === ADD) {
         // ignore the indexer, since we will add it to the end, anyways
         if (isList) {
           const returnField = cachedResult[identifier] || [];
@@ -31,7 +31,7 @@ export default function createNewData(handler, cachedResult, pathArray, context)
         // pointfeed subscription
         return {[identifier]: document};
       }
-      if (handler === 'REMOVE') {
+      if (handler === REMOVE) {
         // TODO not sure if any of this handler is correct
         // ignore the indexer, since we will remove whatever object has the id of "document"
         if (isList) {
@@ -45,7 +45,7 @@ export default function createNewData(handler, cachedResult, pathArray, context)
         // pointfeed subscription. this will probably never happen, but give en an object so they don't code defensively
         return isObject(cachedResult[identifier]) ? {} : null;
       }
-      if (handler === 'UPDATE') {
+      if (handler === UPDATE) {
         if (isList) {
           if (!indexer) {
             throw new Error(`Cannot update an array, document ID not specified in path: ${pathArray}`)

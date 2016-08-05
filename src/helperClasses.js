@@ -27,6 +27,7 @@ export class CachedMutation {
     this.variableSet = new Set();
     this.singles = {};
   }
+
   clear(clearSingles) {
     this.fullMutation = undefined;
     this.variableEnhancers = [];
@@ -38,17 +39,21 @@ export class CachedMutation {
 }
 
 export class CachedSubscription {
-  constructor(subscriptionString) {
+  constructor(subscriptionString, key) {
     this.ast = parse(subscriptionString);
-    this.response = {};
+    this.responses = {
+      [key]: {}
+    };
   }
 }
 
 export class CachedQuery {
-  constructor(queryString, schema, idFieldName, refetch) {
+  constructor(queryString, schema, idFieldName, refetch, key) {
     this.ast = parseAndInitializeQuery(queryString, schema, idFieldName);
     this.refetch = refetch;
-    this.response = {};
+    this.responses = {
+      [key]: {}
+    };
   }
 
   /**
@@ -60,33 +65,24 @@ export class CachedQuery {
    */
   createResponse(context, component, key, dispatch, getState, forceFetch) {
     const {data, firstRun} = denormalizeStore(context);
-    const response = {
+    this.responses[key] = {
       data,
       firstRun,
       isComplete: !forceFetch && !context.operation.sendToServer,
       setVariables: this.setVariablesFactory(component, key, dispatch, getState)
     };
-    if (!key) {
-      this.response = response;
-    } else {
-      this.response[key] = response;
-    }
   }
 
   setVariablesFactory(component, key, dispatch, getState) {
     return cb => {
       let stateVariables;
-      if (key) {
-        this.response.key = undefined;
-        const currentVariables = getState().data.variables[component][key];
-        const variables = Object.assign({}, currentVariables, cb(currentVariables));
-        stateVariables = {[component]: {[key]: variables}};
-      } else {
-        this.response = undefined;
-        const currentVariables = getState().data.variables[component];
-        const variables = Object.assign({}, currentVariables, cb(currentVariables));
-        stateVariables = {[component]: variables};
-      }
+      this.responses[key] = undefined;
+      const currentVariables = getState().data.variables[component][key];
+      const variables = {
+        ...currentVariables,
+        ...cb(currentVariables)
+      };
+      stateVariables = {[component]: {[key]: variables}};
 
       // use dispatch to trigger a recompute.
       dispatch({

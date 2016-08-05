@@ -17,7 +17,7 @@ export default function setSubVariablesFactory(component, key, dispatch, getStat
     cachedSubscription.unsubscribe();
 
     //start the new sub
-    cachedSubscription.unsubscribe = startSubscription(stateVariables, cachedSubscription.response.data);
+    cachedSubscription.unsubscribe = startSubscription(stateVariables);
 
     // store the vars in the store so we can restart the sub from a peristed state
     dispatch({

@@ -14,6 +14,10 @@ export const FRONT = 'front';
 export const BACK = 'back';
 export const FULL = 'full';
 
+export const ADD = 'add';
+export const UPDATE = 'update';
+export const REMOVE = 'remove';
+
 
 export const ensureTypeFromNonNull = type => type.kind === NON_NULL ? type.ofType : type;
 
@@ -94,23 +98,24 @@ export const teardownDocumentAST = queryAST => {
   return {operation, fragments};
 };
 
-export const getVariables = (variables = {}, cashayDataState, component, key, cachedResponse) => {
+export const getVariables = (initialVariables = {}, cashayDataState, component, key, cachedResponse) => {
+  // the variables saved in the redux store override what's passed in
   const componentVars = cashayDataState.variables[component];
-  const stateVars = componentVars && key ? componentVars[key] : componentVars;
-  return resolveVariables(cashayDataState, stateVars, variables, key, cachedResponse);
+  const stateVars = componentVars && componentVars[key];
+  const newInitialVariables =  resolveInitialVariables(cashayDataState, initialVariables, cachedResponse);
+  // make the stateVars override the likely stale UD vars, but if the UD vars have something that used to be undefined, keep it
+  return {...newInitialVariables, ...stateVars};
 };
 
-const resolveVariables = (cashayDataState, stateVars, variables, key, cachedResponse) => {
-  const variableNames = Object.keys(variables);
-  const response = key ? cachedResponse[key] : cachedResponse;
+const resolveInitialVariables = (cashayDataState, initialVariables, cachedResponse) => {
+  const variableNames = Object.keys(initialVariables);
   const newVariables = {};
   for (let i = 0; i < variableNames.length; i++) {
     const variableName = variableNames[i];
-    const value = variables[variableName];
-    newVariables[variableName] = (typeof value === 'function') ? safeValue(response, value, cashayDataState) : value;
+    const value = initialVariables[variableName];
+    newVariables[variableName] = (typeof value === 'function') ? safeValue(cachedResponse, value, cashayDataState) : value;
   }
-  // make the stateVars override the likely stale UD vars, but if the UD vars have something that used to be undefined, keep it
-  return {...newVariables, ...stateVars};
+  return newVariables;
 };
 
 const safeValue = (response, cb, cashayDataState) => response && response.data && cb(response.data, cashayDataState);

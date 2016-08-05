@@ -5,6 +5,9 @@ import createVariableDefinitions from '../createVariableDefinitions';
 
 export default function createBasicMutation(mutationName, schema, variables) {
   const mutationFieldSchema = schema.mutationSchema.fields[mutationName];
+  if (!mutationFieldSchema) {
+    throw new Error(`${mutationName} not found in your mutation schema! Did you include it?`)
+  }
   const mutationArgs = makeArgsFromVars(mutationFieldSchema, variables);
   const context = {schema, initialVariableDefinitions: []};
   const {variableDefinitions} = createVariableDefinitions(mutationArgs, mutationFieldSchema, false, context);

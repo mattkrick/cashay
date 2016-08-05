@@ -123,6 +123,6 @@ export const equalPendingQueries = (baseQuery, {component, key, variables}) => {
   if (baseVariablesKeys.length !== variablesKeys.length) return false;
   // this is just a heuristic that doesn't check variable values.
   // that's OK because unique queries with unique variables shouldn't share the same component name
-  // Also, calling a query twice before you get the results of the first is an unsupported anti-pattern
+  // Also, calling a query twice with different vars before you get the results of the first is an unsupported anti-pattern
   return true;
 }
