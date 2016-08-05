@@ -1,7 +1,7 @@
 import {SET_VARIABLES} from '../normalize/duck';
 
-export default function setSubVariablesFactory(component, key, dispatch, getState, cachedSubscription, startSubscription) {
-  return cb => {
+export default function setSubVariablesFactory(component, key, dispatch, getState, cachedSubscription, promiseStart) {
+  return async cb => {
     let stateVariables;
     if (key) {
       const currentVariables = this.getState().data.variables[component][key];
@@ -17,7 +17,7 @@ export default function setSubVariablesFactory(component, key, dispatch, getStat
     cachedSubscription.unsubscribe();
 
     //start the new sub
-    cachedSubscription.unsubscribe = startSubscription(stateVariables);
+    cachedSubscription.unsubscribe = await promiseStart(stateVariables);
 
     // store the vars in the store so we can restart the sub from a peristed state
     dispatch({

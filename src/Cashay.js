@@ -614,14 +614,24 @@ class Cashay {
 
     const getCachedResult = () => cachedSubscription.responses[key].data;
     const subscriptionHandlers = this.makeSubscriptionHandlers(component, key, variables);
-    const startSubscription = (subVars) => subscriber(subscriptionString, subVars, subscriptionHandlers, getCachedResult);
-    const unsubscribe = startSubscription(variables);
+    // const startSubscription = (subVars) => subscriber(subscriptionString, subVars, subscriptionHandlers, getCachedResult);
+    const promiseStart = (subVars) => new Promise((resolve) => {
+      const unsubscribe = subscriber(subscriptionString, subVars, subscriptionHandlers, getCachedResult);
+      resolve(unsubscribe)
+    });
+    promiseStart(variables).then(unsubscribe => {
+      cachedSubscription.responses[key] = {
+        ...cachedSubscription.responses[key],
+        status: 'subscribed',
+        unsubscribe
+      }
+    });
     const {data} = denormalizeStore(context, true);
     return cachedSubscription.responses[key] = {
       data,
-      setVariables: setSubVariablesFactory(component, key, this.store.dispatch, this.getState, cachedSubscription, startSubscription),
-      status: 'subscribed',
-      unsubscribe
+      setVariables: setSubVariablesFactory(component, key, this.store.dispatch, this.getState, cachedSubscription, promiseStart),
+      status: 'subscribing',
+      unsubscribe: null
     };
   }
 
