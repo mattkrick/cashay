@@ -1,70 +1,65 @@
 import {VARIABLE} from 'graphql/language/kinds';
 import {TypeKind} from 'graphql/type/introspection';
+import {ensureTypeFromNonNull, BEFORE, AFTER} from '../utils';
+
 const {LIST} = TypeKind;
-import {ensureTypeFromNonNull} from '../utils';
 
-const FIRST = 'first';
-const LAST = 'last';
-
-const getSuppliedArgs = (args, variables = {}, paginationWords) => {
+const acceptsArgs = (fieldSchema, paginationWords, paginationWordKeys) => {
+  let acceptsPaginationArgs = false;
+  let acceptsRegularArgs = false;
+  for (let i = 0; i < paginationWordKeys.length; i++) {
+    const key = paginationWordKeys[i];
+    const pageWord = paginationWords[key];
+    if (fieldSchema.args[pageWord]) {
+      acceptsPaginationArgs = true;
+    } else {
+      acceptsRegularArgs = true;
+    }
+  }
+  return {acceptsPaginationArgs, acceptsRegularArgs};
+};
+/**
+ * Determine whether the arguments provided are going to be used for pagination
+ * @param {Object} fieldSchema a piece of the GraphQL client schema for the particular field
+ * @param {Array} reqASTArgs the arguments coming from the request AST
+ * @param {Object} paginationWords an object containing the 4 pagination meanings & the user-defined words they use
+ * @param {Object} variables the variables to forward onto the GraphQL server
+ * */
+export default function separateArgs(fieldSchema, reqASTArgs, paginationWords, variables) {
+  if (!fieldSchema.args) throw new Error(`${fieldSchema.name} does not support arguments. Check your GraphQL query.`);
+  const responseType = ensureTypeFromNonNull(fieldSchema.type);
   const regularArgs = {};
   const paginationArgs = {};
   const paginationWordKeys = Object.keys(paginationWords);
+  const {acceptsPaginationArgs, acceptsRegularArgs} = acceptsArgs(fieldSchema, paginationWords, paginationWordKeys);
   let hasPagination = false;
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
+  for (let i = 0; i < reqASTArgs.length; i++) {
+    const arg = reqASTArgs[i];
     const argName = arg.name.value;
-    let argValue = arg.value.kind === VARIABLE ? variables[arg.value.name.value] : arg.value.value;
+    if (!fieldSchema.args[argName]) {
+      throw new Error(`${fieldSchema.name} does not support ${argName}`)
+    }
+    const argValue = arg.value.kind === VARIABLE ? variables[arg.value.name.value] : arg.value.value;
     if (argValue === undefined) continue;
     let paginationMeaning = paginationWordKeys.find(pageWord => paginationWords[pageWord] === argName);
     if (paginationMeaning) {
-      if (paginationMeaning === FIRST || paginationMeaning === LAST) {
-        argValue = parseInt(argValue);
+      if (paginationMeaning === BEFORE || paginationMeaning === AFTER) {
+        throw new Error(`Supplying pagination cursors to cashay is not supported. ${variables}`)
       }
-      paginationArgs[paginationMeaning] = argValue;
+      if (hasPagination === true) {
+        throw new Error(`Only one pagination argument can be supplied at a time. ${variables}`)
+      }
+      if (responseType.kind !== LIST) {
+        throw new Error(`${fieldSchema.name} is not a List. ${variables} should not contain pagination args`);
+      }
+      paginationArgs[paginationMeaning] = +argValue;
       hasPagination = true;
     } else {
       regularArgs[argName] = argValue;
     }
   }
-  if (hasPagination) {
-    const {before, after, first, last} = paginationArgs;
-    if (before && !last || after && !first || before && first || after && last || before && after || first && last) {
-      throw new Error('Pagination options are: `before, last` `after, first`, `first`, and `last`');
-    }
+  return {
+    regularArgs: acceptsRegularArgs && regularArgs,
+    paginationArgs: acceptsPaginationArgs && paginationArgs
   }
-  return {regularArgs, paginationArgs};
-};
-
-const getPossibleArgs = (schema, paginationWords) => {
-    if (!schema.args) return {};
-    let acceptsRegularArgs = false;
-    let acceptsPaginationArgs = false;
-    const paginationWordSet = Object.keys(paginationWords)
-      .reduce((reduction, key) => reduction.add(paginationWords[key]), new Set());
-    const argKeys = Object.keys(schema.args);
-    for (let argKey of argKeys) {
-      const arg = schema.args[argKey];
-      if (paginationWordSet.has(arg.name)) {
-        acceptsPaginationArgs = true;
-      } else {
-        acceptsRegularArgs = true;
-      }
-    }
-    return {acceptsRegularArgs, acceptsPaginationArgs};
-  }
-  ;
-
-export const separateArgs = (fieldSchema, reqASTArgs, {paginationWords, variables}) => {
-  const responseType = ensureTypeFromNonNull(fieldSchema.type);
-  // TODO for a speed boost, we could just return the result of getSuppliedArgs, the rest is for safety
-  const {acceptsRegularArgs, acceptsPaginationArgs} = getPossibleArgs(fieldSchema, paginationWords);
-  let {regularArgs, paginationArgs} = getSuppliedArgs(reqASTArgs, variables, paginationWords);
-  regularArgs = acceptsRegularArgs && regularArgs;
-  paginationArgs = acceptsPaginationArgs && paginationArgs;
-  if (paginationArgs && responseType.kind !== LIST) {
-    console.warn(`${responseType} is not a List. Pagination args ignored`);
-    paginationArgs = false;
-  }
-  return {regularArgs, paginationArgs}
 };

@@ -43,12 +43,12 @@ const idFieldName = '_id';
 test('denormalize store from recursive union request', t => {
   const queryAST = parseAndInitializeQuery(unionQueryString, clientSchema, idFieldName);
   const context = buildExecutionContext(queryAST, {
-    cashayDataState: unionStoreFull,
+    cashayState: unionStoreFull,
     idFieldName,
     schema: clientSchema,
     paginationWords
   });
-  const {data: actual} = denormalizeStore(context);
+  const actual = denormalizeStore(context);
   const {data: expected} = unionResponse;
   t.deepEqual(actual, expected);
 });
@@ -56,12 +56,12 @@ test('denormalize store from recursive union request', t => {
 test('denormalize store when the query returns a scalar (String)', t => {
   const queryAST = parseAndInitializeQuery(queryPostCount, clientSchema, idFieldName);
   const context = buildExecutionContext(queryAST, {
-    cashayDataState: storedPostCount,
+    cashayState: storedPostCount,
     idFieldName,
     schema: clientSchema,
     paginationWords
   });
-  const {data: actual} = denormalizeStore(context);
+  const actual = denormalizeStore(context);
   const expected = {"postCount": 4};
   t.deepEqual(actual, expected);
 });
@@ -69,12 +69,12 @@ test('denormalize store when the query returns a scalar (String)', t => {
 test('denormalize store with missing scalar data', t => {
   const queryAST = parseAndInitializeQuery(back1Query, clientSchema, idFieldName);
   const context = buildExecutionContext(queryAST, {
-    cashayDataState: back1StoreNoCursor,
+    cashayState: back1StoreNoCursor,
     idFieldName,
     schema: clientSchema,
     paginationWords
   });
-  const {data: actual} = denormalizeStore(context);
+  const actual = denormalizeStore(context);
   const expected = back1NoCursorDenormalizedFn();
   t.deepEqual(actual, expected);
 });
@@ -82,12 +82,12 @@ test('denormalize store with missing scalar data', t => {
 test('denormalize store with missing entity and array', t => {
   const queryAST = parseAndInitializeQuery(unionQueryString, clientSchema, idFieldName);
   const context = buildExecutionContext(queryAST, {
-    cashayDataState: unionStoreMissingOwnerMembers,
+    cashayState: unionStoreMissingOwnerMembers,
     idFieldName,
     schema: clientSchema,
     paginationWords
   });
-  const {data: actual} = denormalizeStore(context);
+  const actual = denormalizeStore(context);
   const expected = unionMissingOwnerMembersDenormalized;
   t.deepEqual(actual, expected);
 });
@@ -95,24 +95,24 @@ test('denormalize store with missing entity and array', t => {
 test('throws on bad pagination args', t => {
   const queryAST = parseAndInitializeQuery(back1QueryBadArgs, clientSchema, idFieldName);
   const context = buildExecutionContext(queryAST, {
-    cashayDataState: back1Store,
+    cashayState: back1Store,
     idFieldName,
     schema: clientSchema,
     paginationWords
   });
-  t.throws(() => denormalizeStore(context), 'Pagination options are: `before, last` `after, first`, `first`, and `last`');
+  t.throws(() => denormalizeStore(context), 'Supplying pagination cursors to cashay is not supported. undefined');
 });
 
 test('denormalize store with scalar fields with args', t => {
   const queryAST = parseAndInitializeQuery(queryWithSortedArgs, clientSchema, idFieldName);
   const context = buildExecutionContext(queryAST, {
-    cashayDataState: storeFromSortedArgs,
+    cashayState: storeFromSortedArgs,
     idFieldName,
     schema: clientSchema,
     paginationWords,
     variables: {reverse: true, lang: "spanish"}
   });
-  const {data: actual} = denormalizeStore(context);
+  const actual = denormalizeStore(context);
   const {data: expected} = responseFromSortedArgs;
   t.deepEqual(actual, expected);
 });
@@ -120,13 +120,13 @@ test('denormalize store with scalar fields with args', t => {
 test('get a page from a full store (back)', t => {
   const queryAST = parseAndInitializeQuery(back4, clientSchema, idFieldName);
   const context = buildExecutionContext(queryAST, {
-    cashayDataState: fullPostStore,
+    cashayState: fullPostStore,
     idFieldName,
     schema: clientSchema,
     paginationWords,
     variables: {reverse: true, lang: "spanish"}
   });
-  const {data: actual} = denormalizeStore(context);
+  const actual = denormalizeStore(context);
   const {data: expected} = back4ResponseFn(4);
   t.deepEqual(actual, expected);
 });
@@ -134,13 +134,13 @@ test('get a page from a full store (back)', t => {
 test('request an array that does not exist in the state', t => {
   const queryAST = parseAndInitializeQuery(back1Query, clientSchema, idFieldName);
   const context = buildExecutionContext(queryAST, {
-    cashayDataState: emptyInitialState,
+    cashayState: emptyInitialState,
     idFieldName,
     schema: clientSchema,
     paginationWords,
     variables: {reverse: true, lang: "spanish"}
   });
-  const {data: actual} = denormalizeStore(context);
+  const actual = denormalizeStore(context);
   const expected = {"getRecentPosts": []};
   t.deepEqual(actual, expected);
 });
@@ -157,7 +157,7 @@ test('flag sendToServer = true for array of objects', t => {
   }`;
   const queryAST = parseAndInitializeQuery(rawQuery, clientSchema, idFieldName);
   const context = buildExecutionContext(queryAST, {
-    cashayDataState: emptyInitialState,
+    cashayState: emptyInitialState,
     idFieldName,
     schema: clientSchema
   });

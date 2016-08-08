@@ -9,14 +9,30 @@ export const CASHAY = 'CASHAY';
 export const DELIMITER = '_';
 export const NORM_DELIMITER = '::';
 
-// redux store array constants 
+/* redux store array constants */
 export const FRONT = 'front';
 export const BACK = 'back';
 export const FULL = 'full';
 
+/* subscription handler names */
 export const ADD = 'add';
 export const UPDATE = 'update';
+export const UPSERT = 'upsert';
 export const REMOVE = 'remove';
+
+/* default pagination argsuments */
+export const FIRST = 'first';
+export const LAST = 'last';
+export const BEFORE = 'before';
+export const AFTER = 'after';
+
+/* status for queries */
+export const LOADING = 'loading';
+export const COMPLETE = 'complete';
+
+/* status for subscriptions */
+export const SUBSCRIBING = 'subscribing';
+export const READY = 'ready';
 
 
 export const ensureTypeFromNonNull = type => type.kind === NON_NULL ? type.ofType : type;
@@ -48,12 +64,11 @@ export const shallowPlus1Clone = obj => {
 };
 
 export const makeErrorFreeResponse = cachedResponse => {
-  const {isComplete, firstRun, setVariables} = cachedResponse;
+  const {status, setVariables} = cachedResponse;
   return {
-    isComplete,
-    firstRun,
+    data: shallowPlus1Clone(cachedResponse.data),
     setVariables,
-    data: shallowPlus1Clone(cachedResponse.data)
+    status
   }
 };
 
@@ -75,52 +90,62 @@ export const parse = graphQLString => gqlParse(graphQLString, {noLocation: true,
 
 export const buildExecutionContext = (queryAST, params) => {
   const clonedAST = clone(queryAST);
-  const {operation, fragments} = teardownDocumentAST(clonedAST);
+  const {operation, fragments} = teardownDocumentAST(clonedAST.definitions);
   return {operation, fragments, ...params};
 };
 
-export const teardownDocumentAST = queryAST => {
+export const teardownDocumentAST = astDefinitions => {
   let operation;
-  const fragments = queryAST.definitions.reduce((reduction, definition) => {
+  const fragments = {};
+  for (let i = 0; i < astDefinitions.length; i++) {
+    const definition = astDefinitions[i];
     if (definition.kind === OPERATION_DEFINITION) {
       if (operation) {
         throw new Error('Multiple operations not supported');
       }
       operation = definition;
     } else if (definition.kind === FRAGMENT_DEFINITION) {
-      reduction[definition.name.value] = definition;
+      fragments[definition.name.value] = definition;
     }
-    return reduction;
-  }, {});
+  }
   if (!operation) {
     throw new Error('Must provide an operation.');
   }
   return {operation, fragments};
 };
 
-export const getVariables = (initialVariables = {}, cashayDataState, component, key, cachedResponse) => {
-  // the variables saved in the redux store override what's passed in
-  const componentVars = cashayDataState.variables[component];
-  const stateVars = componentVars && componentVars[key];
-  const newInitialVariables =  resolveInitialVariables(cashayDataState, initialVariables, cachedResponse);
+/**
+ * stateVars is the name for the variables stored in the redux state, which are the most current variables for an op.
+ * @param {Object} cashayState the result of this.getState(), usually equivalent to store.getState().cashay
+ * @param {Object} op the name of the container full of keys
+ * @param {Object} key the key for the specified op, defaults to ''
+ * */
+export const getStateVars = (cashayState, op, key) => {
+  // explicitly return undefined so we can use default values in functions
+  return cashayState.ops[op] && cashayState.ops[op][key] && cashayState.ops[op][key].variables || undefined;
+};
+
+export const getVariables = (initialVariables = {}, cashayState, op, key, cachedResponse) => {
+  const stateVars = getStateVars(cashayState, op, key) || {};
+  const newInitialVariables = resolveInitialVariables(cashayState, initialVariables, cachedResponse);
   // make the stateVars override the likely stale UD vars, but if the UD vars have something that used to be undefined, keep it
   return {...newInitialVariables, ...stateVars};
 };
 
-const resolveInitialVariables = (cashayDataState, initialVariables, cachedResponse) => {
+const resolveInitialVariables = (cashayState, initialVariables, cachedResponse) => {
   const variableNames = Object.keys(initialVariables);
   const newVariables = {};
   for (let i = 0; i < variableNames.length; i++) {
     const variableName = variableNames[i];
     const value = initialVariables[variableName];
-    newVariables[variableName] = (typeof value === 'function') ? safeValue(cachedResponse, value, cashayDataState) : value;
+    newVariables[variableName] = (typeof value === 'function') ? safeValue(cachedResponse, value, cashayState) : value;
   }
   return newVariables;
 };
 
-const safeValue = (response, cb, cashayDataState) => response && response.data && cb(response.data, cashayDataState);
+const safeValue = (response, cb, cashayState) => response && response.data && cb(response.data, cashayState);
 
-export const makeNamespaceString = (component, name, d = DELIMITER) => `${CASHAY}${d}${component}${d}${name}`;
+export const makeNamespaceString = (op, name, d = DELIMITER) => `${CASHAY}${d}${op}${d}${name}`;
 
 export const without = (obj, exclusions) => {
   const objKeys = Object.keys(obj);

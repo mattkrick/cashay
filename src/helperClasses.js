@@ -15,14 +15,14 @@ import {TypeKind} from 'graphql/type/introspection';
 import {SET_VARIABLES} from './normalize/duck';
 import denormalizeStore from './normalize/denormalizeStore';
 import parseAndInitializeQuery from './query/parseAndInitializeQuery';
-import {parse} from './utils';
+import {getStateVars, parse, LOADING, COMPLETE} from './utils';
 
 const {LIST, NON_NULL} = TypeKind;
 
 export class CachedMutation {
   constructor() {
     this.fullMutation = undefined;
-    this.activeComponentsObj = {};
+    this.activeQueries = {};
     this.variableEnhancers = [];
     this.variableSet = new Set();
     this.singles = {};
@@ -59,37 +59,33 @@ export class CachedQuery {
   /**
    * create a denormalized document from local data
    * it also turns frags to inline, and flags missing objects and variableDefinitions in context.operation
-   * the response also contains isComplete and firstRun booleans.
-   * isComplete is true if the request is resolved locally
-   * firstRun is true if the none of the queries within the request have been executed before
    */
-  createResponse(context, component, key, dispatch, getState, forceFetch) {
-    const {data, firstRun} = denormalizeStore(context);
+  createResponse(context, op, key, dispatch, getState, forceFetch) {
+    const data = denormalizeStore(context);
+    const isComplete = !forceFetch && !context.operation.sendToServer;
     this.responses[key] = {
       data,
-      firstRun,
-      isComplete: !forceFetch && !context.operation.sendToServer,
-      setVariables: this.setVariablesFactory(component, key, dispatch, getState)
+      setVariables: this.setVariablesFactory(op, key, dispatch, getState),
+      status: isComplete ? COMPLETE : LOADING
     };
   }
 
-  setVariablesFactory(component, key, dispatch, getState) {
+  setVariablesFactory(op, key, dispatch, getState) {
     return cb => {
-      let stateVariables;
+      // trigger an invalidation
       this.responses[key] = undefined;
-      const currentVariables = getState().data.variables[component][key];
+      const cashayState = getState();
+      const stateVars = getStateVars(cashayState, op, key) || {};
       const variables = {
-        ...currentVariables,
-        ...cb(currentVariables)
+        ...stateVars,
+        ...cb(stateVars)
       };
-      stateVariables = {[component]: {[key]: variables}};
+      const payload = {ops: {[op]: {[key]: {variables}}}};
 
-      // use dispatch to trigger a recompute.
+      // trigger a recompute
       dispatch({
         type: SET_VARIABLES,
-        payload: {
-          variables: stateVariables
-        }
+        payload
       });
     }
   }
@@ -175,4 +171,4 @@ const processArgType = argType => {
     vardefType.name = new Name(argType.name)
   }
   return vardefType;
-}
+};

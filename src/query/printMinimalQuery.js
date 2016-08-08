@@ -4,9 +4,9 @@ import {getMissingRequiredVariables} from './queryHelpers';
 import createVariableDefinitions from '../createVariableDefinitions';
 import {ensureRootType} from '../utils';
 
-export const printMinimalQuery = (reqAST, idFieldName, variables, component, schema) => {
+export const printMinimalQuery = (reqAST, idFieldName, variables, op, schema) => {
   const context = {
-    component,
+    op,
     schema
   };
   reqAST.variableDefinitions = minimizeQueryAST(reqAST, idFieldName, variables, schema.querySchema, [], context);

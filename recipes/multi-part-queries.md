@@ -10,9 +10,9 @@ which would return an array like `['123', '124', '125']`.
 The second query would be something like `getPostsByIds`,
 which accepts a required array of IDs `($IDs: [ID!]!)`
 
-then your variables might look like `{IDs: (response, cashayDataState) => response.getPostIds}`
+then your variables might look like `{IDs: (response, cashayState) => response.getPostIds}`
 If you pass in a function for a variable, cashay will try to find it in the response from the query.
-It's here that you can perform a filter against what you already have, eg `cashayDataState.entities.Posts`.
+It's here that you can perform a filter against what you already have, eg `cashayState.entities.Posts`.
 
 Since `IDs` will be falsy for the first pass, that query will be removed from initial server request.
 Then, after the response comes back, `getPostIds` will be removed from the second server request

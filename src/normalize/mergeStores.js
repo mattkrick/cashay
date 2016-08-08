@@ -41,6 +41,11 @@ const mergeDifferentArrays = (front, back) => {
   }
 };
 
+/**
+ * An exercise in combinatorics.
+ * Specific logic on how to merge arrays
+ * Many of these are edge cases, like merging a paginated array with a full array
+ * */
 const handleArrays = (target, src) => {
   // merge similar
   const pageTarget = {};
@@ -92,20 +97,24 @@ const handleArrays = (target, src) => {
   }
 };
 
+/**
+ * A cashay array is an object that holds up to 2 arrays:
+ * either full (not paginated) or front and/or back
+ * */
 const detectCashayArray = (src, allSrcKeys) => {
-  // front & back (2) or full (1), any more than that & it's not cashay's
   if (allSrcKeys.length < 1 || allSrcKeys.length > 2) return false;
-  let isCashayArray = true;
   for (let i = 0; i < allSrcKeys.length; i++) {
     const srcKey = allSrcKeys[i];
     if (!paginationArrayNames.has(srcKey) || !Array.isArray(src[srcKey])) {
-      isCashayArray = false;
-      break;
+      return false;
     }
   }
-  return isCashayArray
+  return true;
 };
 
+/**
+ * A deep merge that has exclusive logic for merging arrays suitable for pagination
+ * */
 export default function mergeStores(state, src, isMutation) {
   // first shallow copy the state as a simple way to get the primitives, we'll later overwrite the pointers
   if (!src) return state;
@@ -126,25 +135,19 @@ export default function mergeStores(state, src, isMutation) {
           // if both the state and src are objects, merge them
           target[key] = {...mergeStores(targetProp, srcProp, isMutation)};
         } else if (isCashayArray) {
+          // this is a mutation, so the array length
           if (key === FRONT) {
-            const oldCount = srcProp.count;
-            const targetPropCopy = targetProp.slice();
-            targetPropCopy.splice(0, oldCount, ...srcProp);
-            target[key] = targetPropCopy;
+            target[key] = [...targetProp.slice(0, srcProp.count), ...srcProp.slice()];
           } else if (key === BACK) {
-            const oldCount = srcProp.count;
-            const targetPropCopy = targetProp.slice();
-            const spliceStart = targetPropCopy.length - oldCount;
-            targetPropCopy.splice(spliceStart, targetPropCopy.length, ...srcProp);
-            target[key] = targetPropCopy;
+            const spliceStart = targetProp.length - srcProp.count;
+            target[key] = [...targetProp.slice(spliceStart), ...srcProp]
           }
         } else {
-          // if the src is not the same as the state, use the pointer from src
+          // for 2 arrays that aren't cashay arrays, use a simple replace (can extend in the future)
           target[key] = srcProp;
         }
       } else {
-        // if it was an object, but now it's not, overwrite the object
-        // if it wasn't an object, but now it is, use the pointer from src
+        // if there is a disagreement on the type of value, default to using the src
         target[key] = srcProp;
       }
     }

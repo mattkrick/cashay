@@ -114,18 +114,26 @@ Now, whenever you need to query or mutate some data, just import your shiny new 
 ### Queries
 
 ```js
-cashay.query(queryString, options)
+const {data, setVariables, status} = cashay.query(queryString, options)
 ```
 
 Options include:
-- `component`: A string to match the component. Required if you pass in `mutationHandlers`. Typically shares the same name as the React component. If left blank, it defaults to the `queryString`.
-- `key`: A unique key to match the component instance, only used where you would use React's `key` (eg in a component that you called `map` on in the parent component).
-- `forceFetch`: A Boolean to ignore local data & get some fresh stuff. Defaults to `false`. Don't use this in `mapStateToProps` or you'll be calling the server every time you call `dispatch`.
-- `transport`: A function to override the singleton transport. Useful if this particular component needs different credentials, or uses websockets, etc.
+- `op`: A string to match the op. 
+Required if you pass in `mutationHandlers`. 
+Typically shares the same name as the React component. 
+If left blank, it defaults to the `queryString`.
+- `key`: A unique key to match the op instance, 
+only used where you would use React's `key` (eg in a op that you called `map` on in the parent op).
+- `forceFetch`: A Boolean to ignore local data & get some fresh stuff. 
+Defaults to `false`. Don't use this in `mapStateToProps` or you'll be calling the server every time you call `dispatch`.
+- `transport`: A function to override the singleton transport. 
+Useful if this particular op needs different credentials, or uses websockets, etc.
 - `variables`: the variables object to pass onto the GraphQL server
-- `customMutations`: Cashay writes mutations for you and guarantees no over/under fetching. But if you don't trust it, you can write your own here.
+- `customMutations`: Cashay writes mutations for you and guarantees no over/under fetching. 
+But if you don't trust it, you can write your own here.
 - `mutationHandlers`: An object where each method is the name of a mutation that changes the query. See below.
-- `localOnly`: A Boolean to only fetch data from the local state. Defaults to `false`. Useful if you only want a mutation to update the query data.
+- `localOnly`: A Boolean to only fetch data from the local state. Defaults to `false`. 
+Useful if you only want a mutation to update the query data.
 
 ```js
 mutationHandler(optimisticVariables, queryResponse, currentResponse, getEntities, invalidate)
@@ -155,14 +163,16 @@ const mapStateToProps = (state, props) => {
 ```
 
 Following the example above, `this.props.response` will be an object that has the following:
-- `isComplete`: A Boolean telling you if the query came back with all requested information. This is useful if you want to use a loading spinner, etc.
-- `firstRun`: A Boolean telling you if this is the first time that the query type was run with these particular arguments (but not necessarily exactly these same fields). Internally, it's useful because it saves a few CPU cycle. Externally, you might use it for notifications on new queries. I don't know. Get creative!
+- `status`: `loading` if there is a fetch in progress, `complete` if otherwise. 
+This is useful if you want to use a loading spinner, etc.
 - `data`: The data object that you expect to get back when you call your GraphQL server.
 - `setVariables`: A callback to run when you want to change your query variables. See below.
 
 ### Setting variables
 
-Cashay gives you a function to make setting variables dead simple. It gives you your component's variables that are currently in the store, and then it's up to you to give it back a new variables object:
+Cashay gives you a function to make setting variables dead simple. 
+It gives you your op's variables that are currently in the store, 
+and then it's up to you to give it back a new variables object:
 
 ```js
 const {setVariables} = this.props.cashay;
@@ -194,21 +204,138 @@ Note: if you return a scalar variable at the highest level of your mutation payl
 make sure the name in the mutation payload schema matches the name in the query to give Cashay a hint to grab it.
 
 The options are as follows:
-- `variables`: The variables object to pass onto the GraphQL server. Make sure the variables have the same names as what your schema expects so Cashay can automatically create the mutation for you. For maximum efficiency, be sure to pass in all variables that you will possibly use (even if that means passing it in as `undefined`). If you can't do these 2 things, you can write a `customMutation` (and tell me your usecase, I'm curious!).
-- `components`: An object the determines which `mutationHandlers` to call. If not provided, it'll call every `component` that has a `mutationHandler` for that `mutationName`. See below.
+- `variables`: The variables object to pass onto the GraphQL server. 
+Make sure the variables have the same names as what your schema expects so Cashay can automatically create the mutation for you. 
+For maximum efficiency, be sure to pass in all variables that you will possibly use 
+(even if that means passing it in as `undefined`). 
+If you can't do these 2 things, you can write a `customMutation` (and tell me your usecase, I'm curious!).
+- `ops`: An object the determines which `mutationHandlers` to call. 
+If not provided, it'll call every `op` that has a `mutationHandler` for that `mutationName`.
 
-In this example, we just want to call the `mutationHandler` for the `comments` component where `key === postId`. If you wanted to delete Comment #3 (where `key = 3`), you'd want to trigger the `mutationHandler` for `{comments: 3}` and not bother wasting CPU cycles checking `{comments: 1}` and `{comments: 2}`.
-Additionally, we call the `mutationHandler` for `post` if the value is true. This might be common if the `post` query includes a `commentCount` that should decrement when a comment is deleted. This logic makes Cashay super efficient by default, while still being flexible enough to write multiple mutations that have the same `mutationName`, but affect different queries. For example, you might have a mutation called `deleteSomething` that accepts a `tableName` and `id` variable. Then, a good practice to to hardcode `tableName` to `Posts` that component. In doing so, you reduce the # of mutations in your schema (since `deleteSomething` can delete any doc in your db). Additionally, because you hardcoded in the tableName, you don't have to pass that variable down via `this.props`.
+In this example, we just want to call the `mutationHandler` for the `comments` op where `key === postId`. 
+If you wanted to delete Comment #3 (where `key = 3`), you'd want to trigger the `mutationHandler` for `{comments: 3}` 
+and not bother wasting CPU cycles checking `{comments: 1}` and `{comments: 2}`.
+Additionally, we call the `mutationHandler` for `post` if the value is true. 
+This might be common if the `post` query includes a `commentCount` that should decrement when a comment is deleted. 
+This logic makes Cashay super efficient by default, 
+while still being flexible enough to write multiple mutations that have the same `mutationName`, 
+but affect different queries. 
+For example, you might have a mutation called `deleteSomething` that accepts a `tableName` and `id` variable. 
+Then, a good practice to to hardcode `tableName` to `Posts` that op. 
+In doing so, you reduce the # of mutations in your schema (since `deleteSomething` can delete any doc in your db). 
+Additionally, because you hardcoded in the tableName, you don't have to pass that variable down via `this.props`.
 
 ```js
 const {postId} = this.props;
-const mutationAffectsPostComponent = true; // can be dynamic, but it's rare... but it happens
-const components = {
+const mutationAffectsPostOp = true; 
+const ops = {
   comments: postId,
-  post: mutationAffectsPostComponent
+  post: mutationAffectsPostOp
 }
-cashay.mutate('deleteComment', {variables: {commentId: postId}, components})
+cashay.mutate('deleteComment', {variables: {commentId: postId}, ops})
 ```
+
+### Subscriptions
+
+Subscriptions are hard, don't let anyone tell you different.
+
+```js
+const {data, setVariables, status, unsubscribe} = cashay.subscribe(subscriptionString, subscriber, options)
+```
+
+A subscriber is a callback that you write yourself.
+Cashay doesn't dictate your socket package, your server, or your message protocol (DDP or otherwise)
+because doing so would tightly couple your front end to your server. That's not cool.
+Cashay will supply you with 3 arguments for the callback:
+- `subscriptionString`: The subscriptionString that you passed into the `subscribe` call
+- `variables`: The variables that you passed into the `subscribe` call
+- `handlers`: An object containing the following:
+  - `add(doc, handlerOptions)`: A function that takes a new doc. Cashay will append it to the end of the stream.
+  - `update(doc, handlerOptions)`: A function that takes a doc diff. 
+ You only need to supply it with the fields that have changed.
+  - `upsert(doc, handlerOptions)`: A function that will call `update` if the doc exists, else `add`.
+ You'll use this 80% of the time over `add`, since `add` could sneak some duplicates in if a socket reconnects.
+  - `remove(id, handlerOptions)`: A function that will remove the document with the given ID
+  - `setStatus(newStatus)`: A function that will set the status of your subscription to whatever you want.
+  This is useful, for example, if the docs coming down the wire are already in the DB, then you can set it to
+  `initializing` and your front-end can react accordingly.
+
+There are currently 2 `handlerOptions`: 
+- `removeKeys`: If you'd like to remove a key from an object, pass in an array of fields to remove.
+e.g. `['milk', 'soda']`.
+If you'd like to completely replace the old with the new, set `removeKeys = true`.
+- `path`: borrowing from [falcor's path syntax](https://netflix.github.io/falcor/documentation/paths.html),
+this allows you to edit a deeply nested subdocument.
+For example, let's say you subscribe to `Friends` and `PhotosForFriend`.
+If it were a query, you'd do something like this:
+```
+subscription($id: String!) {
+  friends(id: $id) {
+    id,
+    name,
+    photos {
+      date,
+      url,
+      likes
+    }
+  }
+}
+```
+However, if these are 2 separate tables in your database, this might be difficult to do in real time.
+So, you can open 2 subscriptions and patch 1 into the other.
+For example, when a `photo` gets a new like, your path might look like `'friends['123'].photos['456]'`.
+
+Basic example:
+```js
+const subscriber = (subscriptionString, variables, handlers) => {
+  // Using the subscriptionString and variables, determine the channel to join
+  // You're free to do this however you like:
+  const channelName = channelLookup(subscriptionString, variables);
+  
+  // connect using your favorite socket client (socketCluster, socket.io, sockJS, ws)
+  const socket = socketCluster.connect();
+  const {upsert, update, remove} = handlers;
+  
+  // subscribe to the channel. Other socket APIs might just use `emit`
+  socket.subscribe(channelName, {waitForAuth: true});
+  
+  // your server should probably send back something that tells you what to do with the data
+  // in this example, the server knows if a document has been added/removed/changed in the database
+  socket.on(channelName, data => {
+    if (data.type === 'add') {
+      upsert(data.fields);
+    } else if (data.type === 'remove') {
+      remove(data.id);
+    } else {
+      update(data.fields, {path: data.path, removeKeys: data.removeKeys});
+    }
+  });
+  
+  // you can do anything else here, too
+  socket.on('unsubscribe', unsubChannel => {
+    if (unsubChannel === channelName) {
+      console.log(`unsubbed from ${unsubChannel}`);
+    }
+  });
+  
+  // you must return a function that will end this subscription
+  return () => socket.unsubscribe(channelName);
+}
+```
+
+`cashay.subscribe` has the following options:
+- `variables`: the variables object to pass onto the GraphQL server
+- `op`: a nickname for your subscription. 
+Two components can share the same subscription by sharing the same `op` name. 
+
+The response includes:
+- `data`: the stream of documents, as they have been recieved
+- `setVariables`: a shorthand for unsubscribing and subscribing to a new channel (for example, if you change users)
+- `status`: 
+  - `'subscribing'`: `cashay.subscribe` has been called, but `subscriber` has not been executed yet
+  - `'ready'`: `subscriber` has been executed.
+  - `[USER_DEFINED]`: whatever you like, just call `handler.setStatus(status)` in your `subscriber`
+- `unsubscribe`: the result of calling your `subscriber`. This could also be an object of functions, if you get tricky.
 
 ## Recipes
 

@@ -1,5 +1,5 @@
 import {TypeKind} from 'graphql/type/introspection';
-import {isObject, ensureTypeFromNonNull, ensureRootType, ADD, UPDATE, REMOVE} from '../utils';
+import {isObject, ensureTypeFromNonNull, ensureRootType, ADD, UPDATE, UPSERT, REMOVE} from '../utils';
 
 const {LIST} = TypeKind;
 
@@ -9,8 +9,13 @@ const splitPathPiece = (piece) => {
   return {identifier, indexer};
 };
 
+const getSafeHandler = (handler, idxInCache) => {
+  if (handler !== UPSERT) return handler;
+  return idxInCache === -1 ? ADD : UPDATE;
+};
+
 export default function createNewData(handler, cachedResult, pathArray, context) {
-  const {document, schema, idFieldName, removeKeys} = context;
+  const {document, docId, schema, idFieldName, removeKeys} = context;
   const subSchema = schema.subscriptionSchema;
   const walkPathRecursion = (cachedResult, pathArray, subSchema) => {
     const {identifier, indexer} = splitPathPiece(pathArray[0]);
@@ -21,55 +26,44 @@ export default function createNewData(handler, cachedResult, pathArray, context)
       Do not provide an indexer (eg '[123]') for adding/removing. Array of arrays are not supported`);
     }
     if (pathArray.length === 1) {
-      // if length is 1, we're in the operation object, so we always return an object full of subscription types
-      if (handler === ADD) {
-        // ignore the indexer, since we will add it to the end, anyways
-        if (isList) {
-          const returnField = cachedResult[identifier] || [];
+      if (isList) {
+        const returnField = cachedResult[identifier] || [];
+        const idxInCache = returnField.findIndex(doc => doc[idFieldName] === docId);
+        const safeHandler = getSafeHandler(handler, idxInCache);
+
+        if (safeHandler === ADD) {
           return {[identifier]: [...returnField, document]};
         }
-        // pointfeed subscription
-        return {[identifier]: document};
-      }
-      if (handler === REMOVE) {
-        // TODO not sure if any of this handler is correct
-        // ignore the indexer, since we will remove whatever object has the id of "document"
-        if (isList) {
-          const returnField = cachedResult[identifier] || [];
-          const idxToRemove = returnField.findIndex(field => field[idFieldName] === document);
-          if (idxToRemove === -1) {
-            throw new Error(`Cannot find object with id: ${indexer} in path: ${pathArray} in array: ${returnField}`);
-          }
-          return {[identifier]: [...returnField.slice(0, idxToRemove), ...returnField.slice(idxToRemove + 1)]};
+        if (safeHandler === REMOVE) {
+          return {[identifier]: [...returnField.slice(0, idxInCache), ...returnField.slice(idxInCache + 1)]};
         }
-        // pointfeed subscription. this will probably never happen, but give en an object so they don't code defensively
-        return isObject(cachedResult[identifier]) ? {} : null;
-      }
-      if (handler === UPDATE) {
-        if (isList) {
-          if (!indexer) {
-            throw new Error(`Cannot update an array, document ID not specified in path: ${pathArray}`)
-          }
-          const returnField = cachedResult[identifier] || [];
-          const idxToUpdate = returnField.findIndex(field => field[idFieldName] === indexer);
-          if (idxToUpdate === -1) {
-            throw new Error(`Cannot find object with id: ${indexer} in path: ${pathArray} in array: ${returnField}`);
-          }
-          const oldDoc = returnField[idxToUpdate];
+        if (safeHandler === UPDATE) {
+          const oldDoc = returnField[idxInCache];
           let updatedDoc;
-          if (isObject(oldDoc)) {
+          if (isObject(oldDoc) && removeKeys !== true) {
             updatedDoc = {...oldDoc, ...document};
             removeKeys.forEach(key => delete updatedDoc[key]);
           } else {
             updatedDoc = document;
           }
           return {
-            [identifier]: [...returnField.slice(0, idxToUpdate), updatedDoc, ...returnField.slice(idxToUpdate + 1)]
+            [identifier]: [...returnField.slice(0, idxInCache), updatedDoc, ...returnField.slice(idxInCache + 1)]
           }
         }
+      }
+      // pointfeed subscriptions
+      const safeHandler = handler === UPSERT ? UPDATE : handler;
+      if (safeHandler === ADD || removeKeys === true) {
+        return {[identifier]: document};
+      }
+      if (safeHandler === UPDATE) {
         const updatedDoc = {...cachedResult[identifier], ...document};
         removeKeys.forEach(key => delete updatedDoc[key]);
         return {[identifier]: updatedDoc};
+      }
+      if (safeHandler === REMOVE) {
+        // this will probably never happen, but give en an object so they don't code defensively
+        return isObject(cachedResult[identifier]) ? {} : null;
       }
     }
     // TODO THIS IS ALL UNTESTED
