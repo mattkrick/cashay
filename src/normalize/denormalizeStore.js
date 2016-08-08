@@ -52,7 +52,7 @@ const visitObject = (subState = {}, reqAST, subSchema, context, baseReduction = 
 
 const visitNormalizedString = (subState, reqAST, subSchema, context) => {
   const {typeName, docId} = getDocFromNormalString(subState);
-  const doc = context.cashayDataState.entities[typeName][docId];
+  const doc = context.cashayState.entities[typeName][docId];
   const fieldSchema = context.schema.types[typeName];
   return visit(doc, reqAST, fieldSchema, context);
 };
@@ -105,12 +105,9 @@ const visit = (subState, reqAST, subSchema, context) => {
   }
 };
 
-export default function denormalizeStore(context, isSubscription) {
-  // if we have nothing in the local state for this query, send it right to the server
-  let firstRun = true;
-
-  // Lookup the root schema for the queryType (hardcoded name in the return of the introspection query)
-  const schema = isSubscription ? context.schema.subscriptionSchema : context.schema.querySchema;
+export default function denormalizeStore(context, schemaName = 'querySchema') {
+  // Lookup the root schema for the operationType (hardcoded name in the return of the introspection query)
+  const schema = context.schema[schemaName];
 
   // a query operation can have multiple queries, gotta catch 'em all
   const queryReduction = context.operation.selectionSet.selections.reduce((reduction, selection) => {
@@ -122,23 +119,16 @@ export default function denormalizeStore(context, isSubscription) {
     // get the query schema to know the expected type and args
     const queryFieldSchema = schema.fields[queryName];
     if (!queryFieldSchema) {
-      throw new Error(`Could not find ${isSubscription ? 'subscription' : 'query'} for ${queryName}.
+      throw new Error(`Could not find ${queryName} in your ${schemaName}.
       Did you add it to your GraphQL schema?`)
     }
 
-
     // look into the current redux state to see if we can borrow any data from it
-    let queryInState = context.cashayDataState.result[queryName];
+    const queryInState = context.cashayState.result[queryName];
 
     // if there's no results stored or being fetched, save some time & don't bother with the args
     const fieldState = queryInState && getFieldState(queryInState, queryFieldSchema, selection, context);
 
-    // if a result exists in the state, this isn't the first time the query was called.
-    // a firstRun flag means there's no need to try to minimize the query pre-server fetch & no need to add deps
-    if (fieldState) {
-      firstRun = false;
-    }
-    // const query
     // get the expected return value, devs can be silly, so if the had the return value in a nonnull, remove it.
     const nonNullQueryFieldSchemaType = ensureTypeFromNonNull(queryFieldSchema.type);
     const subSchema = nonNullQueryFieldSchemaType.kind === LIST ? queryFieldSchema :
@@ -162,8 +152,5 @@ export default function denormalizeStore(context, isSubscription) {
 
   // return what the user expects GraphQL to return
 
-  return {
-    data: queryReduction,
-    firstRun
-  };
+  return queryReduction
 };

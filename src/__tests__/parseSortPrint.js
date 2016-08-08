@@ -11,13 +11,13 @@ export const parseSortPrint = graphQLString => {
 };
 
 export const sortPrint = ast => {
-  const {operation} = teardownDocumentAST(ast);
+  const {operation} = teardownDocumentAST(ast.definitions);
   recurse(operation.selectionSet.selections);
   return print(ast);
 };
 
 export const sortAST = ast => {
-  const {operation} = teardownDocumentAST(ast);
+  const {operation} = teardownDocumentAST(ast.definitions);
   recurse(operation.selectionSet.selections);
   return ast;
 };

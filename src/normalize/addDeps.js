@@ -1,14 +1,14 @@
 import {DELIMITER as _} from '../utils';
 
-export default function addDeps(normalizedResponse, component, key, normalizedDeps, denormalizedDeps) {
+export default function addDeps(normalizedResponse, op, key, normalizedDeps, denormalizedDeps) {
   // get the previous set
   // create a Set of normalized locations in entities (eg 'Post.123')
   const newNormalizedDeps = makeNormalizedDeps(normalizedResponse.entities);
   let oldNormalizedDeps;
-  normalizedDeps[component] = normalizedDeps[component] || {};
-  const componentDeps = normalizedDeps[component];
-  oldNormalizedDeps = componentDeps[key];
-  componentDeps[key] = newNormalizedDeps;
+  normalizedDeps[op] = normalizedDeps[op] || {};
+  const opDeps = normalizedDeps[op];
+  oldNormalizedDeps = opDeps[key];
+  opDeps[key] = newNormalizedDeps;
   let newUniques;
   if (!oldNormalizedDeps) {
     newUniques = newNormalizedDeps;
@@ -27,7 +27,7 @@ export default function addDeps(normalizedResponse, component, key, normalizedDe
     for (let dep of oldNormalizedDeps) {
       const [typeName, entityName] = dep.split(_);
       const entityDep = denormalizedDeps[typeName][entityName];
-      entityDep[component].delete(key);
+      entityDep[op].delete(key);
     }
   }
 
@@ -36,8 +36,8 @@ export default function addDeps(normalizedResponse, component, key, normalizedDe
     const [typeName, entityName] = dep.split(_);
     denormalizedDeps[typeName] = denormalizedDeps[typeName] || {};
     denormalizedDeps[typeName][entityName] = denormalizedDeps[typeName][entityName] || {};
-    denormalizedDeps[typeName][entityName][component] = denormalizedDeps[typeName][entityName][component] || new Set();
-    denormalizedDeps[typeName][entityName][component].add(key);
+    denormalizedDeps[typeName][entityName][op] = denormalizedDeps[typeName][entityName][op] || new Set();
+    denormalizedDeps[typeName][entityName][op].add(key);
   }
 }
 

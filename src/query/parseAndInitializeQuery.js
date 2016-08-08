@@ -53,7 +53,7 @@ const initializeQueryAST = (operationSelections, fragments, fieldSchema, schema,
 
 export default function parseAndInitializeQuery(queryString, schema, idFieldName) {
   const ast = parse(queryString);
-  const {operation, fragments} = teardownDocumentAST(ast);
+  const {operation, fragments} = teardownDocumentAST(ast.definitions);
   initializeQueryAST(operation.selectionSet.selections, fragments, schema.querySchema, schema, idFieldName);
   ast.definitions = [operation];
   return ast;

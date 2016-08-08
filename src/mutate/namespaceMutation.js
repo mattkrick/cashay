@@ -4,11 +4,11 @@ import {clone, convertFragmentToInline, teardownDocumentAST, makeNamespaceString
 import {Name} from '../helperClasses';
 import createVariableDefinitions from '../createVariableDefinitions';
 
-export default function namespaceMutation(mutationAST, component, componentStateVars, schema) {
-  const {operation, fragments} = teardownDocumentAST(mutationAST);
+export default function namespaceMutation(mutationAST, op, opStateVars = {}, schema) {
+  const {operation, fragments} = teardownDocumentAST(mutationAST.definitions);
   const mainMutation = operation.selectionSet.selections[0];
   const fieldSchema = schema.mutationSchema.fields[mainMutation.name.value];
-  const startingContext = {component, componentStateVars, schema, fragments, initialVariableDefinitions: []};
+  const startingContext = {op, opStateVars, schema, fragments, initialVariableDefinitions: []};
   // query-level fields are joined, not namespaced, so we have to treat them differently
   const {variableDefinitions: initialVariableDefinitions, variableEnhancers} =
     createVariableDefinitions(mainMutation.arguments, fieldSchema, false, startingContext);
@@ -49,7 +49,7 @@ const namespaceAndInlineFrags = (fieldSelections, typeSchema, variableEnhancers,
     const fieldSchema = typeSchema.fields[selectionName];
     if (selection.arguments && selection.arguments.length) {
       const aliasOrFieldName = selection.alias && selection.alias.value || selection.name.value;
-      const namespaceAlias = makeNamespaceString(context.component, aliasOrFieldName);
+      const namespaceAlias = makeNamespaceString(context.op, aliasOrFieldName);
       selection.alias = new Name(namespaceAlias);
       const mutations = createVariableDefinitions(selection.arguments, fieldSchema, true, context);
       context.initialVariableDefinitions.push(...mutations.variableDefinitions);

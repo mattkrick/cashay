@@ -1,6 +1,6 @@
-import {STRING, INT, VARIABLE} from 'graphql/language/kinds';
+import {STRING, INT} from 'graphql/language/kinds';
 import {isObject, getRegularArgsKey, FULL, FRONT, BACK} from '../utils';
-import {separateArgs} from './separateArgs';
+import separateArgs from './separateArgs';
 import {getDocFromNormalString, sendChildrenToServer} from './denormalizeHelpers';
 import {RequestArgument} from '../helperClasses';
 
@@ -9,31 +9,38 @@ import {RequestArgument} from '../helperClasses';
  *
  * @param {object} fieldState the parent field in the redux state.
  * @param {object} fieldSchema the portion of the clientSchema relating to the fieldState
- * @param {object} selection the original query that holds the arguments
+ * @param {object} selection the original query AST that holds the arguments
  * @param {object} context
  *
  * @returns {*} an object, or array, or scalar from the normalized store
  * */
 export default function getFieldState(fieldState, fieldSchema, selection, context) {
-  if (isObject(fieldState)) {
-    const {skipTransform, paginationWords} = context;
-    const {arguments: fieldArgs} = selection;
-    const {regularArgs, paginationArgs} = separateArgs(fieldSchema, fieldArgs, context);
-    if (regularArgs) {
-      const regularArgsString = getRegularArgsKey(regularArgs);
-      fieldState = fieldState[regularArgsString];
-    }
-    if (paginationArgs) {
-      const arrType = fieldState[FULL] ? FULL : paginationArgs[paginationWords.last] ? BACK : FRONT;
-      fieldState = handlePaginationArgs(paginationArgs, fieldState[arrType], arrType);
-      if (arrType !== FULL && !skipTransform) {
-        reducePaginationRequest(paginationArgs, fieldState, fieldSchema, selection, context);
-      }
+  if (!isObject(fieldState)) return fieldState;
+  let subState = fieldState;
+  const {skipTransform, paginationWords, variables} = context;
+  const {arguments: fieldArgs} = selection;
+  const {regularArgs, paginationArgs} = separateArgs(fieldSchema, fieldArgs, paginationWords, variables);
+  if (regularArgs) {
+    const regularArgsString = getRegularArgsKey(regularArgs);
+    subState = subState[regularArgsString];
+  }
+  if (paginationArgs) {
+    const arrType = subState[FULL] ? FULL : paginationArgs[paginationWords.last] ? BACK : FRONT;
+    subState = handlePaginationArgs(paginationArgs, subState[arrType]);
+
+    // reduce the ask from the server
+    if (arrType !== FULL && !skipTransform) {
+      reducePaginationRequest(paginationArgs, subState, fieldSchema, selection, context);
     }
   }
-  return fieldState;
+  return subState;
 };
 
+/**
+ * Provide a subset of the array of documents in the state
+ * @param {Object} paginationArgs an object with only 1 field: FIRST or LAST
+ * @param {Array} usefulArray the array of document corresponding to the FIRST or LAST
+ * */
 const handlePaginationArgs = (paginationArgs, usefulArray) => {
   const {first, last} = paginationArgs;
 
@@ -74,10 +81,11 @@ const reducePaginationRequest = (paginationArgs, usefulArray, fieldSchema, selec
       throw new Error(`Your schema does not accept an argument for your cursor named ${cursorWord}.`);
     }
     // flag all AST children with sendToServer = true
+    // TODO why is this necessary if we're just reducing the request?
     sendChildrenToServer(selection);
     // TODO when to remove doWarn?
     const doWarn = true;
-    const {bestCursor, cursorIdx} = getBestCursor(first, usefulArray, context.cashayDataState.entities, doWarn);
+    const {bestCursor, cursorIdx} = getBestCursor(first, usefulArray, context.cashayState.entities, doWarn);
     const desiredDocCount = count - (cursorIdx + 1);
 
     // save the original arguments, we'll overwrite them with efficient ones for the server,
@@ -114,6 +122,7 @@ const getBestCursor = (first, usefulArray, entities, doWarn) => {
     }
   }
 
+  // TODO this is incorrect, I think it should be length -1 and break this into 2 functions
   if (i >= 0 && i < usefulArray.length) {
     return {bestCursor: storedDoc.cursor, cursorIdx: i};
   } else if (doWarn) {
@@ -138,6 +147,14 @@ const countRightPadding = array => {
   }
 };
 
+/**
+ * Assign metadata to the array.
+ * The EOF, BOF are useful to the front-end developer if they want to know if there are more docs available
+ * The count is useful internally to mutations so we know how a certain query has been mutated
+ * @param {Array} slicedArray the subset of the usefulArray
+ * @param {Array} usefulArray all the documents in that direction that are available on the client
+ * @param {Number} count the number of documents desired by the front-end
+ * */
 const assignFieldStateMeta = (slicedArray, usefulArray, count) => {
   Object.assign(slicedArray, {
     EOF: slicedArray[slicedArray.length - 1] === usefulArray[usefulArray.length - 1],

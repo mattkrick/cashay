@@ -3,7 +3,7 @@ import {VARIABLE, OBJECT} from 'graphql/language/kinds';
 import {VariableDefinition} from './helperClasses';
 
 export default function createVariableDefinitions(argsToDefine, fieldSchema, isNamespaced, context) {
-  const {initialVariableDefinitions, component, componentStateVars, schema} = context;
+  const {initialVariableDefinitions, op, opStateVars, schema} = context;
   const variableDefinitions = [];
   const variableEnhancers = [];
   const bagArgs = (argsToDefine, fieldSchema) => {
@@ -16,12 +16,12 @@ export default function createVariableDefinitions(argsToDefine, fieldSchema, isN
         const variableDefOfArg = initialVariableDefinitions.find(def => def.variable.name.value === variableName);
         if (isNamespaced) {
           // namespace the variable definitions & create the enhancer for each
-          const namespaceKey = makeNamespaceString(component, variableName);
+          const namespaceKey = makeNamespaceString(op, variableName);
           if (!variableDefOfArg) {
             const newVariableDef = makeVariableDefinition(argName, namespaceKey, fieldSchema);
             variableDefinitions.push(newVariableDef);
           }
-          const variableEnhancer = enhancerFactory(componentStateVars, variableName, namespaceKey);
+          const variableEnhancer = enhancerFactory(opStateVars, variableName, namespaceKey);
           variableEnhancers.push(variableEnhancer);
         } else if (!variableDefOfArg) {
           const newVariableDef = makeVariableDefinition(argName, variableName, fieldSchema);
@@ -50,11 +50,11 @@ const makeVariableDefinition = (argName, variableName, fieldSchema) => {
   return new VariableDefinition(variableName, argSchema.type);
 };
 
-const enhancerFactory = (componentStateVars, variableName, namespaceKey) => {
+const enhancerFactory = (opStateVars, variableName, namespaceKey) => {
   return variablesObj => {
     return {
       ...variablesObj,
-      [namespaceKey]: componentStateVars[variableName]
+      [namespaceKey]: opStateVars[variableName]
     }
   }
 };

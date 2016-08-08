@@ -1,5 +1,5 @@
 import mergeStores from './mergeStores';
-import {separateArgs} from './separateArgs';
+import separateArgs from './separateArgs';
 import {getSubReqAST} from './getSubReqAST';
 import {ensureRootType, getRegularArgsKey, isObject, NORM_DELIMITER, FULL, FRONT, BACK} from '../utils';
 import {VARIABLE} from 'graphql/language/kinds';
@@ -8,8 +8,8 @@ import {TypeKind} from 'graphql/type/introspection';
 const {UNION} = TypeKind;
 
 const mapResponseToResult = (nestedResult, response, fieldSchema, reqASTArgs, context) => {
-  const {regularArgs, paginationArgs} = separateArgs(fieldSchema, reqASTArgs, context);
-  const regularArgsString = getRegularArgsKey(regularArgs);
+  const {paginationWords, variables} = context;
+  const {regularArgs, paginationArgs} = separateArgs(fieldSchema, reqASTArgs, paginationWords, variables);
   if (paginationArgs) {
     const {first, last} = paginationArgs;
     const arrName = first ? FRONT : last ? BACK : FULL;
@@ -18,6 +18,7 @@ const mapResponseToResult = (nestedResult, response, fieldSchema, reqASTArgs, co
   if (regularArgs === false) {
     return response;
   } else {
+    const regularArgsString = getRegularArgsKey(regularArgs);
     const resultObj = {[regularArgsString]: response};
     return (isObject(nestedResult) && !Array.isArray(nestedResult)) ? mergeStores(nestedResult, resultObj) : resultObj;
   }
