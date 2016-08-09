@@ -26,7 +26,10 @@ import {
   UPDATE,
   UPSERT,
   REMOVE,
-  LOADING
+  LOADING,
+  SUBSCRIBING,
+  READY,
+  UNSUBSCRIBED
 } from './utils';
 import namespaceMutation from './mutate/namespaceMutation';
 import createMutationFromQuery from './mutate/createMutationFromQuery';
@@ -644,21 +647,31 @@ class Cashay {
     const subscriptionHandlers = this.makeSubscriptionHandlers(op, key, variables);
     // const startSubscription = (subVars) => subscriber(subscriptionString, subVars, subscriptionHandlers, getCachedResult);
     const promiseStart = (subVars) => new Promise((resolve) => {
-      const unsubscribe = subscriber(subscriptionString, subVars, subscriptionHandlers, getCachedResult);
-      resolve(unsubscribe)
+      setTimeout(() => {
+        const unsubscribe = subscriber(subscriptionString, subVars, subscriptionHandlers, getCachedResult);
+        resolve(unsubscribe)
+      }, 0)
     });
-    promiseStart(variables).then(unsubscribe => {
+
+    promiseStart(variables).then(socketUnsub => {
       cachedSubscription.responses[key] = {
         ...cachedSubscription.responses[key],
-        status: 'ready',
-        unsubscribe
+        status: READY,
+        unsubscribe: () => {
+          socketUnsub();
+          this.store.dispatch({
+            type: SET_STATUS,
+            status: UNSUBSCRIBED
+          })
+        }
       }
     });
+
     const data = denormalizeStore(context, 'subscriptionSchema');
     return cachedSubscription.responses[key] = {
       data,
       setVariables: setSubVariablesFactory(op, key, this.store.dispatch, this.getState, cachedSubscription, promiseStart),
-      status: 'subscribing',
+      status: SUBSCRIBING,
       unsubscribe: null
     };
   }
