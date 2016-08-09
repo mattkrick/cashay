@@ -33,6 +33,8 @@ export const COMPLETE = 'complete';
 /* status for subscriptions */
 export const SUBSCRIBING = 'subscribing';
 export const READY = 'ready';
+export const UNSUBSCRIBED = 'unsubscribed';
+
 
 
 export const ensureTypeFromNonNull = type => type.kind === NON_NULL ? type.ofType : type;

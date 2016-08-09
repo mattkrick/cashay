@@ -127,7 +127,7 @@ export default function denormalizeStore(context, schemaName = 'querySchema') {
     const queryInState = context.cashayState.result[queryName];
 
     // if there's no results stored or being fetched, save some time & don't bother with the args
-    const fieldState = queryInState && getFieldState(queryInState, queryFieldSchema, selection, context);
+    const fieldState = getFieldState(queryInState, queryFieldSchema, selection, context);
 
     // get the expected return value, devs can be silly, so if the had the return value in a nonnull, remove it.
     const nonNullQueryFieldSchemaType = ensureTypeFromNonNull(queryFieldSchema.type);
