@@ -48,7 +48,7 @@ export const getRegularArgsKey = regularArgs => {
   return regularArgs && (Object.keys(regularArgs).length ? JSON.stringify(regularArgs) : '');
 };
 
-export const isObject = val => val && typeof val === 'object';
+export const isObject = val => val && typeof val === 'object' && !(val instanceof Date);
 
 export const clone = obj => JSON.parse(JSON.stringify(obj));
 

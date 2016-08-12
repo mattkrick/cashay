@@ -87,6 +87,11 @@ const visitIterable = (subState, reqAST, subSchema, context) => {
   return [];
 };
 
+const visitScalar = (subState, scalarType, coerceTypes) => {
+  const coercion = coerceTypes[scalarType];
+  return coercion ? coercion(subState) : subState;
+};
+
 const visit = (subState, reqAST, subSchema, context) => {
   // By implementing a ternary here, we can get rid of a pointless O(n) find in visitObject
   const objectType = subSchema.kind ? subSchema.kind : subSchema.type.kind;
@@ -101,7 +106,7 @@ const visit = (subState, reqAST, subSchema, context) => {
     case LIST:
       return visitIterable(subState, reqAST, subSchema, context);
     default:
-      return subState
+      return visitScalar(subState, subSchema.type.name, context.coerceTypes);
   }
 };
 

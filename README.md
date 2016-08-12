@@ -98,9 +98,15 @@ cashay.query(...);
 The params that you can pass into the `create` method are as follows (*required):
 - *`store`: Your redux store
 - *`schema`: your client schema that cashay helped you make
-- *`httpTransport`: An instance of an [HTTPTransport](./recipes/transports.md) to send off the query + variables to your GraphQL server.
-- `priorityTransport`: An instance of a [Transport](./recipes/transports.md). If it exists, Cashay will use this over the `httpTransport`.
+- *`httpTransport`: An instance of an [HTTPTransport](./recipes/transports.md) 
+to send off the query + variables to your GraphQL server.
+- `priorityTransport`: An instance of a [Transport](./recipes/transports.md). 
+If it exists, Cashay will use this over the `httpTransport`.
 - `idFieldName`: Defaults to `id`, but you can call it whatever it is in your DB (eg Mongo uses `_id`)
+- `coerceTypes`: an object full of methods names matching GraphQL types. It takes in a single scalar value
+and returns the output. This is useful for things like converting dates from strings to numbers or Date types.
+By default, it includes one function: `DateTime = val => new Date(val)`, 
+which coerces everything of type `DateTime` to a Date.
 - `paginationWords`: The reserved words that you use for pagination. Defaults to an object with 4 properties:
 `first, last, after, before`.
 If, for example, your backend uses `count` instead of `first`, you'd send in `{first: 'count'}`.
