@@ -16,7 +16,8 @@ import {
   responseFromSortedArgs,
   storeFromSortedArgs,
   queryPostCount,
-  storedPostCount
+  storedPostCount,
+  coerceTypes
 } from './data';
 import clientSchema from '../../__tests__/clientSchema.json';
 import {
@@ -43,6 +44,7 @@ const idFieldName = '_id';
 test('denormalize store from recursive union request', t => {
   const queryAST = parseAndInitializeQuery(unionQueryString, clientSchema, idFieldName);
   const context = buildExecutionContext(queryAST, {
+    coerceTypes,
     cashayState: unionStoreFull,
     idFieldName,
     schema: clientSchema,
@@ -56,6 +58,7 @@ test('denormalize store from recursive union request', t => {
 test('denormalize store when the query returns a scalar (String)', t => {
   const queryAST = parseAndInitializeQuery(queryPostCount, clientSchema, idFieldName);
   const context = buildExecutionContext(queryAST, {
+    coerceTypes,
     cashayState: storedPostCount,
     idFieldName,
     schema: clientSchema,
@@ -69,6 +72,7 @@ test('denormalize store when the query returns a scalar (String)', t => {
 test('denormalize store with missing scalar data', t => {
   const queryAST = parseAndInitializeQuery(back1Query, clientSchema, idFieldName);
   const context = buildExecutionContext(queryAST, {
+    coerceTypes,
     cashayState: back1StoreNoCursor,
     idFieldName,
     schema: clientSchema,
@@ -82,6 +86,7 @@ test('denormalize store with missing scalar data', t => {
 test('denormalize store with missing entity and array', t => {
   const queryAST = parseAndInitializeQuery(unionQueryString, clientSchema, idFieldName);
   const context = buildExecutionContext(queryAST, {
+    coerceTypes,
     cashayState: unionStoreMissingOwnerMembers,
     idFieldName,
     schema: clientSchema,
@@ -95,6 +100,7 @@ test('denormalize store with missing entity and array', t => {
 test('throws on bad pagination args', t => {
   const queryAST = parseAndInitializeQuery(back1QueryBadArgs, clientSchema, idFieldName);
   const context = buildExecutionContext(queryAST, {
+    coerceTypes,
     cashayState: back1Store,
     idFieldName,
     schema: clientSchema,
@@ -106,6 +112,7 @@ test('throws on bad pagination args', t => {
 test('denormalize store with scalar fields with args', t => {
   const queryAST = parseAndInitializeQuery(queryWithSortedArgs, clientSchema, idFieldName);
   const context = buildExecutionContext(queryAST, {
+    coerceTypes,
     cashayState: storeFromSortedArgs,
     idFieldName,
     schema: clientSchema,
@@ -120,6 +127,7 @@ test('denormalize store with scalar fields with args', t => {
 test('get a page from a full store (back)', t => {
   const queryAST = parseAndInitializeQuery(back4, clientSchema, idFieldName);
   const context = buildExecutionContext(queryAST, {
+    coerceTypes,
     cashayState: fullPostStore,
     idFieldName,
     schema: clientSchema,
@@ -134,6 +142,7 @@ test('get a page from a full store (back)', t => {
 test('request an array that does not exist in the state', t => {
   const queryAST = parseAndInitializeQuery(back1Query, clientSchema, idFieldName);
   const context = buildExecutionContext(queryAST, {
+    coerceTypes,
     cashayState: emptyInitialState,
     idFieldName,
     schema: clientSchema,
@@ -157,6 +166,7 @@ test('flag sendToServer = true for array of objects', t => {
   }`;
   const queryAST = parseAndInitializeQuery(rawQuery, clientSchema, idFieldName);
   const context = buildExecutionContext(queryAST, {
+    coerceTypes,
     cashayState: emptyInitialState,
     idFieldName,
     schema: clientSchema

@@ -106,7 +106,8 @@ const visit = (subState, reqAST, subSchema, context) => {
     case LIST:
       return visitIterable(subState, reqAST, subSchema, context);
     default:
-      return visitScalar(subState, subSchema.type.name, context.coerceTypes);
+      const name = subSchema.name ? subSchema.name : subSchema.type.name;
+      return visitScalar(subState, name, context.coerceTypes);
   }
 };
 
