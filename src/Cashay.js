@@ -52,6 +52,10 @@ const defaultPaginationWords = {
   last: 'last'
 };
 
+const defaultCoerceTypes = {
+  DateTime: val => new Date(val)
+};
+
 class Cashay {
   constructor() {
     // many mutations can share the same mutationName, making it hard to cache stuff without adding complexity
@@ -134,6 +138,8 @@ class Cashay {
   /**
    * The primary method to begin using the singleton
    *
+   * @param {Object} coerceTypes an object full of methods names matching GraphQL types. It takes in a single scalar value
+   * and returns the output. This is useful for things like converting dates from strings to numbers or Date types.
    * @param {Function} getToState a function to get to the cashayState.
    * Useful if your store is not a POJO or if your reducer isn't called `cashay`
    * @param {HTTPTransport} httpTransport an instance of an HTTPTransport used to connect cashay to your server
@@ -144,10 +150,11 @@ class Cashay {
    * @param {Object} schema the client graphQL schema
    * @param {Object} store the redux store
    * */
-  create({getToState, httpTransport, idFieldName, paginationWords, priorityTransport, schema, store}) {
+  create({coerceTypes, getToState, httpTransport, idFieldName, paginationWords, priorityTransport, schema, store}) {
+    this.coerceTypes = coerceTypes === undefined ? this.coerceTypes || defaultCoerceTypes : coerceTypes;
     this.store = store || this.store;
     this.getState = getToState ? () => getToState(this.store) : this.getState || (() => defaultGetToState(this.store));
-    this.paginationWords = Object.assign({}, defaultPaginationWords, paginationWords);
+    this.paginationWords = paginationWords === undefined ? this.paginationWords || defaultPaginationWords : {...defaultPaginationWords, ...paginationWords};
     this.idFieldName = idFieldName === undefined ? this.idFieldName || 'id' : idFieldName;
     this.httpTransport = httpTransport === undefined ? this.httpTransport : httpTransport;
     this.priorityTransport = priorityTransport === undefined ? this.priorityTransport : priorityTransport;
@@ -230,9 +237,10 @@ class Cashay {
     const variables = getVariables(options.variables, cashayState, op, key, initialCachedResponse);
 
     // create an AST that we can mutate
-    const {paginationWords, idFieldName, schema, store, getState} = this;
+    const {coerceTypes, paginationWords, idFieldName, schema, store, getState} = this;
     const context = buildExecutionContext(cachedQuery.ast, {
       cashayState,
+      coerceTypes,
       variables,
       paginationWords,
       idFieldName,
@@ -633,9 +641,10 @@ class Cashay {
     }
     const cachedSubscription = this.cachedSubscriptions[op];
     const cashayState = this.getState();
-    const {paginationWords, idFieldName, schema} = this;
+    const {coerceTypes, paginationWords, idFieldName, schema} = this;
     const variables = getVariables(options.variables, cashayState, op, key, cachedSubscription.responses[key]);
     const context = buildExecutionContext(cachedSubscription.ast, {
+      coerceTypes,
       cashayState,
       variables,
       paginationWords,

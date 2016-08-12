@@ -10,6 +10,10 @@ export const paginationWords = {
   after: 'afterCursor'
 };
 
+export const coerceTypes = {
+  DateTime: val => new Date(val)
+};
+
 export const queryWithSortedArgs = `
 query ($reverse: Boolean, $lang: String) {
   getLatestPost {
