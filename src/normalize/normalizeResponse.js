@@ -98,7 +98,7 @@ const visitUnion = (bag, subResponse, reqAST, subSchema, context) => {
 };
 
 const visit = (bag, subResponse, reqAST, subSchema, context) => {
-  if (!isObject(subResponse)) {
+  if (!isObject(subResponse) || subResponse instanceof Date) {
     return subResponse;
   }
   if (Array.isArray(subResponse)) {
