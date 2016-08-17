@@ -332,6 +332,7 @@ const subscriber = (subscriptionString, variables, handlers) => {
 `cashay.subscribe` has the following options:
 - `variables`: the variables object to pass onto the GraphQL server
 - `op`: a nickname for your subscription. 
+- `dependency`: Used if this call occurs in a computed value (see below) 
 Two components can share the same subscription by sharing the same `op` name. 
 
 The response includes:
@@ -342,6 +343,77 @@ The response includes:
   - `'ready'`: `subscriber` has been executed.
   - `[USER_DEFINED]`: whatever you like, just call `handler.setStatus(status)` in your `subscriber`
 - `unsubscribe`: the result of calling your `subscriber`. This could also be an object of functions, if you get tricky.
+
+## Computed Values
+
+When your data arrives on the client, often times you'll need to run it through a computation.
+For example, what's the high score for all of your socket-connected teammates?
+```js
+const players = cashay.subscribe(getTeammates, subscriber);
+const highScore = players.map(sub => sub.data.player.score).reduce((high, score) => Math.max(high, score),0);
+```
+While a high score is pretty cheap, you don't want to calculate it on every single rerender.
+MobX solves this by having a special `@computed` HOF.
+Redux solves this by [memoizing the selector](https://github.com/reactjs/reselect). 
+Although computations aren't first-class citizens, the pattern works like a champ! 
+```js
+const getHighScore = players => {
+  if (players !== getHighScore.players) {
+    getHighScore.players = players;
+    getHighScore.cache = players.map(sub => sub.data.player.score).reduce((high, score) => Math.max(high, score),0);
+  } 
+  return getHighScore.cache;
+}
+```
+...But what if part of your map-reduce involves another subscription?
+For example, let's say you want to open a chat session for each teammate.
+You first need to know who your team mates are, and _then_ you can get the chat for them.
+That's n+1 subscriptions:
+
+```js
+// BROKEN CODE
+const getChatSessions = players => {
+  if (players !== getHighScore.players) {
+    getChatSessions.players = players;
+    getChatSessions.cache = players.map(sub => {
+      return cashay.subscribe(getChatForUser, subscriber, {variables: sub.data.player.id});
+    })
+  }
+  return getChatSessions.cache;
+}
+
+```
+Can you see the problem? 
+If the nested subscription receives a new chat message, the memoized function won't detect it until `players` changes!
+
+That's where computed values come in handy:
+
+```js
+const result = cashay.computed(computationName, inputs, resolve)
+```
+- `computationName`: A simple name to link a subscription to a computation. 
+Usually this is the plural form of the subscription name.
+- `inputs`: An array of variables to pass to your `resolve` function.
+These will be used for the memoization logic.
+- `resolve(...inputs)` A function allowing you to return any computed value you like.
+ 
+Example:
+```js
+const resolve = players => {
+  return players.reduce((obj, sub) => {
+    const options = {variables: sub.data.player.id, dependency: 'chatSubs'};
+    obj[sub.data.player.id] = cashay.subscribe(getChatForUser, subscriber, options) 
+    return obj;
+  }, {})
+}
+
+const mapStateToProps = (state, props) => {
+  const players = cashay.subscribe(getTeammates, subscriber);
+  return {
+    chatSessionsById: cashay.computed('chatSubs', [players], resolve)
+  }
+}
+```
 
 ## Recipes
 

@@ -41,6 +41,7 @@ export class CachedMutation {
 export class CachedSubscription {
   constructor(subscriptionString, key) {
     this.ast = parse(subscriptionString);
+    this.dependencies = new Set();
     this.responses = {
       [key]: {}
     };

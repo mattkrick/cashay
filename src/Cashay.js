@@ -93,12 +93,20 @@ class Cashay {
     // const example = {
     //   [subscriptionString]: {
     //     ast: SubscriptionAST,
+    //     dependencies: Set(['postSubs, commentSubs'])
     //     responses: {
     //       [key = '']: DenormalizedResponseWithUnsub
     //     }
     //   }
     // };
     this.cachedSubscriptions = {};
+
+    // the object to hold all sub-based computations
+    // const example = {
+    //   inputs: [scalar, arr, obj],
+    //   response: DenormalizedResponseData
+    // };
+    this.cachedComputed = {};
 
     // a flag thrown by the invalidate function and reset when that query is added to the queue
     this._willInvalidateListener = false;
@@ -631,11 +639,15 @@ class Cashay {
    *
    */
   subscribe(subscriptionString, subscriber, options) {
-    const op = options.op || subscriptionString;
-    const key = options.key || '';
+    const {dependency, op = subscriptionString, key = ''} = options;
     const fastResult = this.cachedSubscriptions[op];
     const fastResponse = fastResult && fastResult.responses[key];
-    if (fastResponse) return fastResponse;
+    if (fastResponse) {
+      if (dependency) {
+        fastResult.dependencies.add(dependency)
+      }
+      return fastResponse;
+    }
     if (!fastResult) {
       this.cachedSubscriptions[op] = new CachedSubscription(subscriptionString, key);
     }
@@ -651,7 +663,6 @@ class Cashay {
       idFieldName,
       schema
     });
-
     const getCachedResult = () => cachedSubscription.responses[key].data;
     const subscriptionHandlers = this.makeSubscriptionHandlers(op, key, variables);
     // const startSubscription = (subVars) => subscriber(subscriptionString, subVars, subscriptionHandlers, getCachedResult);
@@ -731,6 +742,9 @@ class Cashay {
       // remove the responses from this.cachedQueries where necessary
       flushDependencies(entitiesAndResult.entities, op, key, this.denormalizedDeps, this.cachedQueries);
 
+      // flush dependencies for all computed values
+      cachedSubscription.dependencies.forEach(dep => this.cachedComputed[dep] = undefined);
+
       // stick normalize data in store and recreate any invalidated denormalized structures
       const payload = {
         ...entitiesAndResult,
@@ -776,6 +790,26 @@ class Cashay {
         })
       }
     }
+  }
+
+  computed(op, inputs = [], resolve) {
+    const fastResult = this.cachedComputed[op];
+    if (fastResult) {
+      let returnFast = true;
+      for (let i = 0; i < inputs.length; i++) {
+        if (inputs[i] !== fastResult.inputs[i]) {
+          returnFast = false;
+          break;
+        }
+      }
+      if (returnFast) return fastResult.response;
+    }
+    const response = resolve(...inputs);
+    this.cachedComputed[op] = {
+      inputs,
+      response
+    };
+    return response;
   }
 }
 export default new Cashay();
