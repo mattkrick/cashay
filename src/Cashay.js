@@ -649,7 +649,7 @@ class Cashay {
       return fastResponse;
     }
     if (!fastResult) {
-      this.cachedSubscriptions[op] = new CachedSubscription(subscriptionString, key);
+      this.cachedSubscriptions[op] = new CachedSubscription(subscriptionString, key, dependency);
     }
     const cachedSubscription = this.cachedSubscriptions[op];
     const cashayState = this.getState();
