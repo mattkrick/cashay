@@ -332,11 +332,14 @@ const subscriber = (subscriptionString, variables, handlers) => {
 `cashay.subscribe` has the following options:
 - `variables`: the variables object to pass onto the GraphQL server
 - `op`: a nickname for your subscription. 
-- `dependency`: Used if this call occurs in a computed value (see below) 
 Two components can share the same subscription by sharing the same `op` name. 
-
+- `dep`: The name of the `op` given to your computed value. 
+Used if this call occurs in a computed value (see below). 
+- `invalidate(oldVal, newVal)`: For performance-driven computed values (see below).
+A function you write that will only invalidate a computed value if `true` is returned.
+Useful if incoming socket data does not always require a recompute.
 The response includes:
-- `data`: the stream of documents, as they have been recieved
+- `data`: the stream of documents, as they have been received
 - `setVariables`: a shorthand for unsubscribing and subscribing to a new channel (for example, if you change users)
 - `status`: 
   - `'subscribing'`: `cashay.subscribe` has been called, but `subscriber` has not been executed yet
@@ -401,7 +404,7 @@ Example:
 ```js
 const resolve = players => {
   return players.reduce((obj, sub) => {
-    const options = {variables: sub.data.player.id, dependency: 'chatSubs'};
+    const options = {variables: sub.data.player.id, dep: 'chatSubs'};
     obj[sub.data.player.id] = cashay.subscribe(getChatForUser, subscriber, options) 
     return obj;
   }, {})

@@ -56,6 +56,8 @@ const defaultCoerceTypes = {
   DateTime: val => new Date(val)
 };
 
+const defaultInvalidate = () => true;
+
 class Cashay {
   constructor() {
     // many mutations can share the same mutationName, making it hard to cache stuff without adding complexity
@@ -93,7 +95,11 @@ class Cashay {
     // const example = {
     //   [subscriptionString]: {
     //     ast: SubscriptionAST,
-    //     dependencies: Set(['postSubs, commentSubs'])
+    //     deps: {
+    //       [key='']: {
+    //         [dep]: invalidateFn || () => true
+    //       }
+    //     },
     //     responses: {
     //       [key = '']: DenormalizedResponseWithUnsub
     //     }
@@ -639,17 +645,24 @@ class Cashay {
    *
    */
   subscribe(subscriptionString, subscriber, options) {
-    const {dependency, op = subscriptionString, key = ''} = options;
+    const {dep, op = subscriptionString, key = '', invalidate = defaultInvalidate} = options;
     const fastResult = this.cachedSubscriptions[op];
     const fastResponse = fastResult && fastResult.responses[key];
     if (fastResponse) {
-      if (dependency) {
-        fastResult.dependencies.add(dependency)
+      if (dep) {
+        fastResult.deps[key] = fastResult.deps[key] || {};
+        fastResult.deps[key][dep] = invalidate;
       }
       return fastResponse;
     }
     if (!fastResult) {
-      this.cachedSubscriptions[op] = new CachedSubscription(subscriptionString, key, dependency);
+      // if it's a new op
+      const initialDeps = dep ? {[key]: {[dep]: invalidate}} : {[key]: {}};
+      this.cachedSubscriptions[op] = new CachedSubscription(subscriptionString, key, initialDeps);
+    } else if (!fastResponse && dep) {
+      // if it's a new key
+      fastResult.deps[key] = fastResult.deps[key] || {};
+      fastResult.deps[key][dep] = invalidate;
     }
     const cachedSubscription = this.cachedSubscriptions[op];
     const cashayState = this.getState();
@@ -717,24 +730,24 @@ class Cashay {
          Include a 'path' option to determine how to patch in the incoming data.`);
       }
       const pathArray = path ? path.split('.') : subscriptionNames;
-      const newData = createNewData(handler, cachedResult, pathArray, {
+      const {oldVal, newVal} = createNewData(handler, cachedResult, pathArray, {
         document,
         docId,
         idFieldName,
         removeKeys,
         schema
       });
-      return {newData, context};
+      return {oldVal, newVal, context};
     };
 
-    const mergeNewData = (actionType, {newData, context}) => {
+    const mergeNewData = (actionType, {oldVal, newVal, context}) => {
       const cachedSubscription = this.cachedSubscriptions[op];
       cachedSubscription.responses[key] = {
         ...cachedSubscription.responses[key],
         // handle multiple sub operations inside the same sub
-        data: {...cachedSubscription.responses[key].data, ...newData}
+        data: {...cachedSubscription.responses[key].data, ...newVal}
       };
-      const normalizedDoc = normalizeResponse(newData, context, true);
+      const normalizedDoc = normalizeResponse(newVal, context, true);
       const {entities, result} = this.getState();
       const entitiesAndResult = shortenNormalizedResponse(normalizedDoc, {entities, result});
       if (!entitiesAndResult) return;
@@ -742,8 +755,15 @@ class Cashay {
       // remove the responses from this.cachedQueries where necessary
       flushDependencies(entitiesAndResult.entities, op, key, this.denormalizedDeps, this.cachedQueries);
 
-      // flush dependencies for all computed values
-      cachedSubscription.dependencies.forEach(dep => this.cachedComputed[dep] = undefined);
+      const deps = cachedSubscription.deps && cachedSubscription.deps[key];
+      if (deps) {
+        Object.keys(deps).forEach(depName => {
+          const invalid = deps[depName](oldVal, newVal);
+          if (invalid) {
+            this.cachedComputed[depName] = undefined
+          }
+        })
+      }
 
       // stick normalize data in store and recreate any invalidated denormalized structures
       const payload = {
@@ -761,22 +781,22 @@ class Cashay {
     return {
       add: (document, options = {}) => {
         const docId = document[this.idFieldName];
-        const newDataAndContext = handleCreateNewData(ADD, document, docId, options);
-        mergeNewData(ADD_SUBSCRIPTION, newDataAndContext)
+        const diffAndContext = handleCreateNewData(ADD, document, docId, options);
+        mergeNewData(ADD_SUBSCRIPTION, diffAndContext)
       },
       update: (document, options = {}) => {
         const docId = document[this.idFieldName];
-        const newDataAndContext = handleCreateNewData(UPDATE, document, docId, options);
-        mergeNewData(UPDATE_SUBSCRIPTION, newDataAndContext)
+        const diffAndContext = handleCreateNewData(UPDATE, document, docId, options);
+        mergeNewData(UPDATE_SUBSCRIPTION, diffAndContext)
       },
       upsert: (document, options = {}) => {
         const docId = document[this.idFieldName];
-        const newDataAndContext = handleCreateNewData(UPSERT, document, docId, options);
-        mergeNewData(UPDATE_SUBSCRIPTION, newDataAndContext);
+        const diffAndContext = handleCreateNewData(UPSERT, document, docId, options);
+        mergeNewData(UPDATE_SUBSCRIPTION, diffAndContext);
       },
       remove: (docId, options = {}) => {
-        const newDataAndContext = handleCreateNewData(REMOVE, null, docId, options);
-        mergeNewData(REMOVE_SUBSCRIPTION, newDataAndContext)
+        const diffAndContext = handleCreateNewData(REMOVE, null, docId, options);
+        mergeNewData(REMOVE_SUBSCRIPTION, diffAndContext)
       },
       setStatus: (status) => {
         const cachedSub = this.cachedSubscriptions[op];

@@ -26,18 +26,18 @@ export default function createNewData(handler, cachedResult, pathArray, context)
       Do not provide an indexer (eg '[123]') for adding/removing. Array of arrays are not supported`);
     }
     if (pathArray.length === 1) {
+      let oldVal;
+      let newVal;
       if (isList) {
         const returnField = cachedResult[identifier] || [];
         const idxInCache = returnField.findIndex(doc => doc[idFieldName] === docId);
         const safeHandler = getSafeHandler(handler, idxInCache);
-
+        oldVal = idxInCache === -1 ? null : returnField[idxInCache];
         if (safeHandler === ADD) {
-          return {[identifier]: [...returnField, document]};
-        }
-        if (safeHandler === REMOVE) {
-          return {[identifier]: [...returnField.slice(0, idxInCache), ...returnField.slice(idxInCache + 1)]};
-        }
-        if (safeHandler === UPDATE) {
+          newVal = {[identifier]: [...returnField, document]};
+        } else if (safeHandler === REMOVE) {
+          newVal = {[identifier]: [...returnField.slice(0, idxInCache), ...returnField.slice(idxInCache + 1)]};
+        } else if (safeHandler === UPDATE) {
           const oldDoc = returnField[idxInCache];
           let updatedDoc;
           if (isObject(oldDoc) && removeKeys !== true) {
@@ -46,25 +46,28 @@ export default function createNewData(handler, cachedResult, pathArray, context)
           } else {
             updatedDoc = document;
           }
-          return {
+          newVal = {
             [identifier]: [...returnField.slice(0, idxInCache), updatedDoc, ...returnField.slice(idxInCache + 1)]
           }
         }
+      } else {
+        oldVal = cachedResult[identifier];
+        // pointfeed subscriptions
+        const safeHandler = handler === UPSERT ? UPDATE : handler;
+        if (safeHandler === ADD || removeKeys === true) {
+          newVal = {[identifier]: document};
+        }
+        if (safeHandler === UPDATE) {
+          const updatedDoc = {...cachedResult[identifier], ...document};
+          removeKeys.forEach(key => delete updatedDoc[key]);
+          newVal = {[identifier]: updatedDoc};
+        }
+        if (safeHandler === REMOVE) {
+          // this will probably never happen, but give en an object so they don't code defensively
+          newVal = isObject(cachedResult[identifier]) ? {} : null;
+        }
       }
-      // pointfeed subscriptions
-      const safeHandler = handler === UPSERT ? UPDATE : handler;
-      if (safeHandler === ADD || removeKeys === true) {
-        return {[identifier]: document};
-      }
-      if (safeHandler === UPDATE) {
-        const updatedDoc = {...cachedResult[identifier], ...document};
-        removeKeys.forEach(key => delete updatedDoc[key]);
-        return {[identifier]: updatedDoc};
-      }
-      if (safeHandler === REMOVE) {
-        // this will probably never happen, but give en an object so they don't code defensively
-        return isObject(cachedResult[identifier]) ? {} : null;
-      }
+      return {oldVal, newVal};
     }
     // TODO THIS IS ALL UNTESTED
     const rootFieldSchemaType = ensureRootType(fieldSchemaType);
