@@ -39,9 +39,9 @@ export class CachedMutation {
 }
 
 export class CachedSubscription {
-  constructor(subscriptionString, key, dependency) {
+  constructor(subscriptionString, key, deps) {
     this.ast = parse(subscriptionString);
-    this.dependencies = dependency ? new Set([dependency]) : new Set();
+    this.deps = deps;
     this.responses = {
       [key]: {}
     };

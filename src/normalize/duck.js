@@ -32,23 +32,3 @@ export default function reducer(state = initialState, action) {
     return state;
   }
 };
-
-//
-// option1 = {
-//   entities: {},
-//   result: {},
-//   ops: {
-//     [component]: {
-//       [key]: {
-//         variables: {
-//           foo :'bar'
-//         },
-//         status: 'complete',
-//         error: {
-//           _error: 'GraphQL error',
-//           errors: ['bad', 'awful']
-//         }
-//       }
-//     }
-//   }
-// }
