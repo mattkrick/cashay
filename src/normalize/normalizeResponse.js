@@ -8,7 +8,7 @@ import {TypeKind} from 'graphql/type/introspection';
 const {UNION} = TypeKind;
 
 const mapResponseToResult = (nestedResult, response, fieldSchema, reqASTArgs, context) => {
-  if (!fieldSchema.arguments) return response;
+  if (!fieldSchema.args) return response;
   const {paginationWords, variables} = context;
   const {regularArgs, paginationArgs} = separateArgs(fieldSchema, reqASTArgs, paginationWords, variables);
   if (paginationArgs) {

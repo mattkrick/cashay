@@ -34,9 +34,9 @@ const visitObject = (subState = {}, reqAST, subSchema, context, baseReduction = 
     } else {
       const fieldName = field.name.value;
       const aliasOrFieldName = field.alias && field.alias.value || fieldName;
-
+      const {directives} = field;
       const fieldSchema = getFieldSchema(field, subSchema, context.schema);
-      if (field.directives.length) {
+      if (directives && directives.length) {
         debugger
       }
       const hasData = subState.hasOwnProperty(fieldName);
@@ -132,31 +132,11 @@ export default function denormalizeStore(context, defaultSchema = 'querySchema')
     const queryFieldSchema = getFieldSchema(selection, schema[defaultSchema], schema);
     // look into the current redux state to see if we can borrow any data from it
     const queryInState = context.getState().result[queryName];
-    let fieldState;
-    if (isLive(selection.directives)) {
-      const returnType = ensureTypeFromNonNull(queryFieldSchema.type);
-      const {live = {}, idFieldName, getState, queryDep, subscribe, subscriptionDeps, variables} = context;
-      const {resolve, subscriber} = live[aliasOrName] || {};
-      const bestSubscriber = subscriber || context.subscriber;
-      const resolveChannelKey = resolve || defaultResolveFactory(idFieldName);
-      const channelKey = resolveChannelKey(null, variables);
-      const initialState = subscribe(aliasOrName, channelKey, bestSubscriber, {returnType});
-      const results = getState().result;
-      //
-      fieldState = results[aliasOrName] && results[aliasOrName][channelKey] || initialState;
-      const subDep = makeFullChannel(aliasOrName, channelKey);
-      subscriptionDeps[subDep] = subscriptionDeps[subDep] || new Set();
-      subscriptionDeps[subDep].add(queryDep);
-    } else {
-      // if there's no results stored or being fetched, save some time & don't bother with the args
-      fieldState = getFieldState(queryInState, queryFieldSchema, selection, context);
-    }
-
+    let fieldState = getFieldState(queryInState, queryFieldSchema, selection, context);
     // get the expected return value, devs can be silly, so if the had the return value in a nonnull, remove it.
     const nonNullQueryFieldSchemaType = ensureTypeFromNonNull(queryFieldSchema.type);
     const subSchema = nonNullQueryFieldSchemaType.kind === LIST ? queryFieldSchema :
       ensureTypeFromNonNull(context.schema.types[nonNullQueryFieldSchemaType.name]);
-
     // recursively visit each branch, flag missing branches with a sendToServer flag
     reduction[aliasOrName] = visit(fieldState, selection, subSchema, context);
 

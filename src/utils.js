@@ -166,7 +166,7 @@ export const without = (obj, exclusions) => {
   return newObj;
 };
 
-export const isLive = (directives) => Boolean(directives.find(d => d.name.value === LIVE));
+export const isLive = (directives) => Boolean(directives && directives.find(d => d.name.value === LIVE));
 
 export const getFieldSchema = (selection, maybeParentSchema, schema) => {
   const selectionName = selection.name.value;
