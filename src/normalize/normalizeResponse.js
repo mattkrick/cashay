@@ -1,13 +1,14 @@
 import mergeStores from './mergeStores';
 import separateArgs from './separateArgs';
 import {getSubReqAST} from './getSubReqAST';
-import {ensureRootType, getRegularArgsKey, isObject, NORM_DELIMITER, FULL, FRONT, BACK} from '../utils';
+import {ensureRootType, getRegularArgsKey, isObject, getFieldSchema, NORM_DELIMITER, FULL, FRONT, BACK} from '../utils';
 import {VARIABLE} from 'graphql/language/kinds';
 import {TypeKind} from 'graphql/type/introspection';
 
 const {UNION} = TypeKind;
 
 const mapResponseToResult = (nestedResult, response, fieldSchema, reqASTArgs, context) => {
+  if (!fieldSchema.arguments) return response;
   const {paginationWords, variables} = context;
   const {regularArgs, paginationArgs} = separateArgs(fieldSchema, reqASTArgs, paginationWords, variables);
   if (paginationArgs) {
@@ -27,21 +28,21 @@ const mapResponseToResult = (nestedResult, response, fieldSchema, reqASTArgs, co
 const visitObject = (bag, subResponse, reqAST, subSchema, context) => {
   return Object.keys(subResponse).reduce((reduction, key) => {
     if (key.startsWith('__')) return reduction;
-    let subReqAST = getSubReqAST(key, reqAST, context.fragments);
-    const name = subReqAST.name.value;
-    const field = subSchema.fields[name];
-    if (!field) {
-      throw new Error(`No field exists for ${name}. Did you update your schema?`)
-    }
-    const fieldType = ensureRootType(field.type);
-    let fieldSchema = context.schema.types[fieldType.name];
-    // handle first recursion where things are stored in the query
-    fieldSchema = fieldSchema || subSchema.types[fieldType.name];
-    const normalizedResponse = visit(bag, subResponse[key], subReqAST, fieldSchema, context);
-    if (field.args) {
-      reduction[name] = mapResponseToResult(reduction[name], normalizedResponse, field, subReqAST.arguments, context);
+    if (reqAST) {
+      const subReqAST = getSubReqAST(key, reqAST, context.fragments);
+      const name = subReqAST.name.value;
+      const fieldSchema = getFieldSchema(subReqAST, subSchema, context.schema);
+      const fieldType = ensureRootType(fieldSchema.type);
+      // handle first recursion where things are stored in the query (sloppy)
+      const typeSchema = context.schema.types[fieldType.name] || subSchema.types[fieldType.name];
+      const normalizedResponse = visit(bag, subResponse[key], subReqAST, typeSchema, context);
+      reduction[name] = mapResponseToResult(reduction[name], normalizedResponse, fieldSchema, subReqAST.arguments, context);
     } else {
-      reduction[name] = normalizedResponse;
+      // this is for subscriptions, since we don't explicitly have a request AST
+      const fieldSchema = subSchema.fields[key];
+      const fieldType = ensureRootType(fieldSchema.type);
+      const typeSchema = context.schema.types[fieldType.name];
+      reduction[key] = visit(bag, subResponse[key], undefined, typeSchema, context);
     }
     return reduction;
   }, {})
@@ -57,7 +58,7 @@ const visitEntity = (bag, subResponse, reqAST, subSchema, context, id) => {
 
 const visitIterable = (bag, subResponse, reqAST, subSchema, context) => {
   const normalizedSubResponse = subResponse.map(res => visit(bag, res, reqAST, subSchema, context));
-  if (reqAST.arguments && reqAST.arguments.length) {
+  if (reqAST && reqAST.arguments && reqAST.arguments.length) {
     const {first, last} = context.paginationWords;
     const paginationFlags = [{word: first, flag: 'EOF'}, {word: last, flag: 'BOF'}];
     for (let i = 0; i < paginationFlags.length; i++) {
@@ -117,8 +118,8 @@ const visit = (bag, subResponse, reqAST, subSchema, context) => {
 };
 
 export default (response, context, isSubscription) => {
-  const schema = isSubscription ? context.schema.subscriptionSchema : context.schema.querySchema;
   const entities = {};
+  const schema = isSubscription ? context.typeSchema : context.schema.querySchema;
   const result = visit(entities, response, context.operation, schema, context);
   return {
     entities,

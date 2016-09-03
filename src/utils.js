@@ -35,6 +35,11 @@ export const SUBSCRIBING = 'subscribing';
 export const READY = 'ready';
 export const UNSUBSCRIBED = 'unsubscribed';
 
+/* directives */
+export const LIVE = 'live';
+export const LOCAL_SORT = 'localSort';
+export const LOCAL_FILTER = 'localFilter';
+
 
 
 export const ensureTypeFromNonNull = type => type.kind === NON_NULL ? type.ofType : type;
@@ -160,3 +165,28 @@ export const without = (obj, exclusions) => {
   }
   return newObj;
 };
+
+export const isLive = (directives) => Boolean(directives.find(d => d.name.value === LIVE));
+
+export const getFieldSchema = (selection, maybeParentSchema, schema) => {
+  const selectionName = selection.name.value;
+  const liveDirective = isLive(selection.directives);
+  const parentSchema = liveDirective ? schema.subscriptionSchema : maybeParentSchema;
+  const fieldSchema = parentSchema.fields[selectionName];
+  if (!fieldSchema) {
+    throw new Error(`${selectionName} isn't in the schema. Did you update your client schema?`)
+  }
+  return fieldSchema;
+}
+
+export const defaultResolveFactory = (idFieldName) => (source, args) => {
+  if (source) {
+    return source[idFieldName] || '';
+  } else {
+    return args[idFieldName] ? args[idFieldName] : args[Object.keys(args)[0]] || '';
+  }
+};
+
+export const makeFullChannel = (channel, channelKey) => {
+  return channelKey ? `${channel}${NORM_DELIMITER}${channelKey}` : channel;
+}

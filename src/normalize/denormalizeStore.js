@@ -1,6 +1,14 @@
 import {TypeKind} from 'graphql/type/introspection';
 import {INLINE_FRAGMENT} from 'graphql/language/kinds';
-import {ensureRootType, ensureTypeFromNonNull, TYPENAME} from '../utils';
+import {
+  defaultResolveFactory,
+  ensureRootType,
+  ensureTypeFromNonNull,
+  getFieldSchema,
+  isLive,
+  makeFullChannel,
+  TYPENAME
+} from '../utils';
 import {
   calculateSendToServer,
   sendChildrenToServer,
@@ -8,7 +16,6 @@ import {
   getDocFromNormalString
 } from './denormalizeHelpers';
 import getFieldState from './getFieldState';
-
 
 const {UNION, LIST, OBJECT} = TypeKind;
 
@@ -27,9 +34,10 @@ const visitObject = (subState = {}, reqAST, subSchema, context, baseReduction = 
     } else {
       const fieldName = field.name.value;
       const aliasOrFieldName = field.alias && field.alias.value || fieldName;
-      const fieldSchema = subSchema.fields[fieldName];
-      if (!fieldSchema) {
-        throw new Error(`No schema found for field: ${fieldName}. Did you update your schema?`)
+
+      const fieldSchema = getFieldSchema(field, subSchema, context.schema);
+      if (field.directives.length) {
+        debugger
       }
       const hasData = subState.hasOwnProperty(fieldName);
 
@@ -52,7 +60,7 @@ const visitObject = (subState = {}, reqAST, subSchema, context, baseReduction = 
 
 const visitNormalizedString = (subState, reqAST, subSchema, context) => {
   const {typeName, docId} = getDocFromNormalString(subState);
-  const doc = context.cashayState.entities[typeName][docId];
+  const doc = context.getState().entities[typeName][docId];
   const fieldSchema = context.schema.types[typeName];
   return visit(doc, reqAST, fieldSchema, context);
 };
@@ -111,29 +119,38 @@ const visit = (subState, reqAST, subSchema, context) => {
   }
 };
 
-export default function denormalizeStore(context, schemaName = 'querySchema') {
+export default function denormalizeStore(context, defaultSchema = 'querySchema') {
   // Lookup the root schema for the operationType (hardcoded name in the return of the introspection query)
-  const schema = context.schema[schemaName];
 
   // a query operation can have multiple queries, gotta catch 'em all
+  const {schema} = context;
   const queryReduction = context.operation.selectionSet.selections.reduce((reduction, selection) => {
     const queryName = selection.name.value;
-
     // aliases are common for executing the same query twice (eg getPerson(id:1) getPerson(id:2))
     const aliasOrName = selection.alias && selection.alias.value || queryName;
-
     // get the query schema to know the expected type and args
-    const queryFieldSchema = schema.fields[queryName];
-    if (!queryFieldSchema) {
-      throw new Error(`Could not find ${queryName} in your ${schemaName}.
-      Did you add it to your GraphQL schema?`)
-    }
-
+    const queryFieldSchema = getFieldSchema(selection, schema[defaultSchema], schema);
     // look into the current redux state to see if we can borrow any data from it
-    const queryInState = context.cashayState.result[queryName];
-
-    // if there's no results stored or being fetched, save some time & don't bother with the args
-    const fieldState = getFieldState(queryInState, queryFieldSchema, selection, context);
+    const queryInState = context.getState().result[queryName];
+    let fieldState;
+    if (isLive(selection.directives)) {
+      const returnType = ensureTypeFromNonNull(queryFieldSchema.type);
+      const {live = {}, idFieldName, getState, queryDep, subscribe, subscriptionDeps, variables} = context;
+      const {resolve, subscriber} = live[aliasOrName] || {};
+      const bestSubscriber = subscriber || context.subscriber;
+      const resolveChannelKey = resolve || defaultResolveFactory(idFieldName);
+      const channelKey = resolveChannelKey(null, variables);
+      const initialState = subscribe(aliasOrName, channelKey, bestSubscriber, {returnType});
+      const results = getState().result;
+      //
+      fieldState = results[aliasOrName] && results[aliasOrName][channelKey] || initialState;
+      const subDep = makeFullChannel(aliasOrName, channelKey);
+      subscriptionDeps[subDep] = subscriptionDeps[subDep] || new Set();
+      subscriptionDeps[subDep].add(queryDep);
+    } else {
+      // if there's no results stored or being fetched, save some time & don't bother with the args
+      fieldState = getFieldState(queryInState, queryFieldSchema, selection, context);
+    }
 
     // get the expected return value, devs can be silly, so if the had the return value in a nonnull, remove it.
     const nonNullQueryFieldSchemaType = ensureTypeFromNonNull(queryFieldSchema.type);

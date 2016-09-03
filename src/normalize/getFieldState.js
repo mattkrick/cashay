@@ -15,10 +15,11 @@ import {RequestArgument} from '../helperClasses';
  * @returns {*} an object, or array, or scalar from the normalized store
  * */
 export default function getFieldState(fieldState, fieldSchema, selection, context) {
+  const {arguments: fieldArgs} = selection;
+  if (!fieldArgs) return fieldState;
   if (!isObject(fieldState)) return fieldState;
   let subState = fieldState;
   const {skipTransform, paginationWords, variables} = context;
-  const {arguments: fieldArgs} = selection;
   const {regularArgs, paginationArgs} = separateArgs(fieldSchema, fieldArgs, paginationWords, variables);
   if (regularArgs) {
     const regularArgsString = getRegularArgsKey(regularArgs);

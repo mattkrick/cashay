@@ -26,7 +26,9 @@ const acceptsArgs = (fieldSchema, paginationWords, paginationWordKeys) => {
  * @param {Object} variables the variables to forward onto the GraphQL server
  * */
 export default function separateArgs(fieldSchema, reqASTArgs, paginationWords, variables) {
-  if (!fieldSchema.args) throw new Error(`${fieldSchema.name} does not support arguments. Check your GraphQL query.`);
+  if (!fieldSchema.args) {
+    throw new Error(`${fieldSchema.name} does not support arguments. Check your GraphQL query.`);
+  }
   const responseType = ensureTypeFromNonNull(fieldSchema.type);
   const regularArgs = {};
   const paginationArgs = {};

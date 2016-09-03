@@ -12,16 +12,18 @@ import {rebuildOriginalArgs} from './normalize/denormalizeHelpers';
 import normalizeResponse from './normalize/normalizeResponse';
 import {printMinimalQuery} from './query/printMinimalQuery';
 import {shortenNormalizedResponse, invalidateMutationsOnNewQuery, equalPendingQueries} from './query/queryHelpers';
-import {checkMutationInSchema, getStateVars} from './utils';
+import {checkMutationInSchema, getStateVars, ensureTypeFromNonNull} from './utils';
 import mergeStores from './normalize/mergeStores';
-import {CachedMutation, CachedQuery, CachedSubscription} from './helperClasses';
+import {CachedMutation, CachedQuery} from './helperClasses';
 import flushDependencies from './query/flushDependencies';
 import {
   parse,
   buildExecutionContext,
+  ensureRootType,
   getVariables,
   clone,
   makeErrorFreeResponse,
+  makeFullChannel,
   ADD,
   UPDATE,
   UPSERT,
@@ -39,11 +41,12 @@ import addDeps from './normalize/addDeps';
 import mergeMutations from './mutate/mergeMutations';
 import ActiveQueries from './mutate/ActiveQueries';
 import createBasicMutation from './mutate/createBasicMutation';
-import setSubVariablesFactory from './subscribe/setSubVariablesFactory';
 import hasMatchingVariables from './mutate/hasMatchingVariables';
 import createNewData from './subscribe/getNewDenormalizedData';
 import isMutationResponseScalar from './mutate/isMutationResponseScalar';
+import {TypeKind} from 'graphql/type/introspection';
 
+const {LIST, SCALAR} = TypeKind;
 const defaultGetToState = store => store.getState().cashay;
 const defaultPaginationWords = {
   before: 'before',
@@ -55,8 +58,6 @@ const defaultPaginationWords = {
 const defaultCoerceTypes = {
   DateTime: val => new Date(val)
 };
-
-const defaultInvalidate = () => true;
 
 class Cashay {
   constructor() {
@@ -80,39 +81,23 @@ class Cashay {
     this.cachedMutations = {};
 
     // the object to hold the denormalized query responses
-    // const example = {
-    //   [op]: {
-    //     ast,
-    //     refetch: FunctionToRefetchQuery,
-    //     responses: {
-    //       [key = '']: DenormalizedResponse
-    //     }
-    //   }
-    // }
-    this.cachedQueries = {};
+    this.cachedQueries = {
+      // [op]: {
+      //   ast,
+      //   refetch: FunctionToRefetchQuery,
+      //   responses: {
+      //     [key = '']: DenormalizedResponse
+      //   }
+      // }
+    };
 
     // the object to hold the subscription stream
     // const example = {
     //   [subscriptionString]: {
-    //     ast: SubscriptionAST,
-    //     deps: {
-    //       [key='']: {
-    //         [dep]: invalidateFn || () => true
-    //       }
-    //     },
-    //     responses: {
-    //       [key = '']: DenormalizedResponseWithUnsub
-    //     }
+    //     [key = '']: DataAndUnsub
     //   }
     // };
     this.cachedSubscriptions = {};
-
-    // the object to hold all sub-based computations
-    // const example = {
-    //   inputs: [scalar, arr, obj],
-    //   response: DenormalizedResponseData
-    // };
-    this.cachedComputed = {};
 
     // a flag thrown by the invalidate function and reset when that query is added to the queue
     this._willInvalidateListener = false;
@@ -144,6 +129,10 @@ class Cashay {
     // }
     this.normalizedDeps = {};
 
+    // each subscription holds an object with all the query ops that require it
+    this.subscriptionDeps = {
+      // [`channel::channelKey`]: Set([op::key, op::key])
+    };
     // a Set of minimized query strings. Identical strings are ignored
     // this could be improved to minimize traffic, but it favors fast and cheap for now
     this.pendingQueries = new Set();
@@ -163,8 +152,9 @@ class Cashay {
    * Takes prioirty over httpTransport. Useful for server-side rendering and sockets.
    * @param {Object} schema the client graphQL schema
    * @param {Object} store the redux store
+   * @param {Function} subscriber the default subscriber for live data
    * */
-  create({coerceTypes, getToState, httpTransport, idFieldName, paginationWords, priorityTransport, schema, store}) {
+  create({coerceTypes, getToState, httpTransport, idFieldName, paginationWords, priorityTransport, schema, store, subscriber}) {
     this.coerceTypes = coerceTypes === undefined ? this.coerceTypes || defaultCoerceTypes : coerceTypes;
     this.store = store || this.store;
     this.getState = getToState ? () => getToState(this.store) : this.getState || (() => defaultGetToState(this.store));
@@ -173,6 +163,7 @@ class Cashay {
     this.httpTransport = httpTransport === undefined ? this.httpTransport : httpTransport;
     this.priorityTransport = priorityTransport === undefined ? this.priorityTransport : priorityTransport;
     this.schema = schema || this.schema;
+    this.subscriber = subscriber || this.subscriber;
   }
 
   /**
@@ -251,14 +242,20 @@ class Cashay {
     const variables = getVariables(options.variables, cashayState, op, key, initialCachedResponse);
 
     // create an AST that we can mutate
-    const {coerceTypes, paginationWords, idFieldName, schema, store, getState} = this;
+    const {subscriptionDeps, coerceTypes, paginationWords, idFieldName, schema, store, getState} = this;
+    const queryDep = makeFullChannel(op, key);
     const context = buildExecutionContext(cachedQuery.ast, {
-      cashayState,
+      getState,
       coerceTypes,
       variables,
       paginationWords,
       idFieldName,
-      schema
+      schema,
+      live: options.live,
+      subscribe: this.subscribe.bind(this),
+      queryDep,
+      subscriber: this.subscriber,
+      subscriptionDeps
     });
 
     // create a response with denormalized data and a function to set the variables
@@ -644,134 +641,64 @@ class Cashay {
   /**
    *
    */
-  subscribe(subscriptionString, subscriber, options) {
-    const {dep, op = subscriptionString, key = '', invalidate = defaultInvalidate} = options;
-    const fastResult = this.cachedSubscriptions[op];
-    const fastResponse = fastResult && fastResult.responses[key];
+  subscribe(channel, key = '', subscriber, options) {
+    const fullChannel = makeFullChannel(channel, key);
+    const fastResponse = this.cachedSubscriptions[fullChannel];
     if (fastResponse) {
-      if (dep) {
-        fastResult.deps[key] = fastResult.deps[key] || {};
-        fastResult.deps[key][dep] = invalidate;
-      }
       return fastResponse;
     }
-    if (!fastResult) {
-      // if it's a new op
-      const initialDeps = dep ? {[key]: {[dep]: invalidate}} : {[key]: {}};
-      this.cachedSubscriptions[op] = new CachedSubscription(subscriptionString, key, initialDeps);
-    } else if (!fastResponse && dep) {
-      // if it's a new key
-      fastResult.deps[key] = fastResult.deps[key] || {};
-      fastResult.deps[key][dep] = invalidate;
-    }
-    const cachedSubscription = this.cachedSubscriptions[op];
-    const cashayState = this.getState();
-    const {coerceTypes, paginationWords, idFieldName, schema} = this;
-    const variables = getVariables(options.variables, cashayState, op, key, cachedSubscription.responses[key]);
-    const context = buildExecutionContext(cachedSubscription.ast, {
-      coerceTypes,
-      cashayState,
-      variables,
-      paginationWords,
-      idFieldName,
-      schema
-    });
-    const getCachedResult = () => cachedSubscription.responses[key].data;
-    const subscriptionHandlers = this.makeSubscriptionHandlers(op, key, variables);
-    // const startSubscription = (subVars) => subscriber(subscriptionString, subVars, subscriptionHandlers, getCachedResult);
-    const promiseStart = (subVars) => new Promise((resolve) => {
-      setTimeout(() => {
-        const unsubscribe = subscriber(subscriptionString, subVars, subscriptionHandlers, getCachedResult);
-        resolve(unsubscribe)
-      }, 0)
-    });
-
-    promiseStart(variables).then(socketUnsub => {
-      cachedSubscription.responses[key] = {
-        ...cachedSubscription.responses[key],
-        status: READY,
-        unsubscribe: () => {
-          socketUnsub();
-          this.store.dispatch({
-            type: SET_STATUS,
-            status: UNSUBSCRIBED
-          })
-        }
-      }
-    });
-
-    const data = denormalizeStore(context, 'subscriptionSchema');
-    return cachedSubscription.responses[key] = {
+    const returnType = options.returnType || ensureTypeFromNonNull(this.schema.subscriptionSchema[channel].type);
+    const data = (returnType.kind === LIST) ? [] : returnType.kind === SCALAR ? null : {};
+    const rootType = ensureRootType(returnType);
+    const typeSchema = this.schema.types[rootType.name];
+    // if it's a new op
+    this.cachedSubscriptions[fullChannel] = {
       data,
-      setVariables: setSubVariablesFactory(op, key, this.store.dispatch, this.getState, cachedSubscription, promiseStart),
-      status: SUBSCRIBING,
-      unsubscribe: null
+      unsubscribe: null,
+      status: SUBSCRIBING
     };
+    const subscriptionHandlers = this.makeSubscriptionHandlers(channel, key, typeSchema);
+    setTimeout(() => {
+      const unsubscribe = subscriber(channel, key, subscriptionHandlers);
+      this.cachedSubscriptions[fullChannel] = {
+        ...this.cachedSubscriptions[fullChannel],
+        unsubscribe,
+        status: READY
+      };
+    }, 0);
+    return this.cachedSubscriptions[fullChannel];
   }
 
-  makeSubscriptionHandlers(op, key, variables) {
-    const handleCreateNewData = (handler, document, docId, {path, removeKeys = []}) => {
-      // removeKeys can optionally be `true`, meaning straight up replace the old with the new
-      const cachedSubscription = this.cachedSubscriptions[op];
-      const cashayState = this.getState();
-      const {paginationWords, idFieldName, schema} = this;
-      const context = buildExecutionContext(cachedSubscription.ast, {
-        cashayState,
-        variables,
-        paginationWords,
-        idFieldName,
-        schema
-      });
-      const operations = context.operation.selectionSet.selections;
-      const cachedResult = cachedSubscription.responses[key].data;
-      const subscriptionNames = Object.keys(cachedResult);
-      if (subscriptionNames.length > 1 && !path) {
-        throw new Error(`Your subscription for ${op} has multiple operations, but no path.
-         Include a 'path' option to determine how to patch in the incoming data.`);
-      }
-      const pathArray = path ? path.split('.') : subscriptionNames;
-      const {oldVal, newVal} = createNewData(handler, cachedResult, pathArray, {
-        document,
-        docId,
-        idFieldName,
-        removeKeys,
-        schema
-      });
-      return {oldVal, newVal, context};
-    };
-
-    const mergeNewData = (actionType, {oldVal, newVal, context}) => {
-      const cachedSubscription = this.cachedSubscriptions[op];
-      cachedSubscription.responses[key] = {
-        ...cachedSubscription.responses[key],
-        // handle multiple sub operations inside the same sub
-        data: {...cachedSubscription.responses[key].data, ...newVal}
+  makeSubscriptionHandlers(channel, key, typeSchema) {
+    const fullChannel = makeFullChannel(channel, key);
+    const mergeNewData = (actionType, {oldVal, newVal}) => {
+      this.cachedSubscriptions[fullChannel] = {
+        ...this.cachedSubscriptions[fullChannel],
+        data: newVal
       };
+      const {schema, idFieldName} = this;
+      const context = {schema, idFieldName, typeSchema};
       const normalizedDoc = normalizeResponse(newVal, context, true);
-      const {entities, result} = this.getState();
-      const entitiesAndResult = shortenNormalizedResponse(normalizedDoc, {entities, result});
-      if (!entitiesAndResult) return;
-
-      // remove the responses from this.cachedQueries where necessary
-      flushDependencies(entitiesAndResult.entities, op, key, this.denormalizedDeps, this.cachedQueries);
-
-      const deps = cachedSubscription.deps && cachedSubscription.deps[key];
-      if (deps) {
-        Object.keys(deps).forEach(depName => {
-          const invalid = deps[depName](oldVal, newVal);
-          if (invalid) {
-            this.cachedComputed[depName] = undefined
+      const namedspacedDoc = {
+        entities: normalizedDoc.entities,
+        result: {
+          [channel]: {
+            [key]: normalizedDoc.result
           }
-        })
-      }
-
-      // stick normalize data in store and recreate any invalidated denormalized structures
-      const payload = {
-        ...entitiesAndResult,
-        ops: {
-          [op]: {[key]: variables}
         }
       };
+      const {entities, result} = this.getState();
+      const payload = shortenNormalizedResponse(namedspacedDoc, {entities, result});
+      if (!payload) return;
+
+      // remove the responses from this.cachedQueries where necessary
+      const depSet = this.subscriptionDeps[fullChannel];
+      for (let dep of depSet) {
+        const [op, key = ''] = dep.split('::');
+        this.cachedQueries[op].responses[key] = undefined;
+      }
+      depSet.clear();
+      // stick normalize data in store and recreate any invalidated denormalized structures
       this.store.dispatch({
         type: actionType,
         payload
@@ -780,26 +707,28 @@ class Cashay {
 
     return {
       add: (document, options = {}) => {
-        const docId = document[this.idFieldName];
-        const diffAndContext = handleCreateNewData(ADD, document, docId, options);
-        mergeNewData(ADD_SUBSCRIPTION, diffAndContext)
+        const cachedResponse = this.cachedSubscriptions[fullChannel].data;
+        const updatedData = createNewData(ADD, cachedResponse, document, this.idFieldName);
+        mergeNewData(ADD_SUBSCRIPTION, updatedData)
       },
       update: (document, options = {}) => {
-        const docId = document[this.idFieldName];
-        const diffAndContext = handleCreateNewData(UPDATE, document, docId, options);
-        mergeNewData(UPDATE_SUBSCRIPTION, diffAndContext)
+        const cachedResponse = this.cachedSubscriptions[fullChannel].data;
+        const updatedData = createNewData(UPDATE, cachedResponse, document, this.idFieldName, options.removeKeys);
+        mergeNewData(UPDATE_SUBSCRIPTION, updatedData)
       },
       upsert: (document, options = {}) => {
-        const docId = document[this.idFieldName];
-        const diffAndContext = handleCreateNewData(UPSERT, document, docId, options);
-        mergeNewData(UPDATE_SUBSCRIPTION, diffAndContext);
+        const cachedResponse = this.cachedSubscriptions[fullChannel].data;
+        const updatedData = createNewData(UPSERT, cachedResponse, document, this.idFieldName, options.removeKeys);
+        mergeNewData(UPDATE_SUBSCRIPTION, updatedData);
       },
       remove: (docId, options = {}) => {
-        const diffAndContext = handleCreateNewData(REMOVE, null, docId, options);
-        mergeNewData(REMOVE_SUBSCRIPTION, diffAndContext)
+        const cachedResponse = this.cachedSubscriptions[fullChannel].data;
+        const document = {[this.idFieldName]: docId};
+        const updatedData = createNewData(REMOVE, cachedResponse, document, this.idFieldName);
+        mergeNewData(REMOVE_SUBSCRIPTION, updatedData)
       },
       setStatus: (status) => {
-        const cachedSub = this.cachedSubscriptions[op];
+        const cachedSub = this.cachedSubscriptions[channel];
         cachedSub.responses[key] = {
           ...cachedSub.responses[key],
           status
@@ -810,26 +739,6 @@ class Cashay {
         })
       }
     }
-  }
-
-  computed(op, inputs = [], resolve) {
-    const fastResult = this.cachedComputed[op];
-    if (fastResult) {
-      let returnFast = true;
-      for (let i = 0; i < inputs.length; i++) {
-        if (inputs[i] !== fastResult.inputs[i]) {
-          returnFast = false;
-          break;
-        }
-      }
-      if (returnFast) return fastResult.response;
-    }
-    const response = resolve(...inputs);
-    this.cachedComputed[op] = {
-      inputs,
-      response
-    };
-    return response;
   }
 }
 export default new Cashay();

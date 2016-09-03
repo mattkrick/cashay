@@ -24,9 +24,9 @@ export const handleMissingData = (visit, aliasOrFieldName, field, fieldSchema, c
       for (let possibleTypeKey of possibleTypesKeys) {
         const objType = possibleTypes[possibleTypeKey];
         const newFieldSchema = context.schema.types[objType.name];
-        Object.assign(unionResponse, visit(unionResponse, field, newFieldSchema, context), {__typename: null});
+        Object.assign(unionResponse, visit(unionResponse, field, newFieldSchema, context));
       }
-      return unionResponse;
+      return {...unionResponse, __typename: null};
     }
     return visit({}, field, newFieldSchema, context);
   }

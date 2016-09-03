@@ -102,7 +102,7 @@ The params that you can pass into the `create` method are as follows (*required)
 to send off the query + variables to your GraphQL server.
 - `priorityTransport`: An instance of a [Transport](./recipes/transports.md). 
 If it exists, Cashay will use this over the `httpTransport`.
-- `idFieldName`: Defaults to `id`, but you can call it whatever it is in your DB (eg Mongo uses `_id`)
+- `idFieldName`: The name of your primary key. Defaults to `id`.
 - `coerceTypes`: an object full of methods names matching GraphQL types. It takes in a single scalar value
 and returns the output. This is useful for things like converting dates from strings to numbers or Date types.
 By default, it includes one function: `DateTime = val => new Date(val)`, 
@@ -112,6 +112,8 @@ which coerces everything of type `DateTime` to a Date.
 If, for example, your backend uses `count` instead of `first`, you'd send in `{first: 'count'}`.
 - `getToState`: A function to get to the cashay sub-state inside the redux state.
 Defaults to `store => store.getState().cashay`
+- `subscriber(channel, key, handlers)`: A default function to handle incoming subscription data. 
+See [Subscriptions](./recipes/subscriptions.md). 
 
 Now, whenever you need to query or mutate some data, just import your shiny new singleton!
 
@@ -124,8 +126,7 @@ const {data, setVariables, status} = cashay.query(queryString, options)
 ```
 
 Options include:
-- `op`: A string to match the op. 
-Required if you pass in `mutationHandlers`. 
+- `op`: A simple name for this query. Highly recommended for a legible redux state.  
 Typically shares the same name as the React component. 
 If left blank, it defaults to the `queryString`.
 - `key`: A unique key to match the op instance, 
@@ -140,6 +141,9 @@ But if you don't trust it, you can write your own here.
 - `mutationHandlers`: An object where each method is the name of a mutation that changes the query. See below.
 - `localOnly`: A Boolean to only fetch data from the local state. Defaults to `false`. 
 Useful if you only want a mutation to update the query data.
+- `live`: An object full of subscription channels. Used with the `@live` directive. See subscriptions.
+- `localFilter`: An object full of subscription channels. Used with the `@localFilter` directive. See subscriptions. 
+- `localSort`: An object full of subscription channels. Used with the `@localSort` directive. See subscriptions. 
 
 ```js
 mutationHandler(optimisticVariables, queryResponse, currentResponse, getEntities, invalidate)
@@ -244,17 +248,19 @@ cashay.mutate('deleteComment', {variables: {commentId: postId}, ops})
 ### Subscriptions
 
 Subscriptions are hard, don't let anyone tell you different.
-
-```js
-const {data, setVariables, status, unsubscribe} = cashay.subscribe(subscriptionString, subscriber, options)
-```
-
-A subscriber is a callback that you write yourself.
+Cashay makes them simpler by allowing you to inline them with the `@live` directive
+and manage them with your custom `subscriber` callback that you write yourself.
 Cashay doesn't dictate your socket package, your server, or your message protocol (DDP or otherwise)
 because doing so would tightly couple your front end to your server. That's not cool.
+
 Cashay will supply you with 3 arguments for the callback:
-- `subscriptionString`: The subscriptionString that you passed into the `subscribe` call
-- `variables`: The variables that you passed into the `subscribe` call
+```
+subscriber(channel, key, handlers)
+```
+
+- `channel`: The alias or field name next to your @live directive. 
+This typically serves as the base channel for your sub. In `post/123` it would be `post`.
+- `key`: The variables that you passed into the `subscribe` call. In `post/123` it would be `123`. 
 - `handlers`: An object containing the following:
   - `add(doc, handlerOptions)`: A function that takes a new doc. Cashay will append it to the end of the stream.
   - `update(doc, handlerOptions)`: A function that takes a doc diff. 
@@ -266,40 +272,19 @@ Cashay will supply you with 3 arguments for the callback:
   This is useful, for example, if the docs coming down the wire are already in the DB, then you can set it to
   `initializing` and your front-end can react accordingly.
 
-There are currently 2 `handlerOptions`: 
+As shown above, each handler takes an object called `handlerOptions`, which has a single field: 
 - `removeKeys`: If you'd like to remove a key from an object, pass in an array of fields to remove.
 e.g. `['milk', 'soda']`.
-If you'd like to completely replace the old with the new, set `removeKeys = true`.
-- `path`: borrowing from [falcor's path syntax](https://netflix.github.io/falcor/documentation/paths.html),
-this allows you to edit a deeply nested subdocument.
-For example, let's say you subscribe to `Friends` and `PhotosForFriend`.
-If it were a query, you'd do something like this:
-```
-subscription($id: String!) {
-  friends(id: $id) {
-    id,
-    name,
-    photos {
-      date,
-      url,
-      likes
-    }
-  }
-}
-```
-However, if these are 2 separate tables in your database, this might be difficult to do in real time.
-So, you can open 2 subscriptions and patch 1 into the other.
-For example, when a `photo` gets a new like, your path might look like `'friends['123'].photos['456]'`.
 
 Basic example:
 ```js
-const subscriber = (subscriptionString, variables, handlers) => {
-  // Using the subscriptionString and variables, determine the channel to join
-  // You're free to do this however you like:
-  const channelName = channelLookup(subscriptionString, variables);
+function subscriber(channel, key, handlers) {
+  // compose your channel name how you like. I like the conventional REST-ish slash delimiter (eg `comments/123`)
+  const channelName = `${channel}/${key}`;
   
   // connect using your favorite socket client (socketCluster, socket.io, sockJS, ws)
   const socket = socketCluster.connect();
+  
   const {upsert, update, remove} = handlers;
   
   // subscribe to the channel. Other socket APIs might just use `emit`
@@ -313,7 +298,7 @@ const subscriber = (subscriptionString, variables, handlers) => {
     } else if (data.type === 'remove') {
       remove(data.id);
     } else {
-      update(data.fields, {path: data.path, removeKeys: data.removeKeys});
+      update(data.fields, {removeKeys: data.removeKeys});
     }
   });
   
@@ -324,98 +309,14 @@ const subscriber = (subscriptionString, variables, handlers) => {
     }
   });
   
-  // you must return a function that will end this subscription
+  // you should return a function that will end this subscription
   return () => socket.unsubscribe(channelName);
 }
 ```
 
-`cashay.subscribe` has the following options:
-- `variables`: the variables object to pass onto the GraphQL server
-- `op`: a nickname for your subscription. 
-Two components can share the same subscription by sharing the same `op` name. 
-- `dep`: The name of the `op` given to your computed value. 
-Used if this call occurs in a computed value (see below). 
-- `invalidate(oldVal, newVal)`: For performance-driven computed values (see below).
-A function you write that will only invalidate a computed value if `true` is returned.
-Useful if incoming socket data does not always require a recompute.
-The response includes:
-- `data`: the stream of documents, as they have been received
-- `setVariables`: a shorthand for unsubscribing and subscribing to a new channel (for example, if you change users)
-- `status`: 
-  - `'subscribing'`: `cashay.subscribe` has been called, but `subscriber` has not been executed yet
-  - `'ready'`: `subscriber` has been executed.
-  - `[USER_DEFINED]`: whatever you like, just call `handler.setStatus(status)` in your `subscriber`
-- `unsubscribe`: the result of calling your `subscriber`. This could also be an object of functions, if you get tricky.
-
-## Computed Values
-
-When your data arrives on the client, often times you'll need to run it through a computation.
-For example, what's the high score for all of your socket-connected teammates?
-```js
-const players = cashay.subscribe(getTeammates, subscriber);
-const highScore = players.map(sub => sub.data.player.score).reduce((high, score) => Math.max(high, score),0);
+Example of a really complicated live query:
 ```
-While a high score is pretty cheap, you don't want to calculate it on every single rerender.
-MobX solves this by having a special `@computed` HOF.
-Redux solves this by [memoizing the selector](https://github.com/reactjs/reselect). 
-Although computations aren't first-class citizens, the pattern works like a champ! 
-```js
-const getHighScore = players => {
-  if (players !== getHighScore.players) {
-    getHighScore.players = players;
-    getHighScore.cache = players.map(sub => sub.data.player.score).reduce((high, score) => Math.max(high, score),0);
-  } 
-  return getHighScore.cache;
-}
-```
-...But what if part of your map-reduce involves another subscription?
-For example, let's say you want to open a chat session for each teammate.
-You first need to know who your team mates are, and _then_ you can get the chat for them.
-That's n+1 subscriptions:
-
-```js
-// BROKEN CODE
-const getChatSessions = players => {
-  if (players !== getHighScore.players) {
-    getChatSessions.players = players;
-    getChatSessions.cache = players.map(sub => {
-      return cashay.subscribe(getChatForUser, subscriber, {variables: sub.data.player.id});
-    })
-  }
-  return getChatSessions.cache;
-}
-
-```
-Can you see the problem? 
-If the nested subscription receives a new chat message, the memoized function won't detect it until `players` changes!
-
-That's where computed values come in handy:
-
-```js
-const result = cashay.computed(computationName, inputs, resolve)
-```
-- `computationName`: A simple name to link a subscription to a computation. 
-Usually this is the plural form of the subscription name.
-- `inputs`: An array of variables to pass to your `resolve` function.
-These will be used for the memoization logic.
-- `resolve(...inputs)` A function allowing you to return any computed value you like.
- 
-Example:
-```js
-const resolve = players => {
-  return players.reduce((obj, sub) => {
-    const options = {variables: sub.data.player.id, dep: 'chatSubs'};
-    obj[sub.data.player.id] = cashay.subscribe(getChatForUser, subscriber, options) 
-    return obj;
-  }, {})
-}
-
-const mapStateToProps = (state, props) => {
-  const players = cashay.subscribe(getTeammates, subscriber);
-  return {
-    chatSessionsById: cashay.computed('chatSubs', [players], resolve)
-  }
-}
+// TODO
 ```
 
 ## Recipes
@@ -424,8 +325,8 @@ const mapStateToProps = (state, props) => {
 
 ## Examples (PR to list yours)
 
-- [Cashay-playground](https://github.com/mattkrick/cashay-playground)
-- [Action by Parabol](https://github.com/ParabolInc/action/)
+- [Cashay-playground](https://github.com/mattkrick/cashay-playground), no time to actively maintain :sob:
+- [Action by Parabol](https://github.com/ParabolInc/action/), paid to maintain :smile:
 
 ## Contributing
 
@@ -437,16 +338,16 @@ Bugs will be fixed with the following priority:
 
 ## Roadmap to 1.0
 
-- Subscriptions
 - Fixing `getEntites` in the `mutationHandler`
 - Test coverage at 95%
 - Persisted data and TTL on documents
-- Support directives
+- Support native directives
 
 ## Deviations from the GraphQL spec
 
 The following edge cases are valid per the GraphQL spec, but are not supported in Cashay:
-- List of Lists (eg `GraphQLList(GraphQLList(Foo))`). I can't think of a good reason to ever do this. Storing a 2D graph like this is wrong. 
+- List of Lists (eg `GraphQLList(GraphQLList(Foo))`). I can't think of a good reason to ever do this. 
+Storing a 2D graph like this is wrong. 
 - Multi-part mutations. Combine them into 1 mutation, or call them separately. Below is an example of what not to do.
 ```
  mutation {
