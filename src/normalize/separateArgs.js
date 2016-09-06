@@ -1,6 +1,6 @@
 import {VARIABLE} from 'graphql/language/kinds';
 import {TypeKind} from 'graphql/type/introspection';
-import {ensureTypeFromNonNull, BEFORE, AFTER} from '../utils';
+import {ensureTypeFromNonNull, getVariableValue, BEFORE, AFTER} from '../utils';
 
 const {LIST} = TypeKind;
 
@@ -41,7 +41,7 @@ export default function separateArgs(fieldSchema, reqASTArgs, paginationWords, v
     if (!fieldSchema.args[argName]) {
       throw new Error(`${fieldSchema.name} does not support ${argName}`)
     }
-    const argValue = arg.value.kind === VARIABLE ? variables[arg.value.name.value] : arg.value.value;
+    const argValue = getVariableValue(arg, variables);
     if (argValue === undefined) continue;
     let paginationMeaning = paginationWordKeys.find(pageWord => paginationWords[pageWord] === argName);
     if (paginationMeaning) {

@@ -1,59 +1,92 @@
 import {FRAGMENT_SPREAD, INLINE_FRAGMENT} from 'graphql/language/kinds';
-import {convertFragmentToInline, parse, clone, ensureRootType, TYPENAME, teardownDocumentAST, getFieldSchema} from '../utils';
+import {
+  convertFragmentToInline,
+  ENTITY,
+  parse,
+  clone,
+  ensureRootType,
+  TYPENAME,
+  teardownDocumentAST,
+  getFieldSchema,
+  makeEntityArgs
+} from '../utils';
 import {TypeKind} from 'graphql/type/introspection';
 import {Field} from '../helperClasses';
 
 const {UNION} = TypeKind;
 
-const initializeQueryAST = (operationSelections, fragments, parentSchema, schema, idFieldName) => {
-  const catalogFields = [idFieldName, TYPENAME];
-  for (let i = 0; i < operationSelections.length; i++) {
-    // convert fragment spreads into inline so we can minimize queries later
-    let selection = operationSelections[i];
-    if (selection.kind === FRAGMENT_SPREAD) {
-      const fragment = clone(fragments[selection.name.value]);
-      selection = operationSelections[i] = convertFragmentToInline(fragment);
-    }
-    // if it's an inline fragment, set schema to the typecondition, or parentSchema if null
-    if (selection.kind === INLINE_FRAGMENT) {
-      const subSchema = selection.typeCondition ? schema.types[selection.typeCondition.name.value] : parentSchema;
-      const children = selection.selectionSet.selections;
-      for (let fieldToRemove of catalogFields) {
-        const idx = children.findIndex(child => child.name && child.name.value === fieldToRemove);
-        if (idx !== -1) {
-          children.splice(idx, 1);
-        }
-      }
-      initializeQueryAST(selection.selectionSet.selections, fragments, subSchema, schema, idFieldName);
-      return;
-    }
-    // sort args once here to make sure the key is the same in the store w/o sorting later
-    if (selection.arguments && selection.arguments.length) {
-      selection.arguments.sort((a, b) => a.name.value > b.name.value);
-    }
-
-    if (selection.selectionSet) {
-      const children = selection.selectionSet.selections;
-      const fieldSchema = getFieldSchema(selection, parentSchema);
-      const rootFieldSchema = ensureRootType(fieldSchema.type);
-      const typeSchema = schema.types[rootFieldSchema.name];
-      const fieldsToAdd = typeSchema.kind === UNION ? catalogFields : typeSchema.fields[idFieldName] ? [idFieldName] : [];
-      for (let fieldToAdd of fieldsToAdd) {
-        const child = children.find(child => child.name && child.name.value === fieldToAdd);
-        if (!child) {
-          children.push(new Field({name: fieldToAdd}))
-        }
-      }
-      initializeQueryAST(selection.selectionSet.selections, fragments, typeSchema, schema, idFieldName);
-    }
-
+const validateEntities = (entityDirective, schema) => {
+  const entityArgs = makeEntityArgs(entityDirective.arguments);
+  if (entityArgs.id && entityArgs.ids) {
+    throw new Error(`@entity can receive either an 'id' or 'ids' arg, not both`);
   }
+  if (!entityArgs.type) {
+    throw new Error(`@entity requires a type arg.`);
+  }
+  const typeValue = entityArgs.type.value;
+  const typeSchema = schema.types[typeValue.value];
+  if (!typeSchema) {
+    throw new Error(`Cannot find type ${typeValue.value} in your schema!`);
+  }
+  // TODO properly initialize unions?
 };
 
 export default function parseAndInitializeQuery(queryString, schema, idFieldName) {
   const ast = parse(queryString);
   const {operation, fragments} = teardownDocumentAST(ast.definitions);
-  initializeQueryAST(operation.selectionSet.selections, fragments, schema.querySchema, schema, idFieldName);
+  const catalogFields = [idFieldName, TYPENAME];
+  const initializeQueryAST = (fields, parentSchema) => {
+    for (let i = 0; i < fields.length; i++) {
+      // convert fragment spreads into inline so we can minimize queries later
+      let field = fields[i];
+      if (field.kind === FRAGMENT_SPREAD) {
+        const fragment = clone(fragments[field.name.value]);
+        field = fields[i] = convertFragmentToInline(fragment);
+      }
+      // if it's an inline fragment, set schema to the typecondition, or parentSchema if null
+      if (field.kind === INLINE_FRAGMENT) {
+        const subSchema = field.typeCondition ? schema.types[field.typeCondition.name.value] : parentSchema;
+        const children = field.selectionSet.selections;
+        for (let fieldToRemove of catalogFields) {
+          const idx = children.findIndex(child => child.name && child.name.value === fieldToRemove);
+          if (idx !== -1) {
+            children.splice(idx, 1);
+          }
+        }
+        initializeQueryAST(children, subSchema);
+        continue;
+      }
+      // sort args once here to make sure the key is the same in the store w/o sorting later
+      if (field.arguments && field.arguments.length) {
+        field.arguments.sort((a, b) => a.name.value > b.name.value);
+      }
+      const entityDirective = field.directives && field.directives.find(d => d.name.value === ENTITY);
+      if (field.selectionSet) {
+        const children = field.selectionSet.selections;
+        // if no resolve function is present, then it might just be a sort or filter
+        if (entityDirective) {
+          validateEntities(entityDirective, schema);
+        } else {
+          const fieldSchema = getFieldSchema(field, parentSchema, schema);
+          const rootFieldSchema = ensureRootType(fieldSchema.type);
+          const typeSchema = schema.types[rootFieldSchema.name];
+          const fieldsToAdd = typeSchema.kind === UNION ? catalogFields : typeSchema.fields[idFieldName] ? [idFieldName] : [];
+          for (let fieldToAdd of fieldsToAdd) {
+            const child = children.find(child => child.name && child.name.value === fieldToAdd);
+            if (!child) {
+              children.push(new Field({name: fieldToAdd}))
+            }
+          }
+          initializeQueryAST(children, typeSchema);
+        }
+      }
+      else if (entityDirective) {
+        throw new Error(`@entity can only be applied to an object or array`);
+      }
+    }
+  };
+  initializeQueryAST(operation.selectionSet.selections, schema.querySchema);
   ast.definitions = [operation];
   return ast;
 };
+

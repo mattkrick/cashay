@@ -231,7 +231,7 @@ class Cashay {
           transport: this.getTransport(options.transport)
         });
       };
-      this.cachedQueries[op] = new CachedQuery(queryString, this.schema, this.idFieldName, refetch, key);
+      this.cachedQueries[op] = new CachedQuery(queryString, this.schema, this.idFieldName, options.directives, refetch, key);
       invalidateMutationsOnNewQuery(op, this.cachedMutations);
     }
 
@@ -251,10 +251,10 @@ class Cashay {
       paginationWords,
       idFieldName,
       schema,
-      live: options.live,
+      directives: options.directives,
       subscribe: this.subscribe.bind(this),
       queryDep,
-      subscriber: this.subscriber,
+      defaultSubscriber: this.subscriber,
       subscriptionDeps
     });
 
@@ -647,7 +647,8 @@ class Cashay {
     if (fastResponse) {
       return fastResponse;
     }
-    const returnType = options.returnType || ensureTypeFromNonNull(this.schema.subscriptionSchema[channel].type);
+
+    const returnType = options && options.returnType || ensureTypeFromNonNull(this.schema.subscriptionSchema[channel].type);
     const data = (returnType.kind === LIST) ? [] : returnType.kind === SCALAR ? null : {};
     const rootType = ensureRootType(returnType);
     const typeSchema = this.schema.types[rootType.name];

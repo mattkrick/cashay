@@ -1,4 +1,4 @@
-import {INLINE_FRAGMENT, OPERATION_DEFINITION, FRAGMENT_DEFINITION} from 'graphql/language/kinds';
+import {INLINE_FRAGMENT, OPERATION_DEFINITION, FRAGMENT_DEFINITION, VARIABLE} from 'graphql/language/kinds';
 import {TypeKind} from 'graphql/type/introspection';
 import {parse as gqlParse} from 'graphql/language/parser';
 
@@ -39,7 +39,8 @@ export const UNSUBSCRIBED = 'unsubscribed';
 export const LIVE = 'live';
 export const LOCAL_SORT = 'localSort';
 export const LOCAL_FILTER = 'localFilter';
-
+export const LOCAL = 'local';
+export const ENTITY = `entity`;
 
 
 export const ensureTypeFromNonNull = type => type.kind === NON_NULL ? type.ofType : type;
@@ -167,19 +168,20 @@ export const without = (obj, exclusions) => {
 };
 
 export const isLive = (directives) => Boolean(directives && directives.find(d => d.name.value === LIVE));
+export const hasDirective = (directives, type) => Boolean(directives && directives.find(d => d.name.value === type));
 
-export const getFieldSchema = (selection, maybeParentSchema, schema) => {
+export const getFieldSchema = (selection, maybeTypeSchema, schema) => {
   const selectionName = selection.name.value;
   const liveDirective = isLive(selection.directives);
-  const parentSchema = liveDirective ? schema.subscriptionSchema : maybeParentSchema;
-  const fieldSchema = parentSchema.fields[selectionName];
+  const typeSchema = liveDirective ? schema.subscriptionSchema : maybeTypeSchema;
+  const fieldSchema = typeSchema.fields[selectionName];
   if (!fieldSchema) {
     throw new Error(`${selectionName} isn't in the schema. Did you update your client schema?`)
   }
   return fieldSchema;
-}
+};
 
-export const defaultResolveFactory = (idFieldName) => (source, args) => {
+export const defaultResolveChannelKeyFactory = (idFieldName) => (source, args) => {
   if (source) {
     return source[idFieldName] || '';
   } else {
@@ -187,6 +189,32 @@ export const defaultResolveFactory = (idFieldName) => (source, args) => {
   }
 };
 
+export const defaultResolveEntityIdFactory = (idFieldName) => (source, args) => {
+  if (args.id) {
+   return args.id;
+  }
+  if (args.ids) {
+    return args.ids;
+  }
+  if (source) {
+    return source[idFieldName];
+  }
+};
+
 export const makeFullChannel = (channel, channelKey) => {
   return channelKey ? `${channel}${NORM_DELIMITER}${channelKey}` : channel;
+};
+
+export const makeEntityArgs = (argsArr, variables) => {
+  const entityArgs = {};
+  for (let i = 0; i < argsArr.length; i++) {
+    const arg = argsArr[i];
+    // we don't want or need variables when doing static checks during init
+    entityArgs[arg.name.value] = variables ? getVariableValue(arg, variables) : arg;
+  }
+  return entityArgs;
+};
+
+export const getVariableValue = (arg, variables) => {
+  return arg.value.kind === VARIABLE ? variables[arg.value.name.value] : arg.value.value;
 }
