@@ -2,9 +2,6 @@ import {
   INSERT_QUERY,
   INSERT_MUTATION,
   SET_ERROR,
-  ADD_SUBSCRIPTION,
-  UPDATE_SUBSCRIPTION,
-  REMOVE_SUBSCRIPTION,
   SET_STATUS
 } from './normalize/duck';
 import denormalizeStore from './normalize/denormalizeStore';
@@ -32,7 +29,8 @@ import {
   LOADING,
   SUBSCRIBING,
   READY,
-  UNSUBSCRIBED
+  UNSUBSCRIBED,
+  REMOVAL_FLAG
 } from './utils';
 import namespaceMutation from './mutate/namespaceMutation';
 import createMutationFromQuery from './mutate/createMutationFromQuery';
@@ -43,7 +41,7 @@ import mergeMutations from './mutate/mergeMutations';
 import ActiveQueries from './mutate/ActiveQueries';
 import createBasicMutation from './mutate/createBasicMutation';
 import hasMatchingVariables from './mutate/hasMatchingVariables';
-import createNewData from './subscribe/getNewDenormalizedData';
+import processSubscriptionDoc from './subscribe/processSubscriptionDoc';
 import isMutationResponseScalar from './mutate/isMutationResponseScalar';
 import {TypeKind} from 'graphql/type/introspection';
 
@@ -685,57 +683,48 @@ class Cashay {
 
   makeSubscriptionHandlers(channel, key, typeSchema) {
     const fullChannel = makeFullChannel(channel, key);
-    const mergeNewData = (actionType, {oldVal, newVal}, document) => {
-      this.cachedSubscriptions[fullChannel] = {
-        ...this.cachedSubscriptions[fullChannel],
-        data: newVal
-      };
-      const {schema, idFieldName} = this;
-      const context = {schema, idFieldName, typeSchema};
-      const normalizedDoc = normalizeResponse(newVal, context, true);
-      const namedspacedDoc = {
-        entities: normalizedDoc.entities,
-        result: {
-          [channel]: {
-            [key]: normalizedDoc.result
-          }
-        }
-      };
-      const {entities, result} = this.getState();
-      const payload = shortenNormalizedResponse(namedspacedDoc, {entities, result});
-      if (!payload) return;
+    const mergeNewData = (handler, document) => {
+      const {result} = this.getState();
+      const oldDenormResult = this.cachedSubscriptions[fullChannel];
+      const oldNormResult = result[channel] && result[channel][key] || [];
+      const {denormResult, actionType, oldDoc, newDoc, normEntities, normResults} =
+        processSubscriptionDoc(handler, document, oldDenormResult, oldNormResult, typeSchema, this.idFieldName);
 
-      // remove the responses from this.cachedQueries where necessary
+      // INVALIDATE SUBSCRIPTION DEPS
       const depSet = this.subscriptionDeps[fullChannel];
       for (let queryDep of depSet) {
         this._invalidateQueryDep(queryDep);
       }
       depSet.clear();
 
-      const typeName = getTypeName(typeSchema, newVal, document);
+      // INVALIDATE CACHED DEPS
+      const typeName = typeSchema.kind === UNION ? oldDenormResult.data.__typename : typeSchema.name;
       const cachedDepsForType = this.cachedDeps[typeName];
       const queryDeps = Object.keys(cachedDepsForType);
-      const docId = document[this.idFieldName];
-      const setsToInvalidate = this.denormalizedDeps[typeName] && this.denormalizedDeps[typeName][docId];
-      const opsToInvalidate = setsToInvalidate ? Object.keys(setsToInvalidate) : [];
       for (let i = 0; i < queryDeps.length; i++) {
         const queryDep = queryDeps[i];
         for (let resolver of cachedDepsForType[queryDep]) {
-          const isIncluded = resolver(document);
-          if (isIncluded) {
+          // in the future, we can use field-specific invalidation, but for now, we invalidate if the obj changes
+          if ((newDoc && resolver(newDoc)) || (oldDoc && resolver(oldDoc))) {
+            // the only reason to not invalidate is if the document was unaffected and still is unaffected
+            // is resovle functions are expensive, we could also look at denormalziedDeps instead of testing oldDoc
             this._invalidateQueryDep(queryDep);
-          } else {
-            // maybe it used to be included?
-            for (let j = 0; j < opsToInvalidate.length; j++) {
-              const opToInvalidate = opsToInvalidate[j];
-              const keySet = setsToInvalidate[opToInvalidate];
-              for (let key of keySet) {
-                this.cachedQueries[opToInvalidate].responses[key] = undefined;
-              }
-            }
           }
         }
       }
+
+      this.cachedSubscriptions[fullChannel] = {
+        ...oldDenormResult,
+        data: denormResult
+      };
+      const payload = {
+        entities: normEntities,
+        result: {
+          [channel]: {
+            [key]: normResults
+          }
+        }
+      };
       // stick normalize data in store and recreate any invalidated denormalized structures
       this.store.dispatch({
         type: actionType,
@@ -744,38 +733,22 @@ class Cashay {
     };
 
     return {
-      add: (document, options = {}) => {
-        const cachedResponse = this.cachedSubscriptions[fullChannel].data;
-        const updatedData = createNewData(ADD, cachedResponse, document, this.idFieldName);
-        mergeNewData(ADD_SUBSCRIPTION, updatedData, document)
+      add: (document) => {
+        mergeNewData(ADD, document)
       },
       update: (document, options = {}) => {
-        const cachedResponse = this.cachedSubscriptions[fullChannel].data;
-        const updatedData = createNewData(UPDATE, cachedResponse, document, this.idFieldName, options.removeKeys);
-        mergeNewData(UPDATE_SUBSCRIPTION, updatedData, document)
+        const {removeKeys} = options;
+        const updatedDoc = (Array.isArray(options.removeKeys)) ?
+          removeKeys.reduce((obj, key) => obj[key] = REMOVAL_FLAG, {...document}) : document;
+        mergeNewData(UPDATE, updatedDoc)
       },
       upsert: (document, options = {}) => {
-        const cachedResponse = this.cachedSubscriptions[fullChannel].data;
-        const updatedData = createNewData(UPSERT, cachedResponse, document, this.idFieldName, options.removeKeys);
-        mergeNewData(UPDATE_SUBSCRIPTION, updatedData, document);
+        const updatedDoc = (Array.isArray(options.removeKeys)) ?
+          removeKeys.reduce((obj, key) => obj[key] = REMOVAL_FLAG, {...document}) : document;
+        mergeNewData(UPSERT, updatedDoc)
       },
-      remove: (docId, options = {}) => {
-        const cachedResponse = this.cachedSubscriptions[fullChannel].data;
-        const document = {[this.idFieldName]: docId};
-        let typeName;
-        if (typeSchema.kind === UNION) {
-          // todo worry about union of scalars?
-          if (Array.isArray(cachedResponse)) {
-            const oldDoc = cachedResponse.find(doc => doc[this.idFieldName] === docId);
-            typeName = oldDoc.__typename;
-          } else {
-            typeName = cachedResponse.__typename;
-          }
-        } else {
-          typeName = typeSchema.name;
-        }
-        const updatedData = createNewData(REMOVE, cachedResponse, document, this.idFieldName);
-        mergeNewData(REMOVE_SUBSCRIPTION, updatedData, document)
+      remove: (docId, options) => {
+        mergeNewData(REMOVE, {[this.idFieldName]: docId});
       },
       setStatus: (status) => {
         const cachedSub = this.cachedSubscriptions[channel];
