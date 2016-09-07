@@ -8,28 +8,30 @@ import {
   TYPENAME,
   teardownDocumentAST,
   getFieldSchema,
-  makeCachedArgs
+  CACHED_ARGS
 } from '../utils';
 import {TypeKind} from 'graphql/type/introspection';
 import {Field} from '../helperClasses';
 
 const {UNION} = TypeKind;
 
-const validateCachedDirective = (cachedDirective, schema) => {
-  const cachedDirectiveArgs = makeCachedArgs(cachedDirective.arguments);
-  if (cachedDirectiveArgs.id && cachedDirectiveArgs.ids) {
+const validateCachedDirective = (cachedDirective) => {
+  const argsArr = cachedDirective.arguments;
+  const cachedArgs = {};
+  for (let i = 0; i < argsArr.length; i++) {
+    const arg = argsArr[i];
+    const argName = arg.name.value;
+    if (!CACHED_ARGS.includes(argName)) {
+      throw new Error(`@cached only accepts ${JSON.stringify(CACHED_ARGS)} not ${argName}.`);
+    }
+    cachedArgs[argName] = arg;
+  }
+  if (cachedArgs.id && cachedArgs.ids) {
     throw new Error(`@entity can receive either an 'id' or 'ids' arg, not both`);
   }
-
-  if (!cachedDirectiveArgs.type) {
+  if (!cachedArgs.type) {
     throw new Error(`@entity requires a type arg.`);
   }
-  const typeValue = cachedDirectiveArgs.type.value;
-  const typeSchema = schema.types[typeValue.value];
-  if (!typeSchema) {
-    throw new Error(`Cannot find type ${typeValue.value} in your schema!`);
-  }
-  // TODO properly initialize unions?
 };
 
 export default function parseAndInitializeQuery(queryString, schema, idFieldName) {
@@ -66,7 +68,7 @@ export default function parseAndInitializeQuery(queryString, schema, idFieldName
         const children = field.selectionSet.selections;
         // if no resolve function is present, then it might just be a sort or filter
         if (cachedDirective) {
-          validateCachedDirective(cachedDirective, schema);
+          validateCachedDirective(cachedDirective);
         } else {
           const fieldSchema = getFieldSchema(field, parentSchema, schema);
           const rootFieldSchema = ensureRootType(fieldSchema.type);

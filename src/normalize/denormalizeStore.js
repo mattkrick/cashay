@@ -7,15 +7,16 @@ import {
   getFieldSchema,
   isLive,
   makeCachedArgs,
-  TYPENAME
+  TYPENAME,
+  parseCachedType
 } from '../utils';
 import {
   calculateSendToServer,
   handleMissingData,
   getDocFromNormalString,
-  maybeLiveQuery,
-  getCachedFieldState
+  maybeLiveQuery
 } from './denormalizeHelpers';
+import getCachedFieldState from './getCachedFieldState';
 
 const {ENUM, LIST, SCALAR} = TypeKind;
 
@@ -46,8 +47,9 @@ const visitObject = (subState = {}, reqAST, parentTypeSchema, context, reduction
       const cachedDirective = field.directives && field.directives.find(d => d.name.value === CACHED);
 
       if (cachedDirective) {
-        const cachedDirectiveArgs = makeCachedArgs(cachedDirective.arguments, context.variables);
-        const typeSchema = context.schema.types[cachedDirectiveArgs.type];
+        const cachedDirectiveArgs = makeCachedArgs(cachedDirective.arguments, context.variables, context.schema);
+        const {type} = parseCachedType(cachedDirectiveArgs.type);
+        const typeSchema = context.schema.types[type];
         const fieldState = getCachedFieldState(subState, cachedDirectiveArgs, field, context);
         const visitor = Array.isArray(fieldState) ? visitIterable : visitObject;
         reduction[aliasOrFieldName] = visitor(fieldState, field, typeSchema, context);

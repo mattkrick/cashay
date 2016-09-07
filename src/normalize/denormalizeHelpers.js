@@ -78,79 +78,6 @@ export const getDocFromNormalString = (normalString) => {
   return {typeName, docId};
 };
 
-const makeUsefulSource = (source, result) => {
-  return source === result ? null : source;
-};
-
-const stringifyEntity = (type, id) => `${type}${NORM_DELIMITER}${id}`;
-
-const getEntity = (filterFunction, isArray, possibleTypes, entities, idFieldName, argDocs) => {
-  const result = isArray ? [] : {};
-  for (let t = 0; t < possibleTypes.length; t++) {
-    const type = possibleTypes[t];
-    const typeEntities = entities[type];
-    if (!typeEntities) continue;
-    const docIds = argDocs || Object.keys(typeEntities);
-    for (let i = 0; i < docIds.length; i++) {
-      const docId = docIds[i];
-      const doc = typeEntities[docId];
-      if (filterFunction(doc)) {
-        const stringifiedDoc = stringifyEntity(type, doc[idFieldName]);
-        if (isArray) {
-          result.push(stringifiedDoc);
-        } else {
-          return stringifiedDoc;
-        }
-      }
-    }
-  }
-  // if not everything loaded & we just wanted 1, we want to return an object
-  return result;
-};
-
-const initCachedDeps = (cachedDeps, type, queryDep, resolver) => {
-  cachedDeps[type] = cachedDeps[type] || {};
-  cachedDeps[type][queryDep] = cachedDeps[type][queryDep] || new Set();
-  cachedDeps[type][queryDep].add(resolver);
-};
-
-export const getCachedFieldState = (source, cachedDirectiveArgs, field, context) => {
-  const {cachedDeps, directives = {}, getState, idFieldName, queryDep} = context;
-  const {type} = cachedDirectiveArgs;
-  const typeSchema = context.schema.types[type];
-  const {entities, result} = getState();
-  const usefulSource = makeUsefulSource(source, result);
-  const aliasOrFieldName = field.alias && field.alias.value || field.name.value;
-  const {resolveCached, resolveCachedList} = directives[aliasOrFieldName] || {};
-
-  const possibleTypes = typeSchema.kind === UNION ? Object.keys(typeSchema.possibleTypes) : [type];
-  if (resolveCachedList) {
-    // they want a list!
-    initCachedDeps(cachedDeps, type, queryDep, resolveCachedList);
-    return getEntity(resolveCachedList(usefulSource, cachedDirectiveArgs), true, possibleTypes, entities, idFieldName);
-
-  } else if (resolveCached) {
-    // they want a single doc!
-    initCachedDeps(cachedDeps, type, queryDep, resolveCached);
-    return getEntity(resolveCached(usefulSource, cachedDirectiveArgs), false, possibleTypes, entities, idFieldName);
-  } else {
-    const {id, ids} = cachedDirectiveArgs;
-    if (!id && !ids) {
-      throw new Error(`Must supply either id, ids or resolveCached, resolveCachedList for ${aliasOrFieldName}`);
-    }
-    if (possibleTypes.length === 1) {
-      // not a union!
-      if (id) return stringifyEntity(type, id);
-      if (ids) return ids.map(id => stringifyEntity(type, id));
-    } else {
-      const filterFunction = () => Boolean;
-      const docIds = ids || [id];
-      const isArray = Boolean(ids);
-      return getEntity(filterFunction, isArray, possibleTypes, entities, idFieldName, docIds)
-    }
-  }
-};
-
 export const maybeLiveQuery = (source, fieldSchema, field, nnFieldType, context) => {
   const fieldName = field.name.value;
   if (!isLive(field.directives)) {
@@ -160,7 +87,7 @@ export const maybeLiveQuery = (source, fieldSchema, field, nnFieldType, context)
   const aliasOrFieldName = field.alias && field.alias.value || fieldName;
   const {directives = {}, idFieldName, getState, queryDep, subscribe, subscriptionDeps, variables} = context;
   const result = getState().result;
-  const usefulSource = makeUsefulSource(source, result);
+  const usefulSource = source === result ? null : source;
   const {resolveChannelKey, subscriber} = directives[aliasOrFieldName] || {};
   const bestSubscriber = subscriber || context.defaultSubscriber;
   const makeChannelKey = resolveChannelKey || defaultResolveChannelKeyFactory(idFieldName);

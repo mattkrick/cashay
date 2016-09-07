@@ -1,4 +1,4 @@
-import {ADD, UPDATE, UPSERT, REMOVE, REMOVAL_FLAG} from '../utils';
+import {ADD, UPDATE, UPSERT, REMOVE, REMOVAL_FLAG, shallowEqual} from '../utils';
 import {
   ADD_SUBSCRIPTION,
   UPDATE_SUBSCRIPTION,
@@ -23,10 +23,10 @@ const immutableUpdate = (arr, idx, updatedDoc) => {
   return [...arr.slice(0, idx), updatedDoc, ...arr.slice(idx + 1)]
 };
 
-export default function processSubscriptionDoc(handler, document, oldDenormResult, oldNormResult, typeSchema, idFieldName) {
+export default function processSubscriptionDoc(handler, document, oldDenormResult, oldNormResult, context) {
+  const {idFieldName, typeSchema} = context;
   const docId = document[idFieldName];
   const isList = Array.isArray(oldDenormResult.data);
-
   if (isList) {
     const idxInCache = oldDenormResult.data.findIndex(doc => doc[idFieldName] === docId);
     const safeHandler = getSafeHandler(handler, idxInCache);
@@ -38,7 +38,7 @@ export default function processSubscriptionDoc(handler, document, oldDenormResul
         oldDoc: null,
         newDoc: document,
         normEntities: normalizedDoc.entities,
-        normResult: oldNormResult.concat(normalizedDoc.result[0])
+        normResult: oldNormResult.concat(normalizedDoc.result)
       };
     } else if (safeHandler === REMOVE) {
       const oldDoc = oldDenormResult.data[idxInCache];
@@ -54,7 +54,8 @@ export default function processSubscriptionDoc(handler, document, oldDenormResul
     } else if (safeHandler === UPDATE) {
       const oldDoc = oldDenormResult.data[idxInCache];
       // this shallow merge will break if the doc has nested docs
-      const mergedDoc = {...oldDoc, document};
+      const mergedDoc = {...oldDoc, ...document};
+      if (shallowEqual(oldDoc, mergedDoc)) return;
       const normalizedDoc = normalizeResponse(mergedDoc, context, true);
       return {
         actionType: UPDATE_SUBSCRIPTION,
@@ -62,7 +63,7 @@ export default function processSubscriptionDoc(handler, document, oldDenormResul
         oldDoc,
         newDoc: mergedDoc,
         normEntities: normalizedDoc.entities,
-        normResult: immutableUpdate(oldNormResult, idxInCache, normalizedDoc.result[0])
+        normResult: immutableUpdate(oldNormResult, idxInCache, normalizedDoc.result)
       };
     }
   } else {
@@ -78,7 +79,8 @@ export default function processSubscriptionDoc(handler, document, oldDenormResul
         normResult
       }
     } else if (safeHandler === UPDATE) {
-      const mergedDoc = {...oldDenormResult.data, document};
+      const mergedDoc = {...oldDenormResult.data, ...document};
+      if (shallowEqual(oldDenormResult.data, mergedDoc)) return;
       const {entities: normEntities, result: normResult} = normalizeResponse(mergedDoc, context, true);
       return {
         actionType: UPDATE_SUBSCRIPTION,

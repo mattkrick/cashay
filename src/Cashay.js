@@ -685,10 +685,13 @@ class Cashay {
     const fullChannel = makeFullChannel(channel, key);
     const mergeNewData = (handler, document) => {
       const {result} = this.getState();
+      const {schema, idFieldName} = this;
+      const context = {schema, idFieldName, typeSchema};
       const oldDenormResult = this.cachedSubscriptions[fullChannel];
       const oldNormResult = result[channel] && result[channel][key] || [];
-      const {denormResult, actionType, oldDoc, newDoc, normEntities, normResults} =
-        processSubscriptionDoc(handler, document, oldDenormResult, oldNormResult, typeSchema, this.idFieldName);
+      const processedDoc = processSubscriptionDoc(handler, document, oldDenormResult, oldNormResult, context);
+      if (!processedDoc) return;
+      const {denormResult, actionType, oldDoc, newDoc, normEntities, normResult} = processedDoc;
 
       // INVALIDATE SUBSCRIPTION DEPS
       const depSet = this.subscriptionDeps[fullChannel];
@@ -700,7 +703,7 @@ class Cashay {
       // INVALIDATE CACHED DEPS
       const typeName = typeSchema.kind === UNION ? oldDenormResult.data.__typename : typeSchema.name;
       const cachedDepsForType = this.cachedDeps[typeName];
-      const queryDeps = Object.keys(cachedDepsForType);
+      const queryDeps = cachedDepsForType ? Object.keys(cachedDepsForType) : [];
       for (let i = 0; i < queryDeps.length; i++) {
         const queryDep = queryDeps[i];
         for (let resolver of cachedDepsForType[queryDep]) {
@@ -721,7 +724,7 @@ class Cashay {
         entities: normEntities,
         result: {
           [channel]: {
-            [key]: normResults
+            [key]: normResult
           }
         }
       };

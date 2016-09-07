@@ -41,7 +41,8 @@ export const LIVE = 'live';
 export const LOCAL_SORT = 'localSort';
 export const LOCAL_FILTER = 'localFilter';
 export const LOCAL = 'local';
-export const CACHED = `entity`;
+export const CACHED = `cached`;
+export const CACHED_ARGS = ['id', 'ids', 'type'];
 
 
 export const ensureTypeFromNonNull = type => type.kind === NON_NULL ? type.ofType : type;
@@ -193,14 +194,25 @@ export const makeFullChannel = (channel, channelKey) => {
   return channelKey ? `${channel}${NORM_DELIMITER}${channelKey}` : channel;
 };
 
-export const makeCachedArgs = (argsArr, variables) => {
-  const entityArgs = {};
+export const makeCachedArgs = (argsArr, variables, schema) => {
+  const cachedArgs = {};
   for (let i = 0; i < argsArr.length; i++) {
     const arg = argsArr[i];
-    // we don't want or need variables when doing static checks during init
-    entityArgs[arg.name.value] = variables ? getVariableValue(arg, variables) : arg;
+    const argName = arg.name.value;
+    cachedArgs[argName] = getVariableValue(arg, variables);
   }
-  return entityArgs;
+  if (cachedArgs.id && typeof cachedArgs.id !== 'string') {
+    throw new Error(`@cached 'id' arg requires a string`)
+  }
+  if (cachedArgs.ids && !Array.isArray(cachedArgs.ids)) {
+    throw new Error(`@cached 'ids' arg requires an array`)
+  }
+  const {type} = parseCachedType(cachedArgs.type);
+  const typeSchema = schema.types[type];
+  if (!typeSchema) {
+    throw new Error(`@cached type ${type} does not exist in your schema!`);
+  }
+  return cachedArgs;
 };
 
 export const getVariableValue = (arg, variables) => {
@@ -216,4 +228,30 @@ export const getTypeName = (typeSchema, updatedData, doc) => {
     return typeName;
   }
   return typeSchema.name;
+};
+
+export const shallowEqual = (obj1, obj2) => {
+  // obj1 is guaranteed to be different than obj2, so no need to check strict eq
+  const obj1Keys = Object.keys(obj1);
+  const obj2Keys = Object.keys(obj2);
+  if (obj1Keys.length !== obj2Keys.length) return false;
+  for (let i = 0; i < obj1Keys.length; i++) {
+    const key = obj1Keys[i];
+    if (obj1[key] !== obj2[key]) return false;
+  }
+  return true;
+};
+
+export const parseCachedType = (type) => {
+  if (type.startsWith('[')) {
+    return {
+      type: type.substr(1,type.length-2),
+      typeIsList: true
+    }
+  } else {
+    return {
+      type,
+      typeIsList: false
+    }
+  }
 };
