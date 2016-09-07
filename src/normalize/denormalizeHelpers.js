@@ -3,10 +3,8 @@ import {TypeKind} from 'graphql/type/introspection';
 import getFieldState from './getFieldState';
 import {
   defaultResolveChannelKeyFactory,
-  defaultResolveEntityIdFactory,
   isLive,
   makeFullChannel,
-  makeEntityArgs,
   NORM_DELIMITER
 } from '../utils';
 const {UNION, LIST, SCALAR, ENUM} = TypeKind;
@@ -84,46 +82,73 @@ const makeUsefulSource = (source, result) => {
   return source === result ? null : source;
 };
 
-const normalizeUserValue = (resolveType) => (id) => {
-  const type = resolveType(id);
-  return `${type}${NORM_DELIMITER}${id}`;
-};
+const stringifyEntity = (type, id) => `${type}${NORM_DELIMITER}${id}`;
 
-const makeResolveType = (typeSchema, entities) => {
-  const typeName = typeSchema.name;
-  if (typeSchema.kind === UNION) {
-    const possibleTypes = Object.keys(typeSchema.possibleTypes);
-    return (id) => {
-      for (let i = 0; i < possibleTypes.length; i++) {
-        const possibleType = possibleTypes[i];
-        if (entities[possibleType] && entities[possibleType][id]) {
-          return possibleType;
+const getEntity = (filterFunction, isArray, possibleTypes, entities, idFieldName, argDocs) => {
+  const result = isArray ? [] : {};
+  for (let t = 0; t < possibleTypes.length; t++) {
+    const type = possibleTypes[t];
+    const typeEntities = entities[type];
+    if (!typeEntities) continue;
+    const docIds = argDocs || Object.keys(typeEntities);
+    for (let i = 0; i < docIds.length; i++) {
+      const docId = docIds[i];
+      const doc = typeEntities[docId];
+      if (filterFunction(doc)) {
+        const stringifiedDoc = stringifyEntity(type, doc[idFieldName]);
+        if (isArray) {
+          result.push(stringifiedDoc);
+        } else {
+          return stringifiedDoc;
         }
       }
-      // the doc isn't here yet, just return nothing & wait for the sub to load what the dev knows will come
-      return possibleTypes[0];
     }
-  } else {
-    return () => typeName;
   }
+  // if not everything loaded & we just wanted 1, we want to return an object
+  return result;
 };
 
-export const lookupEntity = (source, entityArgs, field, context) => {
-  const {directives = {}, getState, idFieldName} = context;
+const initCachedDeps = (cachedDeps, type, queryDep, resolver) => {
+  cachedDeps[type] = cachedDeps[type] || {};
+  cachedDeps[type][queryDep] = cachedDeps[type][queryDep] || new Set();
+  cachedDeps[type][queryDep].add(resolver);
+};
+
+export const getCachedFieldState = (source, cachedDirectiveArgs, field, context) => {
+  const {cachedDeps, directives = {}, getState, idFieldName, queryDep} = context;
+  const {type} = cachedDirectiveArgs;
+  const typeSchema = context.schema.types[type];
   const {entities, result} = getState();
   const usefulSource = makeUsefulSource(source, result);
   const aliasOrFieldName = field.alias && field.alias.value || field.name.value;
-  const {resolveEntity} = directives[aliasOrFieldName] || {};
-  const makeEntityId = resolveEntity || defaultResolveEntityIdFactory(idFieldName);
-  if (!makeEntityId) {
-    throw new Error(`Cannot resolve entity id for ${aliasOrFieldName}. Did you include a resolveEntity function?`);
+  const {resolveCached, resolveCachedList} = directives[aliasOrFieldName] || {};
+
+  const possibleTypes = typeSchema.kind === UNION ? Object.keys(typeSchema.possibleTypes) : [type];
+  if (resolveCachedList) {
+    // they want a list!
+    initCachedDeps(cachedDeps, type, queryDep, resolveCachedList);
+    return getEntity(resolveCachedList(usefulSource, cachedDirectiveArgs), true, possibleTypes, entities, idFieldName);
+
+  } else if (resolveCached) {
+    // they want a single doc!
+    initCachedDeps(cachedDeps, type, queryDep, resolveCached);
+    return getEntity(resolveCached(usefulSource, cachedDirectiveArgs), false, possibleTypes, entities, idFieldName);
+  } else {
+    const {id, ids} = cachedDirectiveArgs;
+    if (!id && !ids) {
+      throw new Error(`Must supply either id, ids or resolveCached, resolveCachedList for ${aliasOrFieldName}`);
+    }
+    if (possibleTypes.length === 1) {
+      // not a union!
+      if (id) return stringifyEntity(type, id);
+      if (ids) return ids.map(id => stringifyEntity(type, id));
+    } else {
+      const filterFunction = () => Boolean;
+      const docIds = ids || [id];
+      const isArray = Boolean(ids);
+      return getEntity(filterFunction, isArray, possibleTypes, entities, idFieldName, docIds)
+    }
   }
-  const entityId = makeEntityId(usefulSource, entityArgs);
-  const {type} = entityArgs;
-  const typeSchema = context.schema.types[type];
-  const resolveType = makeResolveType(typeSchema, entities);
-  const normalizer = normalizeUserValue(resolveType);
-  return Array.isArray(entityId) ? entityId.map(normalizer) : normalizer(entityId);
 };
 
 export const maybeLiveQuery = (source, fieldSchema, field, nnFieldType, context) => {

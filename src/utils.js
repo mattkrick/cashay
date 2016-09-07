@@ -2,12 +2,13 @@ import {INLINE_FRAGMENT, OPERATION_DEFINITION, FRAGMENT_DEFINITION, VARIABLE} fr
 import {TypeKind} from 'graphql/type/introspection';
 import {parse as gqlParse} from 'graphql/language/parser';
 
-const {NON_NULL} = TypeKind;
+const {NON_NULL, UNION} = TypeKind;
 
 export const TYPENAME = '__typename';
 export const CASHAY = 'CASHAY';
 export const DELIMITER = '_';
 export const NORM_DELIMITER = '::';
+export const REMOVAL_FLAG = '___CASHAY_REMOVAL_FLAG___';
 
 /* redux store array constants */
 export const FRONT = 'front';
@@ -40,7 +41,7 @@ export const LIVE = 'live';
 export const LOCAL_SORT = 'localSort';
 export const LOCAL_FILTER = 'localFilter';
 export const LOCAL = 'local';
-export const ENTITY = `entity`;
+export const CACHED = `entity`;
 
 
 export const ensureTypeFromNonNull = type => type.kind === NON_NULL ? type.ofType : type;
@@ -168,7 +169,6 @@ export const without = (obj, exclusions) => {
 };
 
 export const isLive = (directives) => Boolean(directives && directives.find(d => d.name.value === LIVE));
-export const hasDirective = (directives, type) => Boolean(directives && directives.find(d => d.name.value === type));
 
 export const getFieldSchema = (selection, maybeTypeSchema, schema) => {
   const selectionName = selection.name.value;
@@ -189,23 +189,11 @@ export const defaultResolveChannelKeyFactory = (idFieldName) => (source, args) =
   }
 };
 
-export const defaultResolveEntityIdFactory = (idFieldName) => (source, args) => {
-  if (args.id) {
-   return args.id;
-  }
-  if (args.ids) {
-    return args.ids;
-  }
-  if (source) {
-    return source[idFieldName];
-  }
-};
-
 export const makeFullChannel = (channel, channelKey) => {
   return channelKey ? `${channel}${NORM_DELIMITER}${channelKey}` : channel;
 };
 
-export const makeEntityArgs = (argsArr, variables) => {
+export const makeCachedArgs = (argsArr, variables) => {
   const entityArgs = {};
   for (let i = 0; i < argsArr.length; i++) {
     const arg = argsArr[i];
@@ -217,4 +205,15 @@ export const makeEntityArgs = (argsArr, variables) => {
 
 export const getVariableValue = (arg, variables) => {
   return arg.value.kind === VARIABLE ? variables[arg.value.name.value] : arg.value.value;
-}
+};
+
+export const getTypeName = (typeSchema, updatedData, doc) => {
+  if (typeSchema.kind === UNION) {
+    const typeName = updatedData.__typename;
+    if (!typeName) {
+      throw new Error(`Cannot determine typeName for incoming document ${doc}.`)
+    }
+    return typeName;
+  }
+  return typeSchema.name;
+};

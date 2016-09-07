@@ -3,10 +3,10 @@ import {INLINE_FRAGMENT} from 'graphql/language/kinds';
 import {
   ensureRootType,
   ensureTypeFromNonNull,
-  ENTITY,
+  CACHED,
   getFieldSchema,
   isLive,
-  makeEntityArgs,
+  makeCachedArgs,
   TYPENAME
 } from '../utils';
 import {
@@ -14,7 +14,7 @@ import {
   handleMissingData,
   getDocFromNormalString,
   maybeLiveQuery,
-  lookupEntity
+  getCachedFieldState
 } from './denormalizeHelpers';
 
 const {ENUM, LIST, SCALAR} = TypeKind;
@@ -43,12 +43,12 @@ const visitObject = (subState = {}, reqAST, parentTypeSchema, context, reduction
     } else {
       const fieldName = field.name.value;
       const aliasOrFieldName = field.alias && field.alias.value || fieldName;
-      const entityDirective = field.directives && field.directives.find(d => d.name.value === ENTITY);
+      const cachedDirective = field.directives && field.directives.find(d => d.name.value === CACHED);
 
-      if (entityDirective) {
-        const entityArgs = makeEntityArgs(entityDirective.arguments, context.variables);
-        const typeSchema = context.schema.types[entityArgs.type];
-        const fieldState = lookupEntity(subState, entityArgs, field, context);
+      if (cachedDirective) {
+        const cachedDirectiveArgs = makeCachedArgs(cachedDirective.arguments, context.variables);
+        const typeSchema = context.schema.types[cachedDirectiveArgs.type];
+        const fieldState = getCachedFieldState(subState, cachedDirectiveArgs, field, context);
         const visitor = Array.isArray(fieldState) ? visitIterable : visitObject;
         reduction[aliasOrFieldName] = visitor(fieldState, field, typeSchema, context);
         continue;

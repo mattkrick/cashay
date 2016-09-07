@@ -1,7 +1,7 @@
 import mergeStores from './mergeStores';
 import separateArgs from './separateArgs';
 import {getSubReqAST} from './getSubReqAST';
-import {ensureRootType, ENTITY, getRegularArgsKey, isObject, getFieldSchema, NORM_DELIMITER, FULL, FRONT, BACK} from '../utils';
+import {ensureRootType, CACHED, getRegularArgsKey, isObject, getFieldSchema, NORM_DELIMITER, FULL, FRONT, BACK} from '../utils';
 import {VARIABLE} from 'graphql/language/kinds';
 import {TypeKind} from 'graphql/type/introspection';
 
@@ -30,7 +30,7 @@ const visitObject = (bag, subResponse, reqAST, subSchema, context) => {
     if (key.startsWith('__')) return reduction;
     if (reqAST) {
       const subReqAST = getSubReqAST(key, reqAST, context.fragments);
-      if (subReqAST.directives.find(d => d.name.value === ENTITY)) return reduction;
+      if (subReqAST.directives.find(d => d.name.value === CACHED)) return reduction;
       const name = subReqAST.name.value;
       const fieldSchema = getFieldSchema(subReqAST, subSchema, context.schema);
       const fieldType = ensureRootType(fieldSchema.type);

@@ -1,4 +1,7 @@
 import {isObject, ADD, UPDATE, UPSERT, REMOVE} from '../utils';
+import {TypeKind} from 'graphql/type/introspection';
+
+const {UNION} = TypeKind;
 
 const getSafeHandler = (handler, idxInCache) => {
   if (handler !== UPSERT) return handler;

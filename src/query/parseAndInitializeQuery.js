@@ -1,29 +1,30 @@
 import {FRAGMENT_SPREAD, INLINE_FRAGMENT} from 'graphql/language/kinds';
 import {
   convertFragmentToInline,
-  ENTITY,
+  CACHED,
   parse,
   clone,
   ensureRootType,
   TYPENAME,
   teardownDocumentAST,
   getFieldSchema,
-  makeEntityArgs
+  makeCachedArgs
 } from '../utils';
 import {TypeKind} from 'graphql/type/introspection';
 import {Field} from '../helperClasses';
 
 const {UNION} = TypeKind;
 
-const validateEntities = (entityDirective, schema) => {
-  const entityArgs = makeEntityArgs(entityDirective.arguments);
-  if (entityArgs.id && entityArgs.ids) {
+const validateCachedDirective = (cachedDirective, schema) => {
+  const cachedDirectiveArgs = makeCachedArgs(cachedDirective.arguments);
+  if (cachedDirectiveArgs.id && cachedDirectiveArgs.ids) {
     throw new Error(`@entity can receive either an 'id' or 'ids' arg, not both`);
   }
-  if (!entityArgs.type) {
+
+  if (!cachedDirectiveArgs.type) {
     throw new Error(`@entity requires a type arg.`);
   }
-  const typeValue = entityArgs.type.value;
+  const typeValue = cachedDirectiveArgs.type.value;
   const typeSchema = schema.types[typeValue.value];
   if (!typeSchema) {
     throw new Error(`Cannot find type ${typeValue.value} in your schema!`);
@@ -60,12 +61,12 @@ export default function parseAndInitializeQuery(queryString, schema, idFieldName
       if (field.arguments && field.arguments.length) {
         field.arguments.sort((a, b) => a.name.value > b.name.value);
       }
-      const entityDirective = field.directives && field.directives.find(d => d.name.value === ENTITY);
+      const cachedDirective = field.directives && field.directives.find(d => d.name.value === CACHED);
       if (field.selectionSet) {
         const children = field.selectionSet.selections;
         // if no resolve function is present, then it might just be a sort or filter
-        if (entityDirective) {
-          validateEntities(entityDirective, schema);
+        if (cachedDirective) {
+          validateCachedDirective(cachedDirective, schema);
         } else {
           const fieldSchema = getFieldSchema(field, parentSchema, schema);
           const rootFieldSchema = ensureRootType(fieldSchema.type);
@@ -80,7 +81,7 @@ export default function parseAndInitializeQuery(queryString, schema, idFieldName
           initializeQueryAST(children, typeSchema);
         }
       }
-      else if (entityDirective) {
+      else if (cachedDirective) {
         throw new Error(`@entity can only be applied to an object or array`);
       }
     }
