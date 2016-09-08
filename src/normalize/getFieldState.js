@@ -1,7 +1,7 @@
 import {STRING, INT} from 'graphql/language/kinds';
 import {isObject, getRegularArgsKey, FULL, FRONT, BACK} from '../utils';
 import separateArgs from './separateArgs';
-import {getDocFromNormalString, sendChildrenToServer} from './denormalizeHelpers';
+import {splitNormalString, sendChildrenToServer} from './denormalizeHelpers';
 import {RequestArgument} from '../helperClasses';
 
 /**
@@ -112,13 +112,13 @@ const getBestCursor = (first, usefulArray, entities, doWarn) => {
   if (first) {
     for (i = usefulArray.length - 1; i >= 0; i--) {
       // given something like `Post:123`, return the document from the store
-      const {typeName, docId} = getDocFromNormalString(usefulArray[i]);
+      const [typeName, docId] = splitNormalString(usefulArray[i]);
       storedDoc = entities[typeName][docId];
       if (storedDoc.cursor) break;
     }
   } else {
     for (i = 0; i < usefulArray.length; i++) {
-      const {typeName, docId} = getDocFromNormalString(usefulArray[i]);
+      const [typeName, docId] = splitNormalString(usefulArray[i]);
       storedDoc = entities[typeName][docId];
       if (storedDoc.cursor) break;
     }

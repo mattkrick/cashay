@@ -1,7 +1,7 @@
-import {
-  parseCachedType,
-  NORM_DELIMITER
-} from '../utils';
+import {parseCachedType, NORM_DELIMITER} from '../utils';
+import {TypeKind} from 'graphql/type/introspection';
+
+const {UNION} = TypeKind;
 
 const stringifyEntity = (type, id) => `${type}${NORM_DELIMITER}${id}`;
 
@@ -48,7 +48,7 @@ const resolveFromState = (resolver, possibleTypes, isArray, entities) => {
 };
 
 
-export default function getCachedFieldState (source, cachedDirectiveArgs, field, context) {
+export default function getCachedFieldState(source, cachedDirectiveArgs, field, context) {
   const {cachedDeps, directives = {}, getState, idFieldName, queryDep} = context;
   const {type, typeIsList} = parseCachedType(cachedDirectiveArgs.type);
   const typeSchema = context.schema.types[type];
@@ -73,6 +73,9 @@ export default function getCachedFieldState (source, cachedDirectiveArgs, field,
   // no resolver means we need to make a default one based off of id/ids.
   // use resolveCached because they could just return something falsy
   if (!resolveCached) {
+    if (directives.resolveCached) {
+      throw new Error(`Did you mean to put resolveCached inside the ${aliasOrFieldName} options object?`);
+    }
     const {id, ids} = cachedDirectiveArgs;
     if (!id && !ids) {
       throw new Error(`Must supply either id, ids or resolveCached for ${aliasOrFieldName}`);

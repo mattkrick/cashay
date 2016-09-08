@@ -5,7 +5,7 @@ import {
   SET_STATUS
 } from './normalize/duck';
 import denormalizeStore from './normalize/denormalizeStore';
-import {rebuildOriginalArgs} from './normalize/denormalizeHelpers';
+import {rebuildOriginalArgs, splitNormalString} from './normalize/denormalizeHelpers';
 import normalizeResponse from './normalize/normalizeResponse';
 import {printMinimalQuery} from './query/printMinimalQuery';
 import {shortenNormalizedResponse, invalidateMutationsOnNewQuery, equalPendingQueries} from './query/queryHelpers';
@@ -182,7 +182,7 @@ class Cashay {
   }
 
   _invalidateQueryDep(queryDep) {
-    const [op, key = ''] = queryDep.split('::');
+    const [op, key = ''] = splitNormalString(queryDep);
     this.cachedQueries[op].responses[key] = undefined;
   }
 

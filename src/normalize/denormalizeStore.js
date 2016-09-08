@@ -13,7 +13,7 @@ import {
 import {
   calculateSendToServer,
   handleMissingData,
-  getDocFromNormalString,
+  splitNormalString,
   maybeLiveQuery
 } from './denormalizeHelpers';
 import getCachedFieldState from './getCachedFieldState';
@@ -24,7 +24,7 @@ const arrayMetadata = ['BOF', 'EOF', 'count'];
 const isPrimitive = (kind) => kind === SCALAR || kind === ENUM;
 const visitObject = (subState = {}, reqAST, parentTypeSchema, context, reduction = {}) => {
   if (typeof subState === 'string') {
-    const {typeName, docId} = getDocFromNormalString(subState);
+    const [typeName, docId] = splitNormalString(subState);
     const {entities} = context.getState();
     // code defensively because a query with an entity may want something that the subscription hasn't returned yet
     subState = entities[typeName] && entities[typeName][docId] || {};

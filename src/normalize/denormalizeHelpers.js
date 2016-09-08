@@ -71,11 +71,13 @@ export const rebuildOriginalArgs = reqAST => {
   }
 };
 
-export const getDocFromNormalString = (normalString) => {
+export const splitNormalString = (normalString) => {
   const splitPoint = normalString.indexOf(NORM_DELIMITER);
-  const typeName = normalString.substr(0, splitPoint);
-  const docId = normalString.substr(splitPoint + NORM_DELIMITER.length);
-  return {typeName, docId};
+  if (splitPoint !== -1) {
+    return [normalString.substr(0, splitPoint), normalString.substr(splitPoint + NORM_DELIMITER.length)]
+  } else {
+    return [normalString];
+  }
 };
 
 export const maybeLiveQuery = (source, fieldSchema, field, nnFieldType, context) => {
@@ -96,5 +98,5 @@ export const maybeLiveQuery = (source, fieldSchema, field, nnFieldType, context)
   const subDep = makeFullChannel(aliasOrFieldName, channelKey);
   subscriptionDeps[subDep] = subscriptionDeps[subDep] || new Set();
   subscriptionDeps[subDep].add(queryDep);
-  return result[aliasOrFieldName] && result[aliasOrFieldName][channelKey] || initialState;
+  return result[aliasOrFieldName] && result[aliasOrFieldName][channelKey] || initialState.data;
 };
