@@ -1,4 +1,4 @@
-import {isObject, FRONT, BACK, FULL} from '../utils';
+import {isObject, FRONT, BACK, FULL, REMOVAL_FLAG} from '../utils';
 
 const paginationArrayNames = new Set([FRONT, BACK, FULL]);
 
@@ -147,8 +147,13 @@ export default function mergeStores(state, src, isMutation) {
           target[key] = srcProp;
         }
       } else {
-        // if there is a disagreement on the type of value, default to using the src
-        target[key] = srcProp;
+        if (srcProp === REMOVAL_FLAG) {
+          delete target[key];
+        } else {
+          // if there is a disagreement on the type of value, default to using the src
+          target[key] = srcProp;
+        }
+
       }
     }
   }

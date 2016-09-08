@@ -1,6 +1,6 @@
 import {VARIABLE} from 'graphql/language/kinds';
 import {TypeKind} from 'graphql/type/introspection';
-import {ensureTypeFromNonNull, BEFORE, AFTER} from '../utils';
+import {ensureTypeFromNonNull, getVariableValue, BEFORE, AFTER} from '../utils';
 
 const {LIST} = TypeKind;
 
@@ -26,7 +26,9 @@ const acceptsArgs = (fieldSchema, paginationWords, paginationWordKeys) => {
  * @param {Object} variables the variables to forward onto the GraphQL server
  * */
 export default function separateArgs(fieldSchema, reqASTArgs, paginationWords, variables) {
-  if (!fieldSchema.args) throw new Error(`${fieldSchema.name} does not support arguments. Check your GraphQL query.`);
+  if (!fieldSchema.args) {
+    throw new Error(`${fieldSchema.name} does not support arguments. Check your GraphQL query.`);
+  }
   const responseType = ensureTypeFromNonNull(fieldSchema.type);
   const regularArgs = {};
   const paginationArgs = {};
@@ -39,7 +41,7 @@ export default function separateArgs(fieldSchema, reqASTArgs, paginationWords, v
     if (!fieldSchema.args[argName]) {
       throw new Error(`${fieldSchema.name} does not support ${argName}`)
     }
-    const argValue = arg.value.kind === VARIABLE ? variables[arg.value.name.value] : arg.value.value;
+    const argValue = getVariableValue(arg, variables);
     if (argValue === undefined) continue;
     let paginationMeaning = paginationWordKeys.find(pageWord => paginationWords[pageWord] === argName);
     if (paginationMeaning) {

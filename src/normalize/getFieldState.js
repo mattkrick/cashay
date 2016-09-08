@@ -1,7 +1,7 @@
 import {STRING, INT} from 'graphql/language/kinds';
 import {isObject, getRegularArgsKey, FULL, FRONT, BACK} from '../utils';
 import separateArgs from './separateArgs';
-import {getDocFromNormalString, sendChildrenToServer} from './denormalizeHelpers';
+import {splitNormalString, sendChildrenToServer} from './denormalizeHelpers';
 import {RequestArgument} from '../helperClasses';
 
 /**
@@ -15,10 +15,12 @@ import {RequestArgument} from '../helperClasses';
  * @returns {*} an object, or array, or scalar from the normalized store
  * */
 export default function getFieldState(fieldState, fieldSchema, selection, context) {
-  if (!isObject(fieldState)) return fieldState;
+  if (!isObject(fieldState) || !fieldSchema.args) return fieldState;
+  const {arguments: fieldArgs} = selection;
+  // TODO can we short circuit if there are no fieldArgs provided?
+  // if (!fieldArgs) return fieldState;
   let subState = fieldState;
   const {skipTransform, paginationWords, variables} = context;
-  const {arguments: fieldArgs} = selection;
   const {regularArgs, paginationArgs} = separateArgs(fieldSchema, fieldArgs, paginationWords, variables);
   if (regularArgs) {
     const regularArgsString = getRegularArgsKey(regularArgs);
@@ -110,13 +112,13 @@ const getBestCursor = (first, usefulArray, entities, doWarn) => {
   if (first) {
     for (i = usefulArray.length - 1; i >= 0; i--) {
       // given something like `Post:123`, return the document from the store
-      const {typeName, docId} = getDocFromNormalString(usefulArray[i]);
+      const [typeName, docId] = splitNormalString(usefulArray[i]);
       storedDoc = entities[typeName][docId];
       if (storedDoc.cursor) break;
     }
   } else {
     for (i = 0; i < usefulArray.length; i++) {
-      const {typeName, docId} = getDocFromNormalString(usefulArray[i]);
+      const [typeName, docId] = splitNormalString(usefulArray[i]);
       storedDoc = entities[typeName][docId];
       if (storedDoc.cursor) break;
     }

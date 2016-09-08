@@ -2,7 +2,7 @@ import {print} from 'graphql/language/printer';
 import {VARIABLE} from 'graphql/language/kinds';
 import {getMissingRequiredVariables} from './queryHelpers';
 import createVariableDefinitions from '../createVariableDefinitions';
-import {ensureRootType} from '../utils';
+import {ensureRootType, isLive} from '../utils';
 
 export const printMinimalQuery = (reqAST, idFieldName, variables, op, schema) => {
   const context = {
@@ -13,13 +13,24 @@ export const printMinimalQuery = (reqAST, idFieldName, variables, op, schema) =>
   return print(reqAST)
 };
 
+const unqueriableDirectives = ['live', 'entity'];
+const safeToSendDirectives = (directives) => {
+  for (let i = 0; i < directives.length; i++) {
+    const directive = directives[i];
+    if (unqueriableDirectives.includes(directive.name.value)) {
+      return false;
+    }
+  }
+  return true;
+};
+
 // mutates initialVariableDefinitions
 const minimizeQueryAST = (reqAST, idFieldName, variables, subSchema, initialVariableDefinitions = [], context) => {
   const {selections} = reqAST.selectionSet;
   for (let i = 0; i < selections.length; i++) {
     const field = selections[i];
     // if it has to go to the server, create some variable definitions and remove the pieces that don't have the required vars
-    if (field.sendToServer) {
+    if (field.sendToServer && safeToSendDirectives(field.directives)) {
       const fieldSchema = subSchema.fields[field.name.value];
       if (field.arguments && field.arguments.length) {
         const createVarDefContext = {...context, initialVariableDefinitions};

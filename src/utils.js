@@ -1,13 +1,14 @@
-import {INLINE_FRAGMENT, OPERATION_DEFINITION, FRAGMENT_DEFINITION} from 'graphql/language/kinds';
+import {INLINE_FRAGMENT, OPERATION_DEFINITION, FRAGMENT_DEFINITION, VARIABLE} from 'graphql/language/kinds';
 import {TypeKind} from 'graphql/type/introspection';
 import {parse as gqlParse} from 'graphql/language/parser';
 
-const {NON_NULL} = TypeKind;
+const {NON_NULL, UNION} = TypeKind;
 
 export const TYPENAME = '__typename';
 export const CASHAY = 'CASHAY';
 export const DELIMITER = '_';
 export const NORM_DELIMITER = '::';
+export const REMOVAL_FLAG = '___CASHAY_REMOVAL_FLAG___';
 
 /* redux store array constants */
 export const FRONT = 'front';
@@ -35,6 +36,13 @@ export const SUBSCRIBING = 'subscribing';
 export const READY = 'ready';
 export const UNSUBSCRIBED = 'unsubscribed';
 
+/* directives */
+export const LIVE = 'live';
+export const LOCAL_SORT = 'localSort';
+export const LOCAL_FILTER = 'localFilter';
+export const LOCAL = 'local';
+export const CACHED = `cached`;
+export const CACHED_ARGS = ['id', 'ids', 'type'];
 
 
 export const ensureTypeFromNonNull = type => type.kind === NON_NULL ? type.ofType : type;
@@ -159,4 +167,91 @@ export const without = (obj, exclusions) => {
     }
   }
   return newObj;
+};
+
+export const isLive = (directives) => Boolean(directives && directives.find(d => d.name.value === LIVE));
+
+export const getFieldSchema = (field, maybeTypeSchema, schema) => {
+  const fieldName = field.name.value;
+  const liveDirective = isLive(field.directives);
+  const typeSchema = liveDirective ? schema.subscriptionSchema : maybeTypeSchema;
+  const fieldSchema = typeSchema.fields[fieldName];
+  if (!fieldSchema) {
+    throw new Error(`${fieldName} isn't in the schema. Did you update your client schema?`)
+  }
+  return fieldSchema;
+};
+
+export const defaultResolveChannelKeyFactory = (idFieldName) => (source, args) => {
+  if (source) {
+    return source[idFieldName] || '';
+  } else {
+    return args[idFieldName] ? args[idFieldName] : args[Object.keys(args)[0]] || '';
+  }
+};
+
+export const makeFullChannel = (channel, channelKey) => {
+  return channelKey ? `${channel}${NORM_DELIMITER}${channelKey}` : channel;
+};
+
+export const makeCachedArgs = (argsArr, variables, schema) => {
+  const cachedArgs = {};
+  for (let i = 0; i < argsArr.length; i++) {
+    const arg = argsArr[i];
+    const argName = arg.name.value;
+    cachedArgs[argName] = getVariableValue(arg, variables);
+  }
+  if (cachedArgs.id && typeof cachedArgs.id !== 'string') {
+    throw new Error(`@cached 'id' arg requires a string`)
+  }
+  if (cachedArgs.ids && !Array.isArray(cachedArgs.ids)) {
+    throw new Error(`@cached 'ids' arg requires an array`)
+  }
+  const {type} = parseCachedType(cachedArgs.type);
+  const typeSchema = schema.types[type];
+  if (!typeSchema) {
+    throw new Error(`@cached type ${type} does not exist in your schema!`);
+  }
+  return cachedArgs;
+};
+
+export const getVariableValue = (arg, variables) => {
+  return arg.value.kind === VARIABLE ? variables[arg.value.name.value] : arg.value.value;
+};
+
+export const getTypeName = (typeSchema, updatedData, doc) => {
+  if (typeSchema.kind === UNION) {
+    const typeName = updatedData.__typename;
+    if (!typeName) {
+      throw new Error(`Cannot determine typeName for incoming document ${doc}.`)
+    }
+    return typeName;
+  }
+  return typeSchema.name;
+};
+
+export const shallowEqual = (obj1, obj2) => {
+  // obj1 is guaranteed to be different than obj2, so no need to check strict eq
+  const obj1Keys = Object.keys(obj1);
+  const obj2Keys = Object.keys(obj2);
+  if (obj1Keys.length !== obj2Keys.length) return false;
+  for (let i = 0; i < obj1Keys.length; i++) {
+    const key = obj1Keys[i];
+    if (obj1[key] !== obj2[key]) return false;
+  }
+  return true;
+};
+
+export const parseCachedType = (type) => {
+  if (type.startsWith('[')) {
+    return {
+      type: type.substr(1,type.length-2),
+      typeIsList: true
+    }
+  } else {
+    return {
+      type,
+      typeIsList: false
+    }
+  }
 };

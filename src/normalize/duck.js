@@ -10,7 +10,15 @@ export const SET_ERROR = '@@cashay/SET_ERROR';
 export const SET_STATUS = '@@cashay/SET_STATUS';
 
 const initialState = {
-  entities: {},
+  entities: {
+    // [GraphQLObjectTypeName] : {
+    //   [args?]: Array.isArray(GraphQLObjectType) ? {
+    //     [FRONT]: [],
+    //     [BACK]: [],
+    //     [FULL]: [],
+    //   } : {}
+    // }
+  },
   error: null,
   ops: {
     // [op]: {

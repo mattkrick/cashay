@@ -5,10 +5,12 @@ It also means tying your backend to a pubsub, whether that is built-in (like Ret
 a message queue (like redis or RabbitMQ), or something built into your socket engine (SocketCluster).
  
 With all these variables, it's hard to decide which strategy is universally the best.
-So, I've decided to list all of the patterns that make sense to me 
-and encourage you to try them, poke holes in them, improve them, and suggest new ones.
-The goal is to arrive at a simple, declarative API.
-However, just like all early technologies, it'll have to start off imperative.
+I've decided that the best solution is the one where the query string represents how you want your data to look.
+This forces your data to accurately reflect your GraphQL schema.
+I'll write more here as the ideas get flushed out further.
+
+
+# LEGACY PATTERNS (NOT POSSIBLE IN CURRENT VERSION)
 
 ## Single-table changefeeds
 

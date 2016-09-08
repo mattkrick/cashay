@@ -1,162 +1,139 @@
 import {TypeKind} from 'graphql/type/introspection';
 import {INLINE_FRAGMENT} from 'graphql/language/kinds';
-import {ensureRootType, ensureTypeFromNonNull, TYPENAME} from '../utils';
+import {
+  ensureRootType,
+  ensureTypeFromNonNull,
+  CACHED,
+  getFieldSchema,
+  isLive,
+  makeCachedArgs,
+  TYPENAME,
+  parseCachedType
+} from '../utils';
 import {
   calculateSendToServer,
-  sendChildrenToServer,
   handleMissingData,
-  getDocFromNormalString
+  splitNormalString,
+  maybeLiveQuery
 } from './denormalizeHelpers';
-import getFieldState from './getFieldState';
+import getCachedFieldState from './getCachedFieldState';
 
-
-const {UNION, LIST, OBJECT} = TypeKind;
+const {ENUM, LIST, SCALAR} = TypeKind;
 
 const arrayMetadata = ['BOF', 'EOF', 'count'];
-
-const visitObject = (subState = {}, reqAST, subSchema, context, baseReduction = {}) => {
-  return reqAST.selectionSet.selections.reduce((reduction, field) => {
+const isPrimitive = (kind) => kind === SCALAR || kind === ENUM;
+const visitObject = (subState = {}, reqAST, parentTypeSchema, context, reduction = {}) => {
+  if (typeof subState === 'string') {
+    const [typeName, docId] = splitNormalString(subState);
+    const {entities} = context.getState();
+    // code defensively because a query with an entity may want something that the subscription hasn't returned yet
+    subState = entities[typeName] && entities[typeName][docId] || {};
+    parentTypeSchema = context.schema.types[typeName];
+  }
+  // default to subState for denorming the persisted store subscriptions
+  const fields = reqAST ? reqAST.selectionSet.selections : Object.keys(subState);
+  for (let i = 0; i < fields.length; i++) {
+    const field = fields[i];
+    if (!reqAST) {
+      // we're mocking data from a sub
+      // TODO recursively denormalize & exit early if not found
+      reduction[field] = subState[field];
+      continue;
+    }
     if (field.kind === INLINE_FRAGMENT) {
       // TODO handle null typeCondition?
-      if (field.typeCondition.name.value === subSchema.name) {
+      if (field.typeCondition.name.value === parentTypeSchema.name) {
         // only follow through if it's the correct union subtype
-        visitObject(subState, field, subSchema, context, reduction);
+        visitObject(subState, field, parentTypeSchema, context, reduction);
       }
     } else if (field.name.value === TYPENAME) {
-      reduction[TYPENAME] = subSchema.name;
+      reduction[TYPENAME] = parentTypeSchema.name;
     } else {
       const fieldName = field.name.value;
       const aliasOrFieldName = field.alias && field.alias.value || fieldName;
-      const fieldSchema = subSchema.fields[fieldName];
-      if (!fieldSchema) {
-        throw new Error(`No schema found for field: ${fieldName}. Did you update your schema?`)
-      }
-      const hasData = subState.hasOwnProperty(fieldName);
+      const cachedDirective = field.directives && field.directives.find(d => d.name.value === CACHED);
 
-      if (hasData) {
-        let fieldState = subState[fieldName];
-        if (fieldSchema.args) {
-          fieldState = getFieldState(fieldState, fieldSchema, field, context);
+      if (cachedDirective) {
+        const cachedDirectiveArgs = makeCachedArgs(cachedDirective.arguments, context.variables, context.schema);
+        const {type} = parseCachedType(cachedDirectiveArgs.type);
+        const typeSchema = context.schema.types[type];
+        const fieldState = getCachedFieldState(subState, cachedDirectiveArgs, field, context);
+        if (Array.isArray(fieldState)) {
+          reduction[aliasOrFieldName] = visitIterable(fieldState, field, typeSchema, context, aliasOrFieldName);
+        } else {
+          reduction[aliasOrFieldName] = visitObject(fieldState, field, typeSchema, context);
         }
-        reduction[aliasOrFieldName] = visit(fieldState, field, fieldSchema, context);
-        if (field.selectionSet) {
-          calculateSendToServer(field, context.idFieldName)
+        continue;
+      }
+      const fieldSchema = getFieldSchema(field, parentTypeSchema, context.schema);
+      const nnFieldType = ensureTypeFromNonNull(fieldSchema.type);
+
+      const hasData = subState.hasOwnProperty(fieldName);
+      if (hasData || isLive(field.directives)) {
+        const fieldState = maybeLiveQuery(subState, fieldSchema, field, nnFieldType, context);
+        const rootFieldType = ensureRootType(nnFieldType);
+        const typeSchema = context.schema.types[rootFieldType.name];
+        if (isPrimitive(nnFieldType.kind)) {
+          reduction[aliasOrFieldName] = visitScalar(fieldState, context.coerceTypes[typeSchema.name])
+        } else {
+          if (nnFieldType.kind === LIST) {
+            reduction[aliasOrFieldName] = visitIterable(fieldState, field, typeSchema, context, aliasOrFieldName);
+          } else {
+            reduction[aliasOrFieldName] = visitObject(fieldState, field, typeSchema, context);
+          }
+          if (field.selectionSet) {
+            calculateSendToServer(field, context.idFieldName)
+          }
         }
       } else {
-        reduction[aliasOrFieldName] = handleMissingData(visit, aliasOrFieldName, field, fieldSchema, context);
+        reduction[aliasOrFieldName] = handleMissingData(visitObject, field, nnFieldType, context);
       }
     }
-    return reduction
-  }, baseReduction);
-};
-
-const visitNormalizedString = (subState, reqAST, subSchema, context) => {
-  const {typeName, docId} = getDocFromNormalString(subState);
-  const doc = context.cashayState.entities[typeName][docId];
-  const fieldSchema = context.schema.types[typeName];
-  return visit(doc, reqAST, fieldSchema, context);
-};
-
-const visitIterable = (subState, reqAST, subSchema, context) => {
-
-  // recurse into the root type, since it could be nonnull(list(nonnull(rootType))). Doesn't work with list of lists
-  const fieldType = ensureRootType(subSchema.type);
-
-  if (Array.isArray(subState)) {
-    // get the schema for the root type, could be a union
-    const fieldSchema = context.schema.types[fieldType.name];
-
-    // for each value in the array, get the denormalized item
-    const mappedState = [];
-    for (let i = 0; i < subState.length; i++) {
-      const res = subState[i];
-      mappedState[i] = visit(res, reqAST, fieldSchema, context);
-    }
-    for (let i = 0; i < arrayMetadata.length; i++) {
-      const metadataName = arrayMetadata[i];
-      if (subState[metadataName]) {
-        mappedState[metadataName] = subState[metadataName];
-      }
-    }
-    return mappedState;
   }
-  // recursively climb down the tree, flagging each branch with sendToServer
-  sendChildrenToServer(reqAST);
-
-  // return an empty array as a placeholder for the data that will come from the server
-  return [];
+  return reduction;
 };
 
-const visitScalar = (subState, scalarType, coerceTypes) => {
-  const coercion = coerceTypes[scalarType];
+const visitIterable = (subState, reqAST, typeSchema, context, aliasOrFieldName) => {
+  // for each value in the array, get the denormalized item
+  let mappedState = [];
+  // the array could be a bunch of objects, or primitives
+  const loopFunc = isPrimitive(typeSchema.kind) ?
+    res => visitScalar(res, context.coerceTypes[typeSchema.name]) :
+    res => visitObject(res, reqAST, typeSchema, context);
+
+  for (let i = 0; i < subState.length; i++) {
+    mappedState[i] = loopFunc(subState[i]);
+  }
+
+  // copy over metadata for smart pagination
+  for (let i = 0; i < arrayMetadata.length; i++) {
+    const metadataName = arrayMetadata[i];
+    if (subState[metadataName]) {
+      mappedState[metadataName] = subState[metadataName];
+    }
+  }
+
+  const {sort, filter} = context;
+  const sortFn = sort && sort[aliasOrFieldName];
+  const filterFn = filter && filter[aliasOrFieldName];
+  if (filterFn) {
+    mappedState = mappedState.filter(filterFn);
+  }
+  if (sortFn) {
+    mappedState = mappedState.sort(sortFn);
+  }
+  return mappedState;
+};
+
+const visitScalar = (subState, coercion) => {
   return coercion ? coercion(subState) : subState;
 };
 
-const visit = (subState, reqAST, subSchema, context) => {
-  // By implementing a ternary here, we can get rid of a pointless O(n) find in visitObject
-  const objectType = subSchema.kind ? subSchema.kind : subSchema.type.kind;
-  switch (objectType) {
-    case OBJECT:
-      if (typeof subState === 'string') {
-        return visitNormalizedString(subState, reqAST, subSchema, context);
-      }
-      return visitObject(subState, reqAST, subSchema, context);
-    case UNION:
-      return visitNormalizedString(subState, reqAST, subSchema, context);
-    case LIST:
-      return visitIterable(subState, reqAST, subSchema, context);
-    default:
-      const name = subSchema.name ? subSchema.name : subSchema.type.name;
-      return visitScalar(subState, name, context.coerceTypes);
+export default function denormalizeStore(context) {
+  const {getState, schema: {querySchema}, operation, normalizedResult} = context;
+  if (normalizedResult) {
+    const visitor = Array.isArray(normalizedResult) ? visitIterable : visitObject;
+    return visitor(normalizedResult, null, {}, context);
   }
-};
-
-export default function denormalizeStore(context, schemaName = 'querySchema') {
-  // Lookup the root schema for the operationType (hardcoded name in the return of the introspection query)
-  const schema = context.schema[schemaName];
-
-  // a query operation can have multiple queries, gotta catch 'em all
-  const queryReduction = context.operation.selectionSet.selections.reduce((reduction, selection) => {
-    const queryName = selection.name.value;
-
-    // aliases are common for executing the same query twice (eg getPerson(id:1) getPerson(id:2))
-    const aliasOrName = selection.alias && selection.alias.value || queryName;
-
-    // get the query schema to know the expected type and args
-    const queryFieldSchema = schema.fields[queryName];
-    if (!queryFieldSchema) {
-      throw new Error(`Could not find ${queryName} in your ${schemaName}.
-      Did you add it to your GraphQL schema?`)
-    }
-
-    // look into the current redux state to see if we can borrow any data from it
-    const queryInState = context.cashayState.result[queryName];
-
-    // if there's no results stored or being fetched, save some time & don't bother with the args
-    const fieldState = getFieldState(queryInState, queryFieldSchema, selection, context);
-
-    // get the expected return value, devs can be silly, so if the had the return value in a nonnull, remove it.
-    const nonNullQueryFieldSchemaType = ensureTypeFromNonNull(queryFieldSchema.type);
-    const subSchema = nonNullQueryFieldSchemaType.kind === LIST ? queryFieldSchema :
-      ensureTypeFromNonNull(context.schema.types[nonNullQueryFieldSchemaType.name]);
-
-    // recursively visit each branch, flag missing branches with a sendToServer flag
-    reduction[aliasOrName] = visit(fieldState, selection, subSchema, context);
-
-    // ugly code that's necessary in case the selection is a scalar. TODO clean!
-    if (selection.selectionSet) {
-      //shallowly climb the tree checking for the sendToServer flag. if it's present on a child, add it to the parent.
-      calculateSendToServer(selection, context.idFieldName);
-    } else if (reduction[aliasOrName] === undefined) {
-      selection.sendToServer = true;
-    }
-    return reduction
-  }, {});
-
-  // add a sendToServerFlag to the operation if any of the queries need data from the server
-  calculateSendToServer(context.operation, context.idFieldName);
-
-  // return what the user expects GraphQL to return
-
-  return queryReduction
+  return visitObject(getState().result, operation, querySchema, context);
 };
