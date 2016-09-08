@@ -87,12 +87,13 @@ export const maybeLiveQuery = (source, fieldSchema, field, nnFieldType, context)
     return getFieldState(source[fieldName], fieldSchema, field, context);
   }
   const aliasOrFieldName = field.alias && field.alias.value || fieldName;
-  const {directives = {}, idFieldName, getState, queryDep, subscribe, subscriptionDeps, variables} = context;
+  const {resolveChannelKey, subscriber, idFieldName, getState, queryDep, subscribe, subscriptionDeps, variables} = context;
   const result = getState().result;
   const usefulSource = source === result ? null : source;
-  const {resolveChannelKey, subscriber} = directives[aliasOrFieldName] || {};
-  const bestSubscriber = subscriber || context.defaultSubscriber;
-  const makeChannelKey = resolveChannelKey || defaultResolveChannelKeyFactory(idFieldName);
+  const fieldResolveChannelKey = resolveChannelKey && resolveChannelKey[aliasOrFieldName];
+  const fieldSubscriber = subscriber && subscriber[aliasOrFieldName];
+  const bestSubscriber = fieldSubscriber || context.defaultSubscriber;
+  const makeChannelKey = fieldResolveChannelKey || defaultResolveChannelKeyFactory(idFieldName);
   const channelKey = makeChannelKey(usefulSource, variables);
   const initialState = subscribe(aliasOrFieldName, channelKey, bestSubscriber, {returnType: nnFieldType});
   const subDep = makeFullChannel(aliasOrFieldName, channelKey);

@@ -30,9 +30,16 @@ const visitObject = (subState = {}, reqAST, parentTypeSchema, context, reduction
     subState = entities[typeName] && entities[typeName][docId] || {};
     parentTypeSchema = context.schema.types[typeName];
   }
-  const fields = reqAST.selectionSet.selections;
+  // default to subState for denorming the persisted store subscriptions
+  const fields = reqAST ? reqAST.selectionSet.selections : Object.keys(subState);
   for (let i = 0; i < fields.length; i++) {
     const field = fields[i];
+    if (!reqAST) {
+      // we're mocking data from a sub
+      // TODO recursively denormalize & exit early if not found
+      reduction[field] = subState[field];
+      continue;
+    }
     if (field.kind === INLINE_FRAGMENT) {
       // TODO handle null typeCondition?
       if (field.typeCondition.name.value === parentTypeSchema.name) {
@@ -51,8 +58,11 @@ const visitObject = (subState = {}, reqAST, parentTypeSchema, context, reduction
         const {type} = parseCachedType(cachedDirectiveArgs.type);
         const typeSchema = context.schema.types[type];
         const fieldState = getCachedFieldState(subState, cachedDirectiveArgs, field, context);
-        const visitor = Array.isArray(fieldState) ? visitIterable : visitObject;
-        reduction[aliasOrFieldName] = visitor(fieldState, field, typeSchema, context);
+        if (Array.isArray(fieldState)) {
+          reduction[aliasOrFieldName] = visitIterable(fieldState, field, typeSchema, context, aliasOrFieldName);
+        } else {
+          reduction[aliasOrFieldName] = visitObject(fieldState, field, typeSchema, context);
+        }
         continue;
       }
       const fieldSchema = getFieldSchema(field, parentTypeSchema, context.schema);
@@ -66,8 +76,11 @@ const visitObject = (subState = {}, reqAST, parentTypeSchema, context, reduction
         if (isPrimitive(nnFieldType.kind)) {
           reduction[aliasOrFieldName] = visitScalar(fieldState, context.coerceTypes[typeSchema.name])
         } else {
-          const visitor = nnFieldType.kind === LIST ? visitIterable : visitObject;
-          reduction[aliasOrFieldName] = visitor(fieldState, field, typeSchema, context);
+          if (nnFieldType.kind === LIST) {
+            reduction[aliasOrFieldName] = visitIterable(fieldState, field, typeSchema, context, aliasOrFieldName);
+          } else {
+            reduction[aliasOrFieldName] = visitObject(fieldState, field, typeSchema, context);
+          }
           if (field.selectionSet) {
             calculateSendToServer(field, context.idFieldName)
           }
@@ -80,9 +93,9 @@ const visitObject = (subState = {}, reqAST, parentTypeSchema, context, reduction
   return reduction;
 };
 
-const visitIterable = (subState, reqAST, typeSchema, context) => {
+const visitIterable = (subState, reqAST, typeSchema, context, aliasOrFieldName) => {
   // for each value in the array, get the denormalized item
-  const mappedState = [];
+  let mappedState = [];
   // the array could be a bunch of objects, or primitives
   const loopFunc = isPrimitive(typeSchema.kind) ?
     res => visitScalar(res, context.coerceTypes[typeSchema.name]) :
@@ -99,6 +112,16 @@ const visitIterable = (subState, reqAST, typeSchema, context) => {
       mappedState[metadataName] = subState[metadataName];
     }
   }
+
+  const {sort, filter} = context;
+  const sortFn = sort && sort[aliasOrFieldName];
+  const filterFn = filter && filter[aliasOrFieldName];
+  if (filterFn) {
+    mappedState = mappedState.filter(filterFn);
+  }
+  if (sortFn) {
+    mappedState = mappedState.sort(sortFn);
+  }
   return mappedState;
 };
 
@@ -107,6 +130,10 @@ const visitScalar = (subState, coercion) => {
 };
 
 export default function denormalizeStore(context) {
-  const {getState, schema: {querySchema}, operation} = context;
+  const {getState, schema: {querySchema}, operation, normalizedResult} = context;
+  if (normalizedResult) {
+    const visitor = Array.isArray(normalizedResult) ? visitIterable : visitObject;
+    return visitor(normalizedResult, null, {}, context);
+  }
   return visitObject(getState().result, operation, querySchema, context);
 };

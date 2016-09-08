@@ -28,7 +28,7 @@ export default function processSubscriptionDoc(handler, document, oldDenormResul
   const docId = document[idFieldName];
   const isList = Array.isArray(oldDenormResult.data);
   if (isList) {
-    const idxInCache = oldDenormResult.data.findIndex(doc => doc[idFieldName] === docId);
+    const idxInCache = oldNormResult.findIndex(normDoc => normDoc.endsWith(docId));
     const safeHandler = getSafeHandler(handler, idxInCache);
     if (safeHandler === ADD) {
       const normalizedDoc = normalizeResponse(document, context, true);

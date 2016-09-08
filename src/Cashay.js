@@ -238,12 +238,13 @@ class Cashay {
     if (!fastResult) {
       const refetch = key => {
         this.query(queryString, {
+          ...options,
           key,
           forceFetch: true,
           transport: this.getTransport(options.transport)
         });
       };
-      this.cachedQueries[op] = new CachedQuery(queryString, this.schema, this.idFieldName, options.directives, refetch, key);
+      this.cachedQueries[op] = new CachedQuery(queryString, this.schema, this.idFieldName, refetch, key);
       invalidateMutationsOnNewQuery(op, this.cachedMutations);
     }
     const cachedQuery = this.cachedQueries[op];
@@ -254,6 +255,7 @@ class Cashay {
 
     // create an AST that we can mutate
     const {cachedDeps, subscriptionDeps, coerceTypes, paginationWords, idFieldName, schema, store, getState} = this;
+    const {sort, filter, resolveChannelKey, resolveCached, subscriber} = options;
     const queryDep = makeFullChannel(op, key);
     const context = buildExecutionContext(cachedQuery.ast, {
       getState,
@@ -262,12 +264,17 @@ class Cashay {
       paginationWords,
       idFieldName,
       schema,
-      directives: options.directives,
       subscribe: this.subscribe.bind(this),
       queryDep,
       defaultSubscriber: this.subscriber,
       subscriptionDeps,
-      cachedDeps
+      cachedDeps,
+      // superpowers
+      sort,
+      filter,
+      resolveChannelKey,
+      resolveCached,
+      subscriber
     });
 
     // create a response with denormalized data and a function to set the variables
@@ -652,20 +659,26 @@ class Cashay {
   /**
    *
    */
-  subscribe(channel, key = '', subscriber, options) {
+  subscribe(channel, key = '', subscriber = this.subscriber, options) {
     const fullChannel = makeFullChannel(channel, key);
     const fastResponse = this.cachedSubscriptions[fullChannel];
     if (fastResponse) {
       return fastResponse;
     }
 
-    const returnType = options && options.returnType || ensureTypeFromNonNull(this.schema.subscriptionSchema[channel].type);
-    const data = (returnType.kind === LIST) ? [] : returnType.kind === SCALAR ? null : {};
+    const returnType = options && options.returnType || ensureTypeFromNonNull(this.schema.subscriptionSchema.fields[channel].type);
+    let initialData = (returnType.kind === LIST) ? [] : returnType.kind === SCALAR ? null : {};
+    const {result} = this.getState();
+    const normalizedResult = result[channel] && result[channel][key];
+    if (normalizedResult) {
+      const {getState, coerceTypes, idFieldName, schema} = this;
+      initialData = denormalizeStore({getState, coerceTypes, idFieldName, schema, normalizedResult});
+    }
     const rootType = ensureRootType(returnType);
     const typeSchema = this.schema.types[rootType.name];
     // if it's a new op
     this.cachedSubscriptions[fullChannel] = {
-      data,
+      data: initialData,
       unsubscribe: null,
       status: SUBSCRIBING
     };
@@ -695,10 +708,12 @@ class Cashay {
 
       // INVALIDATE SUBSCRIPTION DEPS
       const depSet = this.subscriptionDeps[fullChannel];
-      for (let queryDep of depSet) {
-        this._invalidateQueryDep(queryDep);
+      if (depSet instanceof Set) {
+        for (let queryDep of depSet) {
+          this._invalidateQueryDep(queryDep);
+        }
+        depSet.clear();
       }
-      depSet.clear();
 
       // INVALIDATE CACHED DEPS
       const typeName = typeSchema.kind === UNION ? oldDenormResult.data.__typename : typeSchema.name;

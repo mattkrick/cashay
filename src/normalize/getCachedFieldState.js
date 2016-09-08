@@ -49,7 +49,7 @@ const resolveFromState = (resolver, possibleTypes, isArray, entities) => {
 
 
 export default function getCachedFieldState(source, cachedDirectiveArgs, field, context) {
-  const {cachedDeps, directives = {}, getState, idFieldName, queryDep} = context;
+  const {cachedDeps, resolveCached, getState, idFieldName, queryDep} = context;
   const {type, typeIsList} = parseCachedType(cachedDirectiveArgs.type);
   const typeSchema = context.schema.types[type];
   const isUnion = typeSchema.kind === UNION;
@@ -57,9 +57,9 @@ export default function getCachedFieldState(source, cachedDirectiveArgs, field, 
   const {entities, result} = getState();
   const usefulSource = source === result ? null : source;
   const aliasOrFieldName = field.alias && field.alias.value || field.name.value;
-  const {resolveCached} = directives[aliasOrFieldName] || {};
+  const cacheResolverFactory = resolveCached && resolveCached[aliasOrFieldName];
+  const resolver = cacheResolverFactory && cacheResolverFactory(usefulSource, cachedDirectiveArgs);
 
-  const resolver = resolveCached && resolveCached(usefulSource, cachedDirectiveArgs);
   if (isUnion && typeof resolver !== 'function') {
     throw new Error(`@cached requires resolveCached to return a function for union types.`);
   }
@@ -70,12 +70,9 @@ export default function getCachedFieldState(source, cachedDirectiveArgs, field, 
     return resolveFromState(resolver, possibleTypes, typeIsList, entities);
   }
 
-  // no resolver means we need to make a default one based off of id/ids.
+  // no factory means we need to make a default one based off of id/ids.
   // use resolveCached because they could just return something falsy
-  if (!resolveCached) {
-    if (directives.resolveCached) {
-      throw new Error(`Did you mean to put resolveCached inside the ${aliasOrFieldName} options object?`);
-    }
+  if (!cacheResolverFactory) {
     const {id, ids} = cachedDirectiveArgs;
     if (!id && !ids) {
       throw new Error(`Must supply either id, ids or resolveCached for ${aliasOrFieldName}`);

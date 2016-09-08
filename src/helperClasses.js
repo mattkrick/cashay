@@ -49,13 +49,12 @@ export class CachedSubscription {
 }
 
 export class CachedQuery {
-  constructor(queryString, schema, idFieldName, directives, refetch, key) {
+  constructor(queryString, schema, idFieldName, refetch, key) {
     this.ast = parseAndInitializeQuery(queryString, schema, idFieldName);
     this.refetch = refetch;
     this.responses = {
       [key]: {}
     };
-    this.directives = directives;
   }
 
   /**

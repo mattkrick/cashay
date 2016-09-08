@@ -171,13 +171,13 @@ export const without = (obj, exclusions) => {
 
 export const isLive = (directives) => Boolean(directives && directives.find(d => d.name.value === LIVE));
 
-export const getFieldSchema = (selection, maybeTypeSchema, schema) => {
-  const selectionName = selection.name.value;
-  const liveDirective = isLive(selection.directives);
+export const getFieldSchema = (field, maybeTypeSchema, schema) => {
+  const fieldName = field.name.value;
+  const liveDirective = isLive(field.directives);
   const typeSchema = liveDirective ? schema.subscriptionSchema : maybeTypeSchema;
-  const fieldSchema = typeSchema.fields[selectionName];
+  const fieldSchema = typeSchema.fields[fieldName];
   if (!fieldSchema) {
-    throw new Error(`${selectionName} isn't in the schema. Did you update your client schema?`)
+    throw new Error(`${fieldName} isn't in the schema. Did you update your client schema?`)
   }
   return fieldSchema;
 };
