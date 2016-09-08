@@ -9,19 +9,23 @@ Relay for the rest of us
 ## Installation
 `npm i -S cashay`
 
-## How's it different from Relay?
-|                                               |Cashay |Relay|
-|-----------------------------------------------|-------|-----|
-| Uses redux                                    | Yes   | No  |
-| Local state & domain state in the same store  | Yes   | No  |
-| Babelfication-free                            | Yes   | No  |
-| Uses the introspection query on the client    | Yes   | No  |
-| No big changes to your GraphQL server         | Yes   | No  |
-| Writes your mutations for you                 | Yes   | No  |
-| DRY optimistic updates                        | Yes   | No  |
-| Allows for more than append/prepend mutations | Yes   | No  |
-| Works with all frontends                      | Yes   | No  |
-| Aggregates queries from child routes          | No    | Yes |
+## How's it different?
+This is my honest comparison. If I'm leaving out any features out, make a PR!
+
+|                                               | Cashay | Apollo | Relay |
+|-----------------------------------------------|--------|--------|-------|
+| Uses redux                                    | Yes    | Yes    | No    |
+| Local state & domain state in the same store  | Yes    | Yes    | No    |
+| Uses your GraphQL client schema               | Yes    | No     | No    |
+| No big changes to your GraphQL server         | Yes    | No     | No    |
+| Writes your mutations for you                 | Yes    | No     | No    |
+| Allows for more than append/prepend mutations | Yes    | Yes    | No    |
+| Works with all frontends                      | Yes    | Yes    | No    |
+| Aggregates queries from child routes          | No     | No     | Yes   |
+| Supports Subsriptions                         | Yes    | No     | No    |
+| Supports local transforms like sort, filter   | Yes    | No     | No    |
+| Caches denormalized result for fast renders   | Yes    | No     | ?     |
+| Supports Query Batching                       | No     | Yes    | Yes   |
 
 ## Usage
 
@@ -125,8 +129,10 @@ Now, whenever you need to query or mutate some data, just import your shiny new 
 const {data, setVariables, status} = cashay.query(queryString, options)
 ```
 
-Options include:
-- `op`: A simple name for this query. Highly recommended for a legible redux state.  
+
+Options: 
+- `op`: A string to match the op. 
+Required if you pass in `mutationHandlers`. 
 Typically shares the same name as the React component. 
 If left blank, it defaults to the `queryString`.
 - `key`: A unique key to match the op instance, 
@@ -136,15 +142,20 @@ Defaults to `false`. Don't use this in `mapStateToProps` or you'll be calling th
 - `transport`: A function to override the singleton transport. 
 Useful if this particular op needs different credentials, or uses websockets, etc.
 - `variables`: the variables object to pass onto the GraphQL server
-- `customMutations`: Cashay writes mutations for you and guarantees no over/under fetching. 
+- `customMutations`: Cashay writes mutations for you and guarantees no under fetching. 
 But if you don't trust it, you can write your own here.
 - `mutationHandlers`: An object where each method is the name of a mutation that changes the query. See below.
-- `localOnly`: A Boolean to only fetch data from the local state. Defaults to `false`. 
-Useful if you only want a mutation to update the query data.
-- `live`: An object full of subscription channels. Used with the `@live` directive. See subscriptions.
-- `localFilter`: An object full of subscription channels. Used with the `@localFilter` directive. See subscriptions. 
-- `localSort`: An object full of subscription channels. Used with the `@localSort` directive. See subscriptions. 
 
+Each option below is an object full of field names for keys and functions for values.
+- `subscriber(channel, key, handlers)`: See [subscriber recipe](./recipes/subscriber.md)
+- `resolveChannelKey(source, args)`: See [@live recipe](./recipes/at-live.md) 
+- `resolveCached(source,args)`: See [@cached recipe](./recipes/at-cached.md)
+A function to return a document that already exists in your state (likely from a sub)
+- `sort(a,b)`: See [transforms recipe](./recipes/transforms.md)
+- `filter(doc)`: See [transforms recipe](./recipes/transforms.md)
+
+
+#### Mutation Handlers
 ```js
 mutationHandler(optimisticVariables, queryResponse, currentResponse, getEntities, invalidate)
 ```
@@ -253,66 +264,9 @@ and manage them with your custom `subscriber` callback that you write yourself.
 Cashay doesn't dictate your socket package, your server, or your message protocol (DDP or otherwise)
 because doing so would tightly couple your front end to your server. That's not cool.
 
+For examples, see the [subscriber](./recipes/subscriber) and [@live](./recipes/at-live) recipes.
+
 Cashay will supply you with 3 arguments for the callback:
-```
-subscriber(channel, key, handlers)
-```
-
-- `channel`: The alias or field name next to your @live directive. 
-This typically serves as the base channel for your sub. In `post/123` it would be `post`.
-- `key`: The variables that you passed into the `subscribe` call. In `post/123` it would be `123`. 
-- `handlers`: An object containing the following:
-  - `add(doc, handlerOptions)`: A function that takes a new doc. Cashay will append it to the end of the stream.
-  - `update(doc, handlerOptions)`: A function that takes a doc diff. 
- You only need to supply it with the fields that have changed.
-  - `upsert(doc, handlerOptions)`: A function that will call `update` if the doc exists, else `add`.
- You'll use this 80% of the time over `add`, since `add` could sneak some duplicates in if a socket reconnects.
-  - `remove(id, handlerOptions)`: A function that will remove the document with the given ID
-  - `setStatus(newStatus)`: A function that will set the status of your subscription to whatever you want.
-  This is useful, for example, if the docs coming down the wire are already in the DB, then you can set it to
-  `initializing` and your front-end can react accordingly.
-
-As shown above, each handler takes an object called `handlerOptions`, which has a single field: 
-- `removeKeys`: If you'd like to remove a key from an object, pass in an array of fields to remove.
-e.g. `['milk', 'soda']`.
-
-Basic example:
-```js
-function subscriber(channel, key, handlers) {
-  // compose your channel name how you like. I like the conventional REST-ish slash delimiter (eg `comments/123`)
-  const channelName = `${channel}/${key}`;
-  
-  // connect using your favorite socket client (socketCluster, socket.io, sockJS, ws)
-  const socket = socketCluster.connect();
-  
-  const {upsert, update, remove} = handlers;
-  
-  // subscribe to the channel. Other socket APIs might just use `emit`
-  socket.subscribe(channelName, {waitForAuth: true});
-  
-  // your server should probably send back something that tells you what to do with the data
-  // in this example, the server knows if a document has been added/removed/changed in the database
-  socket.on(channelName, data => {
-    if (data.type === 'add') {
-      upsert(data.fields);
-    } else if (data.type === 'remove') {
-      remove(data.id);
-    } else {
-      update(data.fields, {removeKeys: data.removeKeys});
-    }
-  });
-  
-  // you can do anything else here, too
-  socket.on('unsubscribe', unsubChannel => {
-    if (unsubChannel === channelName) {
-      console.log(`unsubbed from ${unsubChannel}`);
-    }
-  });
-  
-  // you should return a function that will end this subscription
-  return () => socket.unsubscribe(channelName);
-}
-```
 
 Example of a really complicated live query:
 ```
