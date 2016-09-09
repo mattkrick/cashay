@@ -46,11 +46,13 @@ const visitObject = (subState = {}, reqAST, parentTypeSchema, context, reduction
         // only follow through if it's the correct union subtype
         visitObject(subState, field, parentTypeSchema, context, reduction);
       }
-    } else if (field.name.value === TYPENAME) {
-      reduction[TYPENAME] = parentTypeSchema.name;
+      continue;
+    }
+    const fieldName = field.name.value;
+    const aliasOrFieldName = field.alias && field.alias.value || fieldName;
+    if (field.name.value === TYPENAME) {
+      reduction[aliasOrFieldName] = parentTypeSchema.name;
     } else {
-      const fieldName = field.name.value;
-      const aliasOrFieldName = field.alias && field.alias.value || fieldName;
       const cachedDirective = field.directives && field.directives.find(d => d.name.value === CACHED);
 
       if (cachedDirective) {
@@ -132,6 +134,7 @@ const visitScalar = (subState, coercion) => {
 export default function denormalizeStore(context) {
   const {getState, schema: {querySchema}, operation, normalizedResult} = context;
   if (normalizedResult) {
+    // this is for rehydrating subscriptions
     const visitor = Array.isArray(normalizedResult) ? visitIterable : visitObject;
     return visitor(normalizedResult, null, {}, context);
   }
