@@ -1,7 +1,19 @@
 import mergeStores from './mergeStores';
 import separateArgs from './separateArgs';
 import {getSubReqAST} from './getSubReqAST';
-import {ensureRootType, CACHED, getRegularArgsKey, isObject, getFieldSchema, NORM_DELIMITER, FULL, FRONT, BACK} from '../utils';
+import {
+  ensureRootType,
+  CACHED,
+  getRegularArgsKey,
+  isObject,
+  getFieldSchema,
+  NORM_DELIMITER,
+  FULL,
+  FRONT,
+  BACK,
+  getVariableValue,
+  parseCachedType
+} from '../utils';
 import {VARIABLE} from 'graphql/language/kinds';
 import {TypeKind} from 'graphql/type/introspection';
 
@@ -26,18 +38,29 @@ const mapResponseToResult = (nestedResult, response, fieldSchema, reqASTArgs, co
 };
 
 const visitObject = (bag, subResponse, reqAST, subSchema, context) => {
-  return Object.keys(subResponse).reduce((reduction, key) => {
-    if (key.startsWith('__')) return reduction;
+  const keys = Object.keys(subResponse);
+  const reduction = {};
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    if (key.startsWith('__')) continue;
     if (reqAST) {
-      const subReqAST = getSubReqAST(key, reqAST, context.fragments);
-      if (subReqAST.directives.find(d => d.name.value === CACHED)) return reduction;
+      const subReqAST = getSubReqAST(key, reqAST);
       const name = subReqAST.name.value;
-      const fieldSchema = getFieldSchema(subReqAST, subSchema, context.schema);
-      const fieldType = ensureRootType(fieldSchema.type);
-      // handle first recursion where things are stored in the query (sloppy)
-      const typeSchema = context.schema.types[fieldType.name] || subSchema.types[fieldType.name];
-      const normalizedResponse = visit(bag, subResponse[key], subReqAST, typeSchema, context);
-      reduction[name] = mapResponseToResult(reduction[name], normalizedResponse, fieldSchema, subReqAST.arguments, context);
+      const cachedDirective = subReqAST.directives.find(d => d.name.value === CACHED);
+      if (cachedDirective) {
+        const typeArg = cachedDirective.arguments.find(arg => arg.name.value === 'type');
+        const typeName = getVariableValue(typeArg, context.variables);
+        const {type} = parseCachedType(typeName);
+        const typeSchema = context.schema.types[type];
+        visit(bag, subResponse[key], subReqAST, typeSchema, context);
+      } else {
+        const fieldSchema = getFieldSchema(subReqAST, subSchema, context.schema);
+        const fieldType = ensureRootType(fieldSchema.type);
+        // handle first recursion where things are stored in the query (sloppy)
+        const typeSchema = context.schema.types[fieldType.name] || subSchema.types[fieldType.name];
+        const normalizedResponse = visit(bag, subResponse[key], subReqAST, typeSchema, context);
+        reduction[name] = mapResponseToResult(reduction[name], normalizedResponse, fieldSchema, subReqAST.arguments, context);
+      }
     } else {
       // this is for subscriptions, since we don't explicitly have a request AST
       const fieldSchema = subSchema.fields[key];
@@ -45,8 +68,8 @@ const visitObject = (bag, subResponse, reqAST, subSchema, context) => {
       const typeSchema = context.schema.types[fieldType.name];
       reduction[key] = visit(bag, subResponse[key], undefined, typeSchema, context);
     }
-    return reduction;
-  }, {})
+  }
+  return reduction;
 };
 const visitEntity = (bag, subResponse, reqAST, subSchema, context, id) => {
   const entityKey = subSchema.name;
@@ -120,8 +143,12 @@ const visit = (bag, subResponse, reqAST, subSchema, context) => {
 
 export default (response, context, isSubscription) => {
   const entities = {};
-  const schema = isSubscription ? context.typeSchema : context.schema.querySchema;
-  const result = visit(entities, response, context.operation, schema, context);
+  let result;
+  if (isSubscription) {
+    result = visitEntity(entities, response, null, context.typeSchema, context, response[context.idFieldName]);
+  } else {
+    result = visitObject(entities, response, context.operation, context.schema.querySchema, context);
+  }
   return {
     entities,
     result

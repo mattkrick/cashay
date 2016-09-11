@@ -1,12 +1,17 @@
 import {INLINE_FRAGMENT} from 'graphql/language/kinds';
 
-export const getSubReqAST = (key, reqAST, fragments) => {
+export const getSubReqAST = (key, reqAST) => {
   let subReqAST;
-  for (let selection of reqAST.selectionSet.selections) {
-    if (selection.kind === INLINE_FRAGMENT) {
-      subReqAST = getSubReqAST(key, selection, fragments);
-    } else if (selection.alias && selection.alias.value === key || selection.name.value === key) {
-      subReqAST = selection;
+  const fields = reqAST.selectionSet.selections;
+  for (let i = 0; i < fields.length; i++) {
+    const field = fields[i];
+    if (field.kind === INLINE_FRAGMENT) {
+      subReqAST = getSubReqAST(key, field);
+    } else {
+      const aliasOrFieldName = field.alias && field.alias.value || field.name.value;
+      if (aliasOrFieldName === key) {
+        subReqAST = field;
+      }
     }
     if (subReqAST) {
       return subReqAST;

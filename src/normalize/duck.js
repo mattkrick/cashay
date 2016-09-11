@@ -8,6 +8,7 @@ export const INSERT_MUTATION = '@@cashay/INSERT_MUTATION';
 export const SET_VARIABLES = '@@cashay/SET_VARIABLES';
 export const SET_ERROR = '@@cashay/SET_ERROR';
 export const SET_STATUS = '@@cashay/SET_STATUS';
+export const CLEAR = '@@cashay/CLEAR';
 
 const initialState = {
   entities: {
@@ -33,8 +34,10 @@ const initialState = {
 };
 
 export default function reducer(state = initialState, action) {
-  if (action.type.startsWith('@@cashay')) {
-    const isMutation = action.type === INSERT_MUTATION;
+  const {type} = action;
+  if (type.startsWith('@@cashay')) {
+    if (type === CLEAR) return initialState;
+    const isMutation = type === INSERT_MUTATION;
     return mergeStores(state, action.payload, isMutation);
   } else {
     return state;

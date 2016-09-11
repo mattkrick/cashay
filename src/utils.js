@@ -182,8 +182,8 @@ export const getFieldSchema = (field, maybeTypeSchema, schema) => {
   return fieldSchema;
 };
 
-export const defaultResolveChannelKeyFactory = (idFieldName) => (source, args) => {
-  if (source) {
+export const defaultResolveChannelKeyFactory = (idFieldName, topLevelSource) => (source, args) => {
+  if (!topLevelSource) {
     return source[idFieldName] || '';
   } else {
     return args[idFieldName] ? args[idFieldName] : args[Object.keys(args)[0]] || '';

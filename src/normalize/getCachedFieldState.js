@@ -54,11 +54,10 @@ export default function getCachedFieldState(source, cachedDirectiveArgs, field, 
   const typeSchema = context.schema.types[type];
   const isUnion = typeSchema.kind === UNION;
   const possibleTypes = isUnion ? Object.keys(typeSchema.possibleTypes) : [type];
-  const {entities, result} = getState();
-  const usefulSource = source === result ? null : source;
+  const {entities} = getState();
   const aliasOrFieldName = field.alias && field.alias.value || field.name.value;
   const cacheResolverFactory = resolveCached && resolveCached[aliasOrFieldName];
-  const resolver = cacheResolverFactory && cacheResolverFactory(usefulSource, cachedDirectiveArgs);
+  const resolver = cacheResolverFactory && cacheResolverFactory(source, cachedDirectiveArgs);
 
   if (isUnion && typeof resolver !== 'function') {
     throw new Error(`@cached requires resolveCached to return a function for union types.`);
