@@ -28,6 +28,7 @@ export default function findTypeInQuery(typeName, operation, schema, matchName) 
         if (selection.kind === INLINE_FRAGMENT) {
           subSchema = typeSchema;
         } else {
+          const selectionName = selection.name.value;
           const cachedDirective = selection.directives.find(d => d.name.value === 'cached');
           if (cachedDirective) {
             const typeArg = cachedDirective.arguments.find(arg => arg.name.value === 'type');
@@ -35,7 +36,6 @@ export default function findTypeInQuery(typeName, operation, schema, matchName) 
             const typeName = getVariableValue(typeArg);
             subSchema = schema.types[typeName]
           } else {
-            const selectionName = selection.name.value;
             const fieldSchema = typeSchema.fields[selectionName];
             const rootFieldType = ensureRootType(fieldSchema.type);
             subSchema = schema.types[rootFieldType.name];
