@@ -1,5 +1,5 @@
 import {INLINE_FRAGMENT} from 'graphql/language/kinds';
-import {ensureRootType, getVariableValue} from '../utils'
+import {ensureRootType, getVariableValue, parseCachedType} from '../utils'
 /**
  * Traverses a query AST operation looking for a specific type (for objects) or name (for scalars)
  * Uses a BFS since return values are likely high up the tree & scalars can break as soon as a matching name is found
@@ -34,7 +34,8 @@ export default function findTypeInQuery(typeName, operation, schema, matchName) 
             const typeArg = cachedDirective.arguments.find(arg => arg.name.value === 'type');
             // this will throw if type isn't static
             const typeName = getVariableValue(typeArg);
-            subSchema = schema.types[typeName]
+            const {type} = parseCachedType(typeName);
+            subSchema = schema.types[type]
           } else {
             const fieldSchema = typeSchema.fields[selectionName];
             const rootFieldType = ensureRootType(fieldSchema.type);

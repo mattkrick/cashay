@@ -11,7 +11,8 @@ import {
   FULL,
   FRONT,
   BACK,
-  getVariableValue
+  getVariableValue,
+  parseCachedType
 } from '../utils';
 import {VARIABLE} from 'graphql/language/kinds';
 import {TypeKind} from 'graphql/type/introspection';
@@ -37,8 +38,11 @@ const mapResponseToResult = (nestedResult, response, fieldSchema, reqASTArgs, co
 };
 
 const visitObject = (bag, subResponse, reqAST, subSchema, context) => {
-  return Object.keys(subResponse).reduce((reduction, key) => {
-    if (key.startsWith('__')) return reduction;
+  const keys = Object.keys(subResponse);
+  const reduction = {};
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i];
+    if (key.startsWith('__')) continue;
     if (reqAST) {
       const subReqAST = getSubReqAST(key, reqAST);
       const name = subReqAST.name.value;
@@ -46,8 +50,9 @@ const visitObject = (bag, subResponse, reqAST, subSchema, context) => {
       if (cachedDirective) {
         const typeArg = cachedDirective.arguments.find(arg => arg.name.value === 'type');
         const typeName = getVariableValue(typeArg, context.variables);
-        const typeSchema = context.schema.types[typeName];
-        reduction[name] = visit(bag, subResponse[key], subReqAST, typeSchema, context);
+        const {type} = parseCachedType(typeName);
+        const typeSchema = context.schema.types[type];
+        visit(bag, subResponse[key], subReqAST, typeSchema, context);
       } else {
         const fieldSchema = getFieldSchema(subReqAST, subSchema, context.schema);
         const fieldType = ensureRootType(fieldSchema.type);
@@ -63,8 +68,8 @@ const visitObject = (bag, subResponse, reqAST, subSchema, context) => {
       const typeSchema = context.schema.types[fieldType.name];
       reduction[key] = visit(bag, subResponse[key], undefined, typeSchema, context);
     }
-    return reduction;
-  }, {})
+  }
+  return reduction;
 };
 const visitEntity = (bag, subResponse, reqAST, subSchema, context, id) => {
   const entityKey = subSchema.name;
