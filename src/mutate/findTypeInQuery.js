@@ -1,5 +1,5 @@
 import {INLINE_FRAGMENT} from 'graphql/language/kinds';
-import {ensureRootType} from '../utils'
+import {ensureRootType, getVariableValue} from '../utils'
 /**
  * Traverses a query AST operation looking for a specific type (for objects) or name (for scalars)
  * Uses a BFS since return values are likely high up the tree & scalars can break as soon as a matching name is found
@@ -22,16 +22,24 @@ export default function findTypeInQuery(typeName, operation, schema, matchName) 
     const {operation, typeSchema} = next;
     if (operation.selectionSet) {
       const {selections} = operation.selectionSet;
-      for (let i = 0; i <  selections.length; i++) {
+      for (let i = 0; i < selections.length; i++) {
         const selection = selections[i];
         let subSchema;
         if (selection.kind === INLINE_FRAGMENT) {
           subSchema = typeSchema;
         } else {
-          const selectionName = selection.name.value;
-          const fieldSchema = typeSchema.fields[selectionName];
-          const rootFieldType = ensureRootType(fieldSchema.type);
-          subSchema = ensureRootType(schema.types[rootFieldType.name]);
+          const cachedDirective = selection.directives.find(d => d.name.value === 'cached');
+          if (cachedDirective) {
+            const typeArg = cachedDirective.arguments.find(arg => arg.name.value === 'type');
+            // this will throw if type isn't static
+            const typeName = getVariableValue(typeArg);
+            subSchema = schema.types[typeName]
+          } else {
+            const selectionName = selection.name.value;
+            const fieldSchema = typeSchema.fields[selectionName];
+            const rootFieldType = ensureRootType(fieldSchema.type);
+            subSchema = schema.types[rootFieldType.name];
+          }
           if (subSchema.name === typeName) {
             if (matchName) {
               const fieldNameOrAlias = selection.alias && selection.alias.value || selectionName;
