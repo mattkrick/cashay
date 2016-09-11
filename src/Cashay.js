@@ -1,8 +1,9 @@
 import {
+  CLEAR,
   INSERT_QUERY,
   INSERT_MUTATION,
   SET_ERROR,
-  SET_STATUS
+  SET_STATUS,
 } from './normalize/duck';
 import denormalizeStore from './normalize/denormalizeStore';
 import {rebuildOriginalArgs, splitNormalString} from './normalize/denormalizeHelpers';
@@ -143,6 +144,22 @@ class Cashay {
     // a Set of minimized query strings. Identical strings are ignored
     // this could be improved to minimize traffic, but it favors fast and cheap for now
     this.pendingQueries = new Set();
+  }
+
+  clear() {
+    this.cachedMutations = {};
+    this.cachedQueries = {};
+    this.cachedSubscriptions = {};
+    this._willInvalidateListener = false;
+    this.mutationHandlers = {};
+    this.denormalizedDeps = {};
+    this.normalizedDeps = {};
+    this.subscriptionDeps = {};
+    this.cachedDeps = {};
+    this.pendingQueries = new Set();
+    if (this.store) {
+      this.store.dispatch({type: CLEAR});
+    }
   }
 
   /**
@@ -487,7 +504,7 @@ class Cashay {
   _updateCachedMutation(mutationName, options) {
     // try to return fast!
     const cachedMutation = this.cachedMutations[mutationName];
-    const {variables} = options;
+    const {variables = {}} = options;
     if (cachedMutation.fullMutation) {
       if (hasMatchingVariables(variables, cachedMutation.variableSet)) return;
       // variable definitions and args will change, nuke the cached mutation + single ASTs
@@ -666,6 +683,9 @@ class Cashay {
       return fastResponse;
     }
 
+    if (!subscriber) {
+      throw new Error(`subscriber function not provided for ${channel}/${key}`)
+    }
     const returnType = options && options.returnType || ensureTypeFromNonNull(this.schema.subscriptionSchema.fields[channel].type);
     let initialData = (returnType.kind === LIST) ? [] : returnType.kind === SCALAR ? null : {};
     const {result} = this.getState();

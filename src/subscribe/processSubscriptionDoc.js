@@ -48,7 +48,7 @@ export default function processSubscriptionDoc(handler, document, oldDenormResul
         denormResult: immutableRemove(oldDenormResult.data, idxInCache),
         oldDoc,
         newDoc: null,
-        // cannot remove the entity immediately since some UPDATES are actually ADD/REMOVEs
+        // cannot remove the entity immediately since some UPDATES come in as an add followed by a remove
         // normEntities: {[typeName]: {[docId]: REMOVAL_FLAG}},
         normEntities: {},
         normResult: immutableRemove(oldNormResult, idxInCache)
