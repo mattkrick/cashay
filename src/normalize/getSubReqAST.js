@@ -1,11 +1,12 @@
 import {INLINE_FRAGMENT} from 'graphql/language/kinds';
 
-export const getSubReqAST = (key, reqAST) => {
+export const getSubReqAST = (key, reqAST, unionType) => {
   let subReqAST;
   const fields = reqAST.selectionSet.selections;
   for (let i = 0; i < fields.length; i++) {
     const field = fields[i];
     if (field.kind === INLINE_FRAGMENT) {
+      if (field.typeCondition.name.value !== unionType) continue;
       subReqAST = getSubReqAST(key, field);
     } else {
       const aliasOrFieldName = field.alias && field.alias.value || field.name.value;

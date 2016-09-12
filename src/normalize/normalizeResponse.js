@@ -11,6 +11,7 @@ import {
   FULL,
   FRONT,
   BACK,
+  TYPENAME,
   getVariableValue,
   parseCachedType
 } from '../utils';
@@ -40,11 +41,13 @@ const mapResponseToResult = (nestedResult, response, fieldSchema, reqASTArgs, co
 const visitObject = (bag, subResponse, reqAST, subSchema, context) => {
   const keys = Object.keys(subResponse);
   const reduction = {};
+  const typenameField = reqAST && reqAST.selectionSet.selections.find(field => field.name.value === TYPENAME);
+  const typenameAlias = typenameField && typenameField.alias && typenameField.alias.value || TYPENAME;
   for (let i = 0; i < keys.length; i++) {
     const key = keys[i];
-    if (key.startsWith('__')) continue;
+    if (key === typenameAlias) continue;
     if (reqAST) {
-      const subReqAST = getSubReqAST(key, reqAST);
+      const subReqAST = getSubReqAST(key, reqAST, subResponse[typenameAlias]);
       const name = subReqAST.name.value;
       const cachedDirective = subReqAST.directives.find(d => d.name.value === CACHED);
       if (cachedDirective) {
@@ -118,7 +121,9 @@ const visitIterable = (bag, subResponse, reqAST, subSchema, context) => {
 };
 
 const visitUnion = (bag, subResponse, reqAST, subSchema, context) => {
-  const concreteSubScema = context.schema.types[subResponse.__typename];
+  const typenameField = reqAST.selectionSet.selections.find(field => field.name.value === TYPENAME);
+  const typenameAlias = typenameField.alias && typenameField.alias.value || TYPENAME;
+  const concreteSubScema = context.schema.types[subResponse[typenameAlias]];
   return visit(bag, subResponse, reqAST, concreteSubScema, context);
 };
 
