@@ -144,6 +144,12 @@ class Cashay {
     // a Set of minimized query strings. Identical strings are ignored
     // this could be improved to minimize traffic, but it favors fast and cheap for now
     this.pendingQueries = new Set();
+
+    this.unsubscribeHandlers = {
+      // [channel]: {
+      //   [key]: UnsubscribeFn
+      // }
+    };
   }
 
   clear() {
@@ -157,6 +163,7 @@ class Cashay {
     this.subscriptionDeps = {};
     this.cachedDeps = {};
     this.pendingQueries = new Set();
+    this.unsubscribeHandlers = {};
     if (this.store) {
       this.store.dispatch({type: CLEAR});
     }
@@ -705,6 +712,8 @@ class Cashay {
     const subscriptionHandlers = this.makeSubscriptionHandlers(channel, key, typeSchema);
     setTimeout(() => {
       const unsubscribe = subscriber(channel, key, subscriptionHandlers);
+      this.unsubscribeHandlers[channel] = this.unsubscribeHandlers[channel] || {};
+      this.unsubscribeHandlers[channel][key] = unsubscribe;
       this.cachedSubscriptions[fullChannel] = {
         ...this.cachedSubscriptions[fullChannel],
         unsubscribe,
@@ -800,6 +809,18 @@ class Cashay {
         })
       }
     }
+  }
+  unsubscribe(channel, key = '') {
+    const unsubscribe = this.unsubscribeHandlers[channel] && this.unsubscribeHandlers[channel][key];
+    const fullChannel = makeFullChannel(channel, key);
+    if (typeof unsubscribe !== 'function') {
+      throw new Error(`No unsubscribe function provided from subscriber for ${fullChannel}`);
+    }
+    this.cachedSubscriptions[fullChannel] = {
+      ...this.cachedSubscriptions[fullChannel],
+      status: UNSUBSCRIBED
+    };
+    unsubscribe();
   }
 }
 export default new Cashay();
