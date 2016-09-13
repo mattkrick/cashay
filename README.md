@@ -17,15 +17,12 @@ This is my honest comparison. If I'm leaving out any features out, make a PR!
 | Uses Redux                                    | Yes    | Yes    | No    |
 | Local state & domain state in the same store  | Yes    | Yes    | No    |
 | Uses your GraphQL client schema               | Yes    | No     | No    |
-| Works even without a schema                   | No     | Yes    | No    |
 | No big changes to your GraphQL server         | Yes    | Yes    | No    |
-| Supports the full GraphQL spec                | No     | Yes    | No    |
-| Supports all standard GraphQL directives      | No     | Yes    | Yes   |
 | Writes your mutations for you                 | Yes    | No     | No    |
 | Allows for more than append/prepend mutations | Yes    | Yes    | No    |
 | Works with all frontends                      | Yes    | Yes    | No    |
 | Aggregates queries from child routes          | No     | No     | Yes   |
-| Supports Subscriptions                         | Yes    | Yes    | No    |
+| Supports Subscriptions                        | Yes    | Yes    | No    |
 | Supports local transforms like sort, filter   | Yes    | No     | No    |
 | Caches denormalized result for fast renders   | Yes    | No     | ?     |
 | Supports Query Batching                       | No     | Yes    | Yes   |
