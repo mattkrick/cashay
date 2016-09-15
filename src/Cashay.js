@@ -683,17 +683,25 @@ class Cashay {
   /**
    *
    */
-  subscribe(channel, key = '', subscriber = this.subscriber, options) {
+  subscribe(channel, key = '', subscriber = this.subscriber, options = {}) {
     const fullChannel = makeFullChannel(channel, key);
     const fastResponse = this.cachedSubscriptions[fullChannel];
     if (fastResponse) {
       return fastResponse;
     }
+    const {returnType: defaultReturnType, events} = options;
 
-    if (!subscriber) {
-      throw new Error(`subscriber function not provided for ${channel}/${key}`)
-    }
-    const returnType = options && options.returnType || ensureTypeFromNonNull(this.schema.subscriptionSchema.fields[channel].type);
+    // TODO event subs
+    // if (events) {
+    //   for (let i = 0; i < events.length; i++) {
+    //     const {eventSubscriber, eventOp, eventKey} = events[i];
+    //
+    //   };
+    // }
+    // if (!subscriber) {
+    //   throw new Error(`subscriber function not provided for ${channel}/${key}`)
+    // }
+    const returnType = defaultReturnType || ensureTypeFromNonNull(this.schema.subscriptionSchema.fields[channel].type);
     let initialData = (returnType.kind === LIST) ? [] : returnType.kind === SCALAR ? null : {};
     const {result} = this.getState();
     const normalizedResult = result[channel] && result[channel][key];
