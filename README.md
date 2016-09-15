@@ -267,12 +267,26 @@ because doing so would tightly couple your front end to your server. That's not 
 
 For examples, see the [subscriber](./recipes/subscriber) and [@live](./recipes/at-live) recipes.
 
-Cashay will supply you with 3 arguments for the callback:
+```
+cashay.unsubscribe(channel, key = '')
+```
+Calls the result of your `subscriber`.
 
-Example of a really complicated live query:
+
+Cashay also provides a lower level subscribe API for advanced use cases.
+If you need to ensure that a component is subscribed, 
+or need to subscribe without supplying data to the view layer, this is for you.
 ```
-// TODO
+const {data, status, unsubscribe} = cashay.subscribe(channel, key, subscriber)
 ```
+- `data`: The array of denormalized docs or diffs from the server. 
+The values are raw and strict JSON (ie datetimes are not instances of `Date`)
+- `status`: 
+  - `SUBSCRIBING`: Subscribe has been called, but the subscriber has not completed yet
+  - `READY`: The subscriber has completed & new docs are ready to be processed
+  - `UNSUBSCRIBED`: The unsubscribe function has been called
+  - user-defined: Whatever you pass in via the `setStatus` handler
+- `unsubscribe`: The function that you returned from your `subscriber`
 
 ## Recipes
 
@@ -293,10 +307,11 @@ Bugs will be fixed with the following priority:
 
 ## Roadmap to 1.0
 
-- Fixing `getEntites` in the `mutationHandler`
-- Test coverage at 95%
-- Persisted data and TTL on documents
-- Support native directives
+- [ ] Fixing mutations API
+- [ ] Persisted data and TTL on documents
+- [X] Subscriptions
+- [X] Support native directives
+- [ ] Test coverage at 95%
 
 ## Deviations from the GraphQL spec
 

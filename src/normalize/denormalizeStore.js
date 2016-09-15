@@ -83,14 +83,14 @@ const visitObject = (subState = {}, reqAST, parentTypeSchema, context, reduction
           } else {
             reduction[aliasOrFieldName] = visitObject(fieldState, field, typeSchema, context);
           }
-          if (field.selectionSet) {
-            calculateSendToServer(field, context.idFieldName)
-          }
         }
       } else {
         reduction[aliasOrFieldName] = handleMissingData(visitObject, field, nnFieldType, context);
       }
     }
+  }
+  if (fields) {
+    calculateSendToServer(reqAST, context.idFieldName)
   }
   return reduction;
 };

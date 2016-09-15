@@ -2,7 +2,7 @@ import {print} from 'graphql/language/printer';
 import {VARIABLE} from 'graphql/language/kinds';
 import {getMissingRequiredVariables} from './queryHelpers';
 import createVariableDefinitions from '../createVariableDefinitions';
-import {ensureRootType, isLive} from '../utils';
+import {ensureRootType, LIVE, CACHED} from '../utils';
 
 export const printMinimalQuery = (reqAST, idFieldName, variables, op, schema) => {
   const context = {
@@ -13,7 +13,7 @@ export const printMinimalQuery = (reqAST, idFieldName, variables, op, schema) =>
   return print(reqAST)
 };
 
-const unqueriableDirectives = ['live', 'entity'];
+const unqueriableDirectives = [LIVE, CACHED];
 const safeToSendDirectives = (directives) => {
   for (let i = 0; i < directives.length; i++) {
     const directive = directives[i];
