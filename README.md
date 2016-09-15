@@ -17,6 +17,7 @@ This is my honest comparison. If I'm leaving out any features out, make a PR!
 | Uses Redux                                    | Yes    | Yes    | No    |
 | Local state & domain state in the same store  | Yes    | Yes    | No    |
 | Uses your GraphQL client schema               | Yes    | No     | No    |
+| Supports the full GraphQL spec                | No     | Yes    | No    |
 | No big changes to your GraphQL server         | Yes    | Yes    | No    |
 | Writes your mutations for you                 | Yes    | No     | No    |
 | Allows for more than append/prepend mutations | Yes    | Yes    | No    |
