@@ -9,8 +9,10 @@ import {
 } from '../utils';
 const {UNION, LIST, SCALAR, ENUM} = TypeKind;
 
-export const handleMissingData = (visitObject, field, nnFieldType, context, isEntity) => {
-  sendChildrenToServer(field);
+export const handleMissingData = (visitObject, field, nnFieldType, cachedDirective, context) => {
+  if (!cachedDirective) {
+    sendChildrenToServer(field);
+  }
   if (nnFieldType.kind === SCALAR) {
     return null;
   } else if (nnFieldType.kind === LIST) {
@@ -32,7 +34,7 @@ export const handleMissingData = (visitObject, field, nnFieldType, context, isEn
       }
       return {...unionResponse, __typename: null};
     }
-    return visitObject({}, field, typeSchema, context, isEntity);
+    return visitObject({}, field, typeSchema, context);
   }
 };
 
@@ -63,11 +65,11 @@ export const rebuildOriginalArgs = reqAST => {
   if (reqAST.originalArguments) {
     reqAST.arguments = reqAST.originalArguments;
   }
-  if (!reqAST.selectionSet) {
-    return;
-  }
-  for (let child of reqAST.selectionSet.selections) {
-    rebuildOriginalArgs(child);
+  if (reqAST.selectionSet) {
+    const fields = reqAST.selectionSet.selections;
+    for (let i = 0; i < fields.length; i++) {
+      rebuildOriginalArgs(fields[i]);
+    }
   }
 };
 

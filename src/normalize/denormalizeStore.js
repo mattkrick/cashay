@@ -85,7 +85,7 @@ const visitObject = (subState = {}, reqAST, parentTypeSchema, context, reduction
           }
         }
       } else {
-        reduction[aliasOrFieldName] = handleMissingData(visitObject, field, nnFieldType, context);
+        reduction[aliasOrFieldName] = handleMissingData(visitObject, field, nnFieldType, cachedDirective, context);
       }
     }
   }

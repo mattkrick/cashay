@@ -83,11 +83,12 @@ const reducePaginationRequest = (paginationArgs, usefulArray, fieldSchema, selec
       throw new Error(`Your schema does not accept an argument for your cursor named ${cursorWord}.`);
     }
     // flag all AST children with sendToServer = true
-    // TODO why is this necessary if we're just reducing the request?
-    sendChildrenToServer(selection);
+    // TODO write test to make sure I don't need to send children to server
+    // sendChildrenToServer(selection);
     // TODO when to remove doWarn?
     const doWarn = true;
-    const {bestCursor, cursorIdx} = getBestCursor(first, usefulArray, context.cashayState.entities, doWarn);
+    const cashayState = context.getState();
+    const {bestCursor, cursorIdx} = getBestCursor(first, usefulArray, cashayState.entities, doWarn);
     const desiredDocCount = count - (cursorIdx + 1);
 
     // save the original arguments, we'll overwrite them with efficient ones for the server,
