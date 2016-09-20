@@ -37,6 +37,9 @@ export default function separateArgs(fieldSchema, reqASTArgs, paginationWords, v
   let hasPagination = false;
   for (let i = 0; i < reqASTArgs.length; i++) {
     const arg = reqASTArgs[i];
+    // if cashay added this argument, ignore it
+    // TODO figure out another way. i hate checking constructors.
+    if (arg.constructor.name === 'RequestArgument') continue;
     const argName = arg.name.value;
     if (!fieldSchema.args[argName]) {
       throw new Error(`${fieldSchema.name} does not support ${argName}`)

@@ -138,7 +138,7 @@ class Cashay {
     // is run against the new doc & if the doc was or is true, the query is invalidated.
     this.cachedDeps = {
       // [entity]: {
-      //   [op::key]: Set(resolveCachedList | resolveCached)
+      //   [op::key]: Set(resolveCached)
       // }
     };
     // a Set of minimized query strings. Identical strings are ignored
@@ -304,13 +304,9 @@ class Cashay {
     // create a response with denormalized data and a function to set the variables
     cachedQuery.createResponse(context, op, key, store.dispatch, getState, forceFetch);
     const cachedResponse = cachedQuery.responses[key];
-    // if this is a different query string but the same base query
-    // eg in this one we request 1 more field
-    // we'll want to add dependencies since we don't know when the server response will come back
-    // normalize the cachedResponse so we can add dependencies and stick it in the store
+
     const normalizedPartialResponse = normalizeResponse(cachedResponse.data, context);
     addDeps(normalizedPartialResponse, op, key, this.normalizedDeps, this.denormalizedDeps);
-
     // if we need more data, get it from the server
     if (cachedResponse.status === LOADING) {
       // if a variable is a function, it may need info that comes from the updated cachedResponse
@@ -388,10 +384,12 @@ class Cashay {
     //re-create the denormalizedPartialResponse because it went stale when we called the server
     rebuildOriginalArgs(context.operation);
     const denormalizedLocalResponse = denormalizeStore(context);
-    const normalizedLocalResponse = normalizeResponse(denormalizedLocalResponse, context);
 
     // normalize response to get ready to dispatch it into the state tree
     const normalizedServerResponse = normalizeResponse(data, context);
+
+    // do local 2nd because the above is going to mutate the variables
+    const normalizedLocalResponse = normalizeResponse(denormalizedLocalResponse, context);
 
     // reset the variables that normalizeResponse mutated TODO no longer necessary?
     context.variables = pendingQuery[pendingQuery.length - 1].variables;
