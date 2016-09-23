@@ -515,7 +515,7 @@ class Cashay {
       // variable definitions and args will change, nuke the cached mutation + single ASTs
       cachedMutation.clear(true);
     } else {
-      cachedMutation.activeQueries = new ActiveQueries(mutationName, options.components, this.cachedQueries, this.mutationHandlers);
+      cachedMutation.activeQueries = new ActiveQueries(mutationName, options.ops, this.cachedQueries, this.mutationHandlers);
     }
     this._createMutationsFromQueries(mutationName, cachedMutation.activeQueries, variables);
   }
@@ -801,6 +801,7 @@ class Cashay {
         mergeNewData(UPSERT, updatedDoc)
       },
       remove: (docId, options) => {
+        debugger
         mergeNewData(REMOVE, {[this.idFieldName]: docId});
       },
       setStatus: (status) => {

@@ -22,17 +22,17 @@ export default class ActiveQueries {
     // if (!mutationHandlerObj) {
     //   throw new Error(`Did you forget to add mutation handlers to your queries for ${mutationName}?`)
     // }
-    const handlerComponents = Object.keys(mutationHandlerObj);
-    const defaultKey = '';
-    for (let i = 0; i < handlerComponents.length; i++) {
-      const op = handlerComponents[i];
+    const listeningOps = Object.keys(mutationHandlerObj);
+    for (let i = 0; i < listeningOps.length; i++) {
+      const op = listeningOps[i];
       if (cachedQueries[op]) {
-        // duck-type to see whether we should dive into the key or not
-        if (cachedQueries[op].responses[defaultKey]) {
-          this[op] = defaultKey;
-        } else {
+        const {responses} = cachedQueries[op];
+        const listeningKeys = Object.keys(responses);
+        if (listeningKeys.length === 1) {
+          this[op] = listeningKeys[0];
+        } else if (listeningKeys.length > 1) {
           throw new Error(`${op} has more than 1 instance.
-          For ${mutationName}, please include a components object in your options`)
+          For ${mutationName}, please include an 'ops' object in your options`)
         }
       }
     }

@@ -27,7 +27,7 @@ export default function getFieldState(fieldState, fieldSchema, selection, contex
     subState = subState[regularArgsString];
   }
   if (paginationArgs) {
-    const arrType = subState[FULL] ? FULL : paginationArgs[paginationWords.last] ? BACK : FRONT;
+    const arrType = subState[FULL] ? FULL : paginationArgs[paginationWords.last] !== undefined ? BACK : FRONT;
     subState = handlePaginationArgs(paginationArgs, subState[arrType]);
 
     // reduce the ask from the server
@@ -47,7 +47,7 @@ const handlePaginationArgs = (paginationArgs, usefulArray) => {
   const {first, last} = paginationArgs;
 
   // try to use the full array. if it doesn't exist, see if we're going backwards & use the back array, else front
-  const count = last || first;
+  const count = last !== undefined ? last : first;
 
   // if last is provided, then first is not and we need to go from last to first
   let slicedArr;
@@ -73,7 +73,7 @@ const reducePaginationRequest = (paginationArgs, usefulArray, fieldSchema, selec
   const count = last || first;
   const {arguments: fieldArgs} = selection;
   const {paginationWords} = context;
-  const countWord = last ? paginationWords.last : paginationWords.first;
+  const countWord = last !== undefined ? paginationWords.last : paginationWords.first;
 
   const missingDocCount = count - usefulArray.length;
   // if we have a partial response & the backend accepts a cursor, only ask for the missing pieces
