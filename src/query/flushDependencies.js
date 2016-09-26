@@ -1,8 +1,8 @@
 /**
  * walk the normalized response & grab the deps for each entity. put em all in a Set & flush it down the toilet
  */
-export default function flushDependencies(entitiesDiff, op, key, denormalizedDeps, cachedQueries) {
-  const keyFlush = makeFlushSet(entitiesDiff, op, key, denormalizedDeps);
+export default function flushDependencies(entitiesDiff, denormalizedDeps, cachedQueries, op, key) {
+  const keyFlush = makeFlushSet(entitiesDiff, denormalizedDeps, op, key);
   const componentKeys = Object.keys(keyFlush);
   for (let i = 0; i < componentKeys.length; i++) {
     const componentKey = componentKeys[i];
@@ -21,7 +21,7 @@ export default function flushDependencies(entitiesDiff, op, key, denormalizedDep
  * Safety checks required because subs affect queries, but not the other way around
  *
  */
-const makeFlushSet = (entitiesDiff, op, key, denormalizedDeps) => {
+const makeFlushSet = (entitiesDiff, denormalizedDeps, op, key) => {
   const keyFlush = {};
   const typeKeys = Object.keys(entitiesDiff);
   for (let i = 0; i < typeKeys.length; i++) {
@@ -45,9 +45,9 @@ const makeFlushSet = (entitiesDiff, op, key, denormalizedDeps) => {
   }
 
   // ensure flushing the callee (if it's a sub it'll just get ignored later)
-  if (!keyFlush[op]) {
-    keyFlush[op] = new Set();
+  if (op) {
+    keyFlush[op] = keyFlush[op] || new Set();
+    keyFlush[op].add(key);
   }
-  keyFlush[op].add(key);
   return keyFlush;
 };

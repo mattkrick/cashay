@@ -421,7 +421,7 @@ class Cashay {
       addDeps(fullNormalizedResponse, op, key, this.normalizedDeps, this.denormalizedDeps);
 
       // remove the responses from this.cachedQueries where necessary
-      flushDependencies(entitiesAndResult.entities, op, key, this.denormalizedDeps, this.cachedQueries);
+      flushDependencies(entitiesAndResult.entities, this.denormalizedDeps, this.cachedQueries, op, key);
 
       // only bother merging the first of the possibly many pending queries
       const partialPayload = i === 0 ? entitiesAndResult : {};
@@ -732,16 +732,16 @@ class Cashay {
   makeSubscriptionHandlers(channel, key, typeSchema) {
     const fullChannel = makeFullChannel(channel, key);
     const mergeNewData = (handler, document) => {
-      const {result} = this.getState();
+      const {entities, result} = this.getState();
       const {schema, idFieldName} = this;
-      const context = {schema, idFieldName, typeSchema};
+      const context = {entities, schema, idFieldName, typeSchema};
       const oldDenormResult = this.cachedSubscriptions[fullChannel];
       const oldNormResult = result[channel] && result[channel][key] || [];
       const processedDoc = processSubscriptionDoc(handler, document, oldDenormResult, oldNormResult, context);
       if (!processedDoc) return;
       const {denormResult, actionType, oldDoc, newDoc, normEntities, normResult} = processedDoc;
 
-      // INVALIDATE SUBSCRIPTION DEPS
+      // INVALIDATE SUBSCRIPTION DEPS (things that depend on the series, not the individual docs)
       const depSet = this.subscriptionDeps[fullChannel];
       if (depSet instanceof Set) {
         for (let queryDep of depSet) {
@@ -750,7 +750,11 @@ class Cashay {
         depSet.clear();
       }
 
-      // INVALIDATE CACHED DEPS
+      // INVALIDATE OPS (things that depend on the individual docs, like other subscriptions that share a doc)
+      // this is necessary if i update something via query, then a sub updates it afterwards
+      // flushDependencies(normEntities, this.denormalizedDeps, this.cachedQueries);
+
+      // INVALIDATE CACHED DEPS (things that depend on the individual docs and a resolver)
       const typeName = typeSchema.kind === UNION ? oldDenormResult.data.__typename : typeSchema.name;
       const cachedDepsForType = this.cachedDeps[typeName];
       const queryDeps = cachedDepsForType ? Object.keys(cachedDepsForType) : [];
@@ -800,9 +804,8 @@ class Cashay {
           removeKeys.reduce((obj, key) => obj[key] = REMOVAL_FLAG, {...document}) : document;
         mergeNewData(UPSERT, updatedDoc)
       },
-      remove: (docId, options) => {
-        debugger
-        mergeNewData(REMOVE, {[this.idFieldName]: docId});
+      remove: (document, options) => {
+        mergeNewData(REMOVE, document);
       },
       setStatus: (status) => {
         const cachedSub = this.cachedSubscriptions[channel];
