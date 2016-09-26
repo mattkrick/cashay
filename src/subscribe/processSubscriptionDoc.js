@@ -23,6 +23,21 @@ const immutableUpdate = (arr, idx, updatedDoc) => {
   return [...arr.slice(0, idx), updatedDoc, ...arr.slice(idx + 1)]
 };
 
+const checkCanDelete = (document, oldDenormResult, context) => {
+  const {entities, typeSchema, idFieldName} = context;
+  const typeName = typeSchema.kind === UNION ? oldDenormResult.data.__typename : typeSchema.name;
+  const docId = document[idFieldName];
+  const oldEntity = entities[typeName][docId];
+  const docKeys = Object.keys(document);
+  for (let i = 0; i < docKeys.length; i++) {
+    const key = docKeys[i];
+    if (oldEntity[key] !== document[key]) {
+      return false;
+    }
+  }
+  return true;
+};
+
 export default function processSubscriptionDoc(handler, document, oldDenormResult, oldNormResult, context) {
   const {idFieldName, typeSchema} = context;
   const docId = document[idFieldName];
@@ -42,15 +57,14 @@ export default function processSubscriptionDoc(handler, document, oldDenormResul
       };
     } else if (safeHandler === REMOVE) {
       const oldDoc = oldDenormResult.data[idxInCache];
+      const canDelete = checkCanDelete(document, oldDenormResult, context);
       const typeName = typeSchema.kind === UNION ? oldDoc.__typename : typeSchema.name;
       return {
         actionType: REMOVE_SUBSCRIPTION,
         denormResult: immutableRemove(oldDenormResult.data, idxInCache),
         oldDoc,
         newDoc: null,
-        // cannot remove the entity immediately since some UPDATES come in as an add followed by a remove
-        // normEntities: {[typeName]: {[docId]: REMOVAL_FLAG}},
-        normEntities: {},
+        normEntities: canDelete ? {[typeName]: {[docId]: REMOVAL_FLAG}} : {},
         normResult: immutableRemove(oldNormResult, idxInCache)
       }
     } else if (safeHandler === UPDATE) {

@@ -26,7 +26,7 @@ const mapResponseToResult = (nestedResult, response, fieldSchema, reqASTArgs, co
   const {regularArgs, paginationArgs} = separateArgs(fieldSchema, reqASTArgs, paginationWords, variables);
   if (paginationArgs) {
     const {first, last} = paginationArgs;
-    const arrName = first ? FRONT : last ? BACK : FULL;
+    const arrName = first !== undefined ? FRONT : last !== undefined ? BACK : FULL;
     response = {[arrName]: response};
   }
   if (regularArgs === false) {
