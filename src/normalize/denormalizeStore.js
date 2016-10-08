@@ -26,8 +26,8 @@ const visitObject = (subState = {}, reqAST, parentTypeSchema, context, reduction
   if (typeof subState === 'string') {
     const [typeName, docId] = splitNormalString(subState);
     const {entities} = context.getState();
-    // code defensively because a query with an entity may want something that the subscription hasn't returned yet
-    subState = entities[typeName] && entities[typeName][docId] || {};
+    // code defensively because an @cached query may want something that the subscription hasn't returned yet
+    subState = entities[typeName] && entities[typeName][docId] || {[context.idFieldName]: ''};
     parentTypeSchema = context.schema.types[typeName];
   }
   // default to subState for denorming the persisted store subscriptions
