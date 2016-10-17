@@ -104,22 +104,22 @@ cashay.query(...);
 The params that you can pass into the `create` method are as follows (*required):
 - *`store`: Your redux store
 - *`schema`: your client schema that cashay helped you make
-- *`httpTransport`: An instance of an [HTTPTransport](./recipes/transports.md) 
+- *`httpTransport`: An instance of an [HTTPTransport](./recipes/transports.md)
 to send off the query + variables to your GraphQL server.
-- `priorityTransport`: An instance of a [Transport](./recipes/transports.md). 
+- `priorityTransport`: An instance of a [Transport](./recipes/transports.md).
 If it exists, Cashay will use this over the `httpTransport`.
 - `idFieldName`: The name of your primary key. Defaults to `id`.
 - `coerceTypes`: an object full of methods names matching GraphQL types. It takes in a single scalar value
 and returns the output. This is useful for things like converting dates from strings to numbers or Date types.
-By default, it includes one function: `DateTime = val => new Date(val)`, 
+By default, it includes one function: `DateTime = val => new Date(val)`,
 which coerces everything of type `DateTime` to a Date.
 - `paginationWords`: The reserved words that you use for pagination. Defaults to an object with 4 properties:
 `first, last, after, before`.
 If, for example, your backend uses `count` instead of `first`, you'd send in `{first: 'count'}`.
 - `getToState`: A function to get to the cashay sub-state inside the redux state.
 Defaults to `store => store.getState().cashay`
-- `subscriber(channel, key, handlers)`: A default function to handle incoming subscription data. 
-See [Subscriptions](./recipes/subscriptions.md). 
+- `subscriber(channel, key, handlers)`: A default function to handle incoming subscription data.
+See [Subscriptions](./recipes/subscriptions.md).
 
 Now, whenever you need to query or mutate some data, just import your shiny new singleton!
 
@@ -132,25 +132,25 @@ const {data, setVariables, status} = cashay.query(queryString, options)
 ```
 
 
-Options: 
-- `op`: A string to match the op. 
-Required if you pass in `mutationHandlers`. 
-Typically shares the same name as the React component. 
+Options:
+- `op`: A string to match the op.
+Required if you pass in `mutationHandlers`.
+Typically shares the same name as the React component.
 If left blank, it defaults to the `queryString`.
-- `key`: A unique key to match the op instance, 
+- `key`: A unique key to match the op instance,
 only used where you would use React's `key` (eg in a op that you called `map` on in the parent op).
-- `forceFetch`: A Boolean to ignore local data & get some fresh stuff. 
+- `forceFetch`: A Boolean to ignore local data & get some fresh stuff.
 Defaults to `false`. Don't use this in `mapStateToProps` or you'll be calling the server every time you call `dispatch`.
-- `transport`: A function to override the singleton transport. 
+- `transport`: A function to override the singleton transport.
 Useful if this particular op needs different credentials, or uses websockets, etc.
 - `variables`: the variables object to pass onto the GraphQL server
-- `customMutations`: Cashay writes mutations for you and guarantees no under fetching. 
+- `customMutations`: Cashay writes mutations for you and guarantees no under fetching.
 But if you don't trust it, you can write your own here.
 - `mutationHandlers`: An object where each method is the name of a mutation that changes the query. See below.
 
 Each option below is an object full of field names for keys and functions for values.
 - `subscriber(channel, key, handlers)`: See [subscriber recipe](./recipes/subscriber.md)
-- `resolveChannelKey(source, args)`: See [@live recipe](./recipes/at-live.md) 
+- `resolveChannelKey(source, args)`: See [@live recipe](./recipes/at-live.md)
 - `resolveCached(source,args)`: See [@cached recipe](./recipes/at-cached.md)
 A function to return a document that already exists in your state (likely from a sub)
 - `sort(a,b)`: See [transforms recipe](./recipes/transforms.md)
@@ -186,15 +186,15 @@ const mapStateToProps = (state, props) => {
 ```
 
 Following the example above, `this.props.response` will be an object that has the following:
-- `status`: `loading` if there is a fetch in progress, `complete` if otherwise. 
+- `status`: `loading` if there is a fetch in progress, `complete` if otherwise.
 This is useful if you want to use a loading spinner, etc.
 - `data`: The data object that you expect to get back when you call your GraphQL server.
 - `setVariables`: A callback to run when you want to change your query variables. See below.
 
 ### Setting variables
 
-Cashay gives you a function to make setting variables dead simple. 
-It gives you your op's variables that are currently in the store, 
+Cashay gives you a function to make setting variables dead simple.
+It gives you your op's variables that are currently in the store,
 and then it's up to you to give it back a new variables object:
 
 ```js
@@ -227,30 +227,30 @@ Note: if you return a scalar variable at the highest level of your mutation payl
 make sure the name in the mutation payload schema matches the name in the query to give Cashay a hint to grab it.
 
 The options are as follows:
-- `variables`: The variables object to pass onto the GraphQL server. 
-Make sure the variables have the same names as what your schema expects so Cashay can automatically create the mutation for you. 
-For maximum efficiency, be sure to pass in all variables that you will possibly use 
-(even if that means passing it in as `undefined`). 
+- `variables`: The variables object to pass onto the GraphQL server.
+Make sure the variables have the same names as what your schema expects so Cashay can automatically create the mutation for you.
+For maximum efficiency, be sure to pass in all variables that you will possibly use
+(even if that means passing it in as `undefined`).
 If you can't do these 2 things, you can write a `customMutation` (and tell me your usecase, I'm curious!).
-- `ops`: An object the determines which `mutationHandlers` to call. 
+- `ops`: An object the determines which `mutationHandlers` to call.
 If not provided, it'll call every `op` that has a `mutationHandler` for that `mutationName`.
 
-In this example, we just want to call the `mutationHandler` for the `comments` op where `key === postId`. 
-If you wanted to delete Comment #3 (where `key = 3`), you'd want to trigger the `mutationHandler` for `{comments: 3}` 
+In this example, we just want to call the `mutationHandler` for the `comments` op where `key === postId`.
+If you wanted to delete Comment #3 (where `key = 3`), you'd want to trigger the `mutationHandler` for `{comments: 3}`
 and not bother wasting CPU cycles checking `{comments: 1}` and `{comments: 2}`.
-Additionally, we call the `mutationHandler` for `post` if the value is true. 
-This might be common if the `post` query includes a `commentCount` that should decrement when a comment is deleted. 
-This logic makes Cashay super efficient by default, 
-while still being flexible enough to write multiple mutations that have the same `mutationName`, 
-but affect different queries. 
-For example, you might have a mutation called `deleteSomething` that accepts a `tableName` and `id` variable. 
-Then, a good practice to to hardcode `tableName` to `Posts` that op. 
-In doing so, you reduce the # of mutations in your schema (since `deleteSomething` can delete any doc in your db). 
+Additionally, we call the `mutationHandler` for `post` if the value is true.
+This might be common if the `post` query includes a `commentCount` that should decrement when a comment is deleted.
+This logic makes Cashay super efficient by default,
+while still being flexible enough to write multiple mutations that have the same `mutationName`,
+but affect different queries.
+For example, you might have a mutation called `deleteSomething` that accepts a `tableName` and `id` variable.
+Then, a good practice to to hardcode `tableName` to `Posts` that op.
+In doing so, you reduce the # of mutations in your schema (since `deleteSomething` can delete any doc in your db).
 Additionally, because you hardcoded in the tableName, you don't have to pass that variable down via `this.props`.
 
 ```js
 const {postId} = this.props;
-const mutationAffectsPostOp = true; 
+const mutationAffectsPostOp = true;
 const ops = {
   comments: postId,
   post: mutationAffectsPostOp
@@ -266,7 +266,8 @@ and manage them with your custom `subscriber` callback that you write yourself.
 Cashay doesn't dictate your socket package, your server, or your message protocol (DDP or otherwise)
 because doing so would tightly couple your front end to your server. That's not cool.
 
-For examples, see the [subscriber](./recipes/subscriber) and [@live](./recipes/at-live) recipes.
+For examples, see the [subscriber](./recipes/subscriber.md) and
+[@live](./recipes/at-live.md) recipes.
 
 ```
 cashay.unsubscribe(channel, key = '')
@@ -275,14 +276,14 @@ Calls the result of your `subscriber`.
 
 
 Cashay also provides a lower level subscribe API for advanced use cases.
-If you need to ensure that a component is subscribed, 
+If you need to ensure that a component is subscribed,
 or need to subscribe without supplying data to the view layer, this is for you.
 ```
 const {data, status, unsubscribe} = cashay.subscribe(channel, key, subscriber)
 ```
-- `data`: The array of denormalized docs or diffs from the server. 
+- `data`: The array of denormalized docs or diffs from the server.
 The values are raw and strict JSON (ie datetimes are not instances of `Date`)
-- `status`: 
+- `status`:
   - `SUBSCRIBING`: Subscribe has been called, but the subscriber has not completed yet
   - `READY`: The subscriber has completed & new docs are ready to be processed
   - `UNSUBSCRIBED`: The unsubscribe function has been called
@@ -317,8 +318,8 @@ Bugs will be fixed with the following priority:
 ## Deviations from the GraphQL spec
 
 The following edge cases are valid per the GraphQL spec, but are not supported in Cashay:
-- List of Lists (eg `GraphQLList(GraphQLList(Foo))`). I can't think of a good reason to ever do this. 
-Storing a 2D graph like this is wrong. 
+- List of Lists (eg `GraphQLList(GraphQLList(Foo))`). I can't think of a good reason to ever do this.
+Storing a 2D graph like this is wrong.
 - Multi-part mutations. Combine them into 1 mutation, or call them separately. Below is an example of what not to do.
 ```
  mutation {
