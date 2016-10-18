@@ -75,7 +75,7 @@ const visitObject = (subState = {}, reqAST, parentTypeSchema, context, reduction
         const fieldState = maybeLiveQuery(subState, fieldSchema, field, nnFieldType, context);
         const rootFieldType = ensureRootType(nnFieldType);
         const typeSchema = context.schema.types[rootFieldType.name];
-        if (isPrimitive(nnFieldType.kind)) {
+        if (isPrimitive(nnFieldType.kind) || subState[fieldName] === null) {
           reduction[aliasOrFieldName] = visitScalar(fieldState, context.coerceTypes[typeSchema.name])
         } else {
           if (nnFieldType.kind === LIST) {
