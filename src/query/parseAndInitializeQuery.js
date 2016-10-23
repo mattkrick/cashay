@@ -13,7 +13,7 @@ import {
 import {TypeKind} from 'graphql/type/introspection';
 import {Field} from '../helperClasses';
 
-const {ENUM, UNION, SCALAR} = TypeKind;
+const {ENUM, UNION, SCALAR, OBJECT} = TypeKind;
 
 const validateCachedDirective = (cachedDirective) => {
   const argsArr = cachedDirective.arguments;
@@ -64,14 +64,14 @@ export default function parseAndInitializeQuery(queryString, schema, idFieldName
         field.arguments.sort((a, b) => a.name.value > b.name.value);
       }
       const cachedDirective = field.directives && field.directives.find(d => d.name.value === CACHED);
-      const fieldSchema = getFieldSchema(field, parentSchema, schema);
-      const rootFieldSchema = ensureRootType(fieldSchema.type);
       if (field.selectionSet) {
         const children = field.selectionSet.selections;
         // if no resolve function is present, then it might just be a sort or filter
         if (cachedDirective) {
           validateCachedDirective(cachedDirective);
         } else {
+          const fieldSchema = getFieldSchema(field, parentSchema, schema);
+          const rootFieldSchema = ensureRootType(fieldSchema.type);
           const typeSchema = schema.types[rootFieldSchema.name];
           const fieldsToAdd = typeSchema.kind === UNION ? catalogFields : typeSchema.fields[idFieldName] ? [idFieldName] : [];
           for (let fieldToAdd of fieldsToAdd) {
@@ -84,8 +84,13 @@ export default function parseAndInitializeQuery(queryString, schema, idFieldName
         }
       } else if (cachedDirective) {
         throw new Error(`@entity can only be applied to an object or array`);
-      } else if (rootFieldSchema.kind !== ENUM && rootFieldSchema.kind !== SCALAR) {
-        throw new Error(`Field ${rootFieldSchema.name} is an object but doesn't have a sub selection.`)
+      } else if (field.name.value !== TYPENAME && parentSchema.kind === OBJECT) {
+        // naively rule out unions, we can deal with those later
+        const fieldSchema = getFieldSchema(field, parentSchema, schema);
+        const rootFieldSchema = ensureRootType(fieldSchema.type);
+        if (rootFieldSchema.kind !== ENUM && rootFieldSchema.kind !== SCALAR) {
+          throw new Error(`Field ${rootFieldSchema.name} is an object but doesn't have a sub selection.`)
+        }
       }
     }
   };
