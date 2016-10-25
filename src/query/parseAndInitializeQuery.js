@@ -13,7 +13,7 @@ import {
 import {TypeKind} from 'graphql/type/introspection';
 import {Field} from '../helperClasses';
 
-const {UNION} = TypeKind;
+const {ENUM, UNION, SCALAR, OBJECT} = TypeKind;
 
 const validateCachedDirective = (cachedDirective) => {
   const argsArr = cachedDirective.arguments;
@@ -82,9 +82,15 @@ export default function parseAndInitializeQuery(queryString, schema, idFieldName
           }
           initializeQueryAST(children, typeSchema);
         }
-      }
-      else if (cachedDirective) {
+      } else if (cachedDirective) {
         throw new Error(`@entity can only be applied to an object or array`);
+      } else if (field.name.value !== TYPENAME && parentSchema.kind === OBJECT) {
+        // naively rule out unions, we can deal with those later
+        const fieldSchema = getFieldSchema(field, parentSchema, schema);
+        const rootFieldSchema = ensureRootType(fieldSchema.type);
+        if (rootFieldSchema.kind !== ENUM && rootFieldSchema.kind !== SCALAR) {
+          throw new Error(`Field ${rootFieldSchema.name} is an object but doesn't have a sub selection.`)
+        }
       }
     }
   };
