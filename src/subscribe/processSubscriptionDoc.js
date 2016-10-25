@@ -28,6 +28,8 @@ const checkCanDelete = (document, oldDenormResult, context) => {
   const typeName = typeSchema.kind === UNION ? oldDenormResult.data.__typename : typeSchema.name;
   const docId = document[idFieldName];
   const oldEntity = entities[typeName][docId];
+  // protect against 2 remove calls coming in quickly
+  if (!oldEntity) return false;
   const docKeys = Object.keys(document);
   for (let i = 0; i < docKeys.length; i++) {
     const key = docKeys[i];
