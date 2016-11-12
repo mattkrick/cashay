@@ -625,7 +625,7 @@ class Cashay {
       cachedResult.responses[key] = makeErrorFreeResponse(cachedResponse);
       const {schema, paginationWords, idFieldName} = this;
       const stateVars = getStateVars(cashayState, op, key);
-      const contextVars = stateVars && clone(stateVars);
+      const contextVars = stateVars && clone(stateVars) || {};
       if (stateVars) {
         ops[op] = ops[op] || {};
         ops[op][key] = ops[op][key] || {};
