@@ -68,7 +68,14 @@ export const shallowPlus1Clone = obj => {
   const newObj = {};
   for (let i = 0; i < dataKeys.length; i++) {
     const key = dataKeys[i];
-    newObj[key] = {...obj[key]};
+    const prop = obj[key];
+    let propClone = prop;
+    if (Array.isArray(prop)) {
+      propClone = prop.slice();
+    } else if (isObject(prop)) {
+      propClone = {...prop};
+    }
+    newObj[key] = propClone;
   }
   return newObj;
 };
