@@ -10,7 +10,7 @@ import {rebuildOriginalArgs, splitNormalString} from './normalize/denormalizeHel
 import normalizeResponse from './normalize/normalizeResponse';
 import {printMinimalQuery} from './query/printMinimalQuery';
 import {shortenNormalizedResponse, invalidateMutationsOnNewQuery, equalPendingQueries} from './query/queryHelpers';
-import {checkMutationInSchema, getStateVars, ensureTypeFromNonNull} from './utils';
+import {checkMutationInSchema, getStateVars, ensureTypeFromNonNull, isObject, shallowEqual} from './utils';
 import mergeStores from './normalize/mergeStores';
 import {CachedMutation, CachedQuery} from './helperClasses';
 import flushDependencies from './query/flushDependencies';
@@ -22,7 +22,6 @@ import {
   clone,
   makeErrorFreeResponse,
   makeFullChannel,
-  getTypeName,
   ADD,
   UPDATE,
   UPSERT,
@@ -510,11 +509,14 @@ class Cashay {
     // try to return fast!
     const cachedMutation = this.cachedMutations[mutationName];
     const {variables = {}} = options;
+
+    const sameOps = isObject(options.ops) ? shallowEqual(options.ops, cachedMutation.activeQueries) : true;
     if (cachedMutation.fullMutation) {
-      if (hasMatchingVariables(variables, cachedMutation.variableSet)) return;
+      if (sameOps && hasMatchingVariables(variables, cachedMutation.variableSet)) return;
       // variable definitions and args will change, nuke the cached mutation + single ASTs
       cachedMutation.clear(true);
-    } else {
+    }
+    if (!cachedMutation.activeQueries || !sameOps) {
       cachedMutation.activeQueries = new ActiveQueries(mutationName, options.ops, this.cachedQueries, this.mutationHandlers);
     }
     this._createMutationsFromQueries(mutationName, cachedMutation.activeQueries, variables);
@@ -820,6 +822,7 @@ class Cashay {
       }
     }
   }
+
   unsubscribe(channel, key = '') {
     const unsubscribe = this.unsubscribeHandlers[channel] && this.unsubscribeHandlers[channel][key];
     const fullChannel = makeFullChannel(channel, key);
