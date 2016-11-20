@@ -36,11 +36,9 @@
   "devDependencies": {
     "ava": "0.15.2",
     "babel-cli": "6.9.0",
-    "babel-plugin-transform-runtime": "^6.9.0",
-    "babel-preset-es2015": "6.9.0",
-    "babel-preset-stage-0": "6.5.0",
+    "babel-preset-es2015": "^6.9.0",
+    "babel-preset-stage-1": "^6.16.0",
     "babel-register": "^6.9.0",
-    "babel-runtime": "^6.9.2",
     "coveralls": "^2.11.9",
     "nyc": "^6.4.4",
     "rimraf": "2.5.2",
@@ -49,6 +47,7 @@
   "dependencies": {
     "graphql": "0.7.1",
     "isomorphic-fetch": "^2.2.1",
-    "minimist": "^1.2.0"
+    "minimist": "^1.2.0",
+    "regenerator-runtime": "^0.9.6"
   }
 }
