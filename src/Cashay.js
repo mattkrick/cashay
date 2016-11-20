@@ -511,14 +511,18 @@ class Cashay {
     const {variables = {}} = options;
 
     const sameOps = isObject(options.ops) ? shallowEqual(options.ops, cachedMutation.activeQueries) : true;
+
+    // if the affected ops need to be updated or initialized, do so
+    if (!sameOps || Object.keys(cachedMutation.activeQueries).length === 0) {
+      cachedMutation.activeQueries = new ActiveQueries(mutationName, options.ops, this.cachedQueries, this.mutationHandlers);
+    }
+
     if (cachedMutation.fullMutation) {
-      if (sameOps && hasMatchingVariables(variables, cachedMutation.variableSet)) return;
+      if (hasMatchingVariables(variables, cachedMutation.variableSet)) return;
       // variable definitions and args will change, nuke the cached mutation + single ASTs
       cachedMutation.clear(true);
     }
-    if (!cachedMutation.activeQueries || !sameOps) {
-      cachedMutation.activeQueries = new ActiveQueries(mutationName, options.ops, this.cachedQueries, this.mutationHandlers);
-    }
+
     this._createMutationsFromQueries(mutationName, cachedMutation.activeQueries, variables);
   }
 
