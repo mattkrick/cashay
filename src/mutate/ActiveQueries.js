@@ -12,7 +12,7 @@ export default class ActiveQueries {
       const op = possibleComponentKeys[i];
       if (cachedQueries[op]) {
         // remove falsy values, bring over the key or true
-        this[op] = possibleComponentObj[op];
+        this[op] = possibleComponentObj[op] === true ? '' : possibleComponentObj[op];
       }
     }
   }

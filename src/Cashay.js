@@ -509,14 +509,7 @@ class Cashay {
     // try to return fast!
     const cachedMutation = this.cachedMutations[mutationName];
     const {variables = {}} = options;
-
-    const sameOps = isObject(options.ops) ? shallowEqual(options.ops, cachedMutation.activeQueries) : true;
-
-    // if the affected ops need to be updated or initialized, do so
-    if (!sameOps || Object.keys(cachedMutation.activeQueries).length === 0) {
-      cachedMutation.activeQueries = new ActiveQueries(mutationName, options.ops, this.cachedQueries, this.mutationHandlers);
-    }
-
+    cachedMutation.activeQueries = new ActiveQueries(mutationName, options.ops, this.cachedQueries, this.mutationHandlers);
     if (cachedMutation.fullMutation) {
       if (hasMatchingVariables(variables, cachedMutation.variableSet)) return;
       // variable definitions and args will change, nuke the cached mutation + single ASTs
@@ -545,8 +538,7 @@ class Cashay {
         if (!cachedSingles[op]) {
           const queryOperation = this.cachedQueries[op].ast.definitions[0];
           const mutationAST = createMutationFromQuery(queryOperation, mutationName, variables, this.schema);
-          //TODO remove safety check, should be sanitized before activeQueries is saved
-          const key = activeQueries[op] === true ? '' : activeQueries[op];
+          const key = activeQueries[op];
           const stateVars = getStateVars(cashayState, op, key);
           const {namespaceAST, variableEnhancers} = namespaceMutation(mutationAST, op, stateVars, this.schema);
           cachedSingles[op] = {
