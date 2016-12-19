@@ -479,81 +479,65 @@ class Cashay {
    *
    * A mutationName is not unique to a mutation, but a name + possibleComponentsObj is
    *
-   * @param {string} mutationName the name of the mutation, as defined in your GraphQL schema
+   * @param {string} mutationString the name of the mutation, as defined in your GraphQL schema
    * @param {Object} options all the options
+   * @param {Object} [options.op] - the name given to this particular mutation. required if a mutation is used in more than 1 place
+   * @param {Object} [options.resolveOptimistic] - a function to adjust the state from variables passed in via a form
+   * @param {Boolean} [options.resolve] - a function to adjust the state from an object from the server
    *
    */
-  mutate(mutationName, options = {}) {
-    const {variables} = options;
-    if (typeof mutationName !== 'string') {
-      throw new Error(`The first argument to 'mutate' should be the name of the mutation`)
+  mutate(mutationString, options = {}) {
+    if (typeof mutationString !== 'string') {
+      throw new Error(`The first argument to 'mutate' should be the query string`)
     }
-    this.cachedMutations[mutationName] = this.cachedMutations[mutationName] || new CachedMutation();
-    const cachedMutation = this.cachedMutations[mutationName];
+    const {op = mutationString, resolveOptimistic, resolve, variables} = options;
+    this.cachedMutations[op] = this.cachedMutations[op] || new CachedMutation(mutationString);
+    const cachedMutation = this.cachedMutations[op];
 
-    // update fullMutation, variableSet, and variableEnhancers
-    this._updateCachedMutation(mutationName, options);
+    class StoreDocument {
+      constructor(self, documentId) {
+        this.store = self.store;
+        this.entityName = self.entityName;
+        this.documentId = documentId;
 
-    // optimistcally update
-    this._processMutationHandlers(mutationName, cachedMutation.activeQueries, null, variables);
+      }
+      update(obj) {
+         this.diffs[this.entityName][this.documentId] = obj;
+      }
+    }
+    class StoreEntity {
+      constructor(self, entityName) {
+        this.entityName = entityName;
+        this.store = self.store;
+
+      }
+      get(documentId) {
+        return StoreDocument(this, documentId)
+      }
+    }
+
+    class UserStore {
+      constructor(store) {
+        this.store = store;
+        this.diffs = {};
+      }
+      entity(entityName) {
+        return new StoreEntity(this, entityName)
+      }
+      result(resultName) {
+        return new StoreResult(resultName)
+      }
+    }
+
+    resolveOptimistic(userStore, variables);
     // if (options.localOnly) return;
 
     // async call the server
-    const {variableEnhancers} = this.cachedMutations[mutationName];
+    const {variableEnhancers} = this.cachedMutations[op];
     const namespacedVariables = variableEnhancers.reduce((enhancer, reduction) => enhancer(reduction), variables);
     const newOptions = {...options, variables: namespacedVariables};
-    return this._mutateServer(mutationName, cachedMutation.activeQueries, cachedMutation.fullMutation, newOptions);
+    return this._mutateServer(op, cachedMutation.activeQueries, cachedMutation.fullMutation, newOptions);
   }
-
-  _updateCachedMutation(mutationName, options) {
-    // try to return fast!
-    const cachedMutation = this.cachedMutations[mutationName];
-    const {variables = {}} = options;
-    cachedMutation.activeQueries = new ActiveQueries(mutationName, options.ops, this.cachedQueries, this.mutationHandlers);
-    if (cachedMutation.fullMutation) {
-      if (hasMatchingVariables(variables, cachedMutation.variableSet)) return;
-      // variable definitions and args will change, nuke the cached mutation + single ASTs
-      cachedMutation.clear(true);
-    }
-
-    this._createMutationsFromQueries(mutationName, cachedMutation.activeQueries, variables);
-  }
-
-  _createMutationsFromQueries(mutationName, activeQueries, variables) {
-    const cachedMutation = this.cachedMutations[mutationName];
-    const cachedSingles = cachedMutation.singles;
-    const cachedSinglesASTs = [];
-    const newVariableEnhancers = [];
-    const opsToUpdateKeys = Object.keys(activeQueries);
-    if (!opsToUpdateKeys.length) {
-      cachedMutation.fullMutation = createBasicMutation(mutationName, this.schema, variables);
-      return;
-    }
-    if (isMutationResponseScalar(this.schema, mutationName)) {
-      cachedMutation.fullMutation = createBasicMutation(mutationName, this.schema, variables);
-    } else {
-      const cashayState = this.getState();
-      for (let i = 0; i < opsToUpdateKeys.length; i++) {
-        const op = opsToUpdateKeys[i];
-        if (!cachedSingles[op]) {
-          const queryOperation = this.cachedQueries[op].ast.definitions[0];
-          const mutationAST = createMutationFromQuery(queryOperation, mutationName, variables, this.schema);
-          const key = activeQueries[op];
-          const stateVars = getStateVars(cashayState, op, key);
-          const {namespaceAST, variableEnhancers} = namespaceMutation(mutationAST, op, stateVars, this.schema);
-          cachedSingles[op] = {
-            ast: namespaceAST,
-            variableEnhancers
-          }
-        }
-        const {ast, variableEnhancers} = cachedSingles[op];
-        cachedSinglesASTs.push(ast);
-        newVariableEnhancers.push(...variableEnhancers);
-      }
-      cachedMutation.fullMutation = mergeMutations(cachedSinglesASTs);
-      cachedMutation.variableEnhancers.push(...newVariableEnhancers);
-    }
-  };
 
   async _mutateServer(mutationName, componentsToUpdateObj, mutationString, options) {
     const {variables} = options;
@@ -652,29 +636,6 @@ class Cashay {
       payload
     });
   }
-
-  _getTypeFactory = (op, key) => {
-    return typeName => {
-      const cashayState = this.getState();
-      const rawState = cashayState.entities[typeName];
-      if (!rawState) {
-        throw new Error(`${typeName} does not exist in your cashay data state entities!`);
-      }
-
-      // TODO using stateVars is wrong because vars could be static in the query, instead we need to check the schema + varDefs + vars
-      const stateVars = getStateVars(cashayState, op, key);
-      if (!stateVars) {
-        return rawState;
-      }
-      const context = {
-        paginationWords: this.paginationWords,
-        variables: stateVars,
-        skipTransform: true,
-        schema: this.schema
-      };
-      return makeFriendlyStore(rawState, typeName, context);
-    }
-  };
 
   /**
    *
