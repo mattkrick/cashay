@@ -89,7 +89,7 @@ const visitObject = (subState = {}, reqAST, parentTypeSchema, context, reduction
       }
     }
   }
-  if (fields) {
+  if (reqAST && fields) {
     calculateSendToServer(reqAST, context.idFieldName)
   }
   return reduction;
