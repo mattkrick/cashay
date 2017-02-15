@@ -682,7 +682,7 @@ class Cashay {
   subscribe(channel, key = '', subscriber = this.subscriber, options = {}) {
     const fullChannel = makeFullChannel(channel, key);
     const fastResponse = this.cachedSubscriptions[fullChannel];
-    if (fastResponse) {
+    if (fastResponse && fastResponse.status !== UNSUBSCRIBED) {
       return fastResponse;
     }
     const {returnType: defaultReturnType, events} = options;
