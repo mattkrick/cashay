@@ -501,9 +501,6 @@ class Cashay {
         this.documentId = documentId;
 
       }
-      update(obj) {
-         this.diffs[this.entityName][this.documentId] = obj;
-      }
     }
     class StoreEntity {
       constructor(self, entityName) {
@@ -512,7 +509,7 @@ class Cashay {
 
       }
       get(documentId) {
-        return StoreDocument(this, documentId)
+        return new StoreDocument(this, documentId)
       }
     }
 
@@ -520,12 +517,35 @@ class Cashay {
       constructor(store) {
         this.store = store;
         this.diffs = {};
+        this.path = [];
       }
       entity(entityName) {
-        return new StoreEntity(this, entityName)
+        this.path.push(...['entities', 'entityName']);
+        return this;
       }
       result(resultName) {
-        return new StoreResult(resultName)
+        this.path.push(...['result', 'resultName']);
+        return this;
+      }
+      get(...documentIds) {
+        this.path.push(...documentIds);
+
+        return this;
+      }
+      update(objOrFn) {
+        if (typeof objOrFn === 'function') {
+          const currentNormalizedDoc = this.store[this.entityName][this.documentId];
+          const userFn = (field) => {
+            if (currentNormalizedDoc.hasOwnProperty(field)) {
+
+            } else {
+              throw new Error(`${field} is not a property `)
+            }
+          }
+        } else {
+          this.diffs[this.entityName][this.documentId] = obj;
+          return obj;
+        }
       }
     }
 
