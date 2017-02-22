@@ -78,8 +78,12 @@ const visitObject = (subState = {}, reqAST, parentTypeSchema, context, reduction
         if (isPrimitive(nnFieldType.kind) || subState[fieldName] === null) {
           reduction[aliasOrFieldName] = visitScalar(fieldState, context.coerceTypes[typeSchema.name])
         } else {
-          if (nnFieldType.kind === LIST) {
-            reduction[aliasOrFieldName] = visitIterable(fieldState, field, typeSchema, context, aliasOrFieldName);
+          if ((nnFieldType.kind === LIST)) {
+            if (fieldState) {
+              reduction[aliasOrFieldName] = visitIterable(fieldState, field, typeSchema, context, aliasOrFieldName);
+            } else {
+              reduction[aliasOrFieldName] = [visitObject(fieldState, field, typeSchema, context)];
+            }
           } else {
             reduction[aliasOrFieldName] = visitObject(fieldState, field, typeSchema, context);
           }

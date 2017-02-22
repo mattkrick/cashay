@@ -175,3 +175,26 @@ test('flag sendToServer = true for array of objects', t => {
   //                                    getPostById ->           keywordsMentioned ->       word
   t.true(context.operation.selectionSet.selections[0].selectionSet.selections[1].selectionSet.selections[0].sendToServer);
 });
+
+test('Same query with another argument', t => {
+  const rawQuery = `
+  query {
+    getCommentsByPostId {
+      _id
+      postId
+      content
+    }
+  }`;
+  const queryAST = parseAndInitializeQuery(rawQuery, clientSchema, idFieldName);
+  const context = buildExecutionContext(queryAST, {
+    variables: {"postId": "p126"},
+    coerceTypes,
+    getState: () => ({entities:{}, result: {getCommentsByPostId: {'"postId": "p123"':[]}}}),
+    idFieldName,
+    paginationWords,
+    schema: clientSchema
+  });
+  const actual = denormalizeStore(context);
+  const expected = {getCommentsByPostId:[{_id:null,postId:null,content:null}]}
+  t.deepEqual(actual, expected)
+});
