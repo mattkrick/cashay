@@ -169,7 +169,7 @@ and again with `serverData` when the mutation response comes back.
 If a return value is provided, it will be normalized & merged with the state.
 If there is no return value, the state won't change.
 
-- `optimisticVariables`: The variables you send to the server when you call a mutation. You can use this to optimistically update the UI. Is `null` when the function is called after receving a resonse from the server.
+- `optimisticVariables`: The variables you send to the server when you call a mutation. You can use this to optimistically update the UI. Is `null` when the function is called after recieving a resonse from the server.
 - `queryResponse`: The data that came back from the server. The shape is identical to whatever the `type` is in your GraphQL schema for that mutation. It is `null` when optimistically updating.
 - `currentResponse`: The response you receive from your query. The shape follows whatever you entered in `queryString`. You can modify this and return it, Cashay will detect the differences.
 - `getEntites(typeName)`: A function that returns all the entities for a given GraphQL type (eg `typeName = PostType`) This is useful in case you want to replace a deleted document with the next-best doc you have locally.
@@ -244,7 +244,7 @@ This logic makes Cashay super efficient by default,
 while still being flexible enough to write multiple mutations that have the same `mutationName`,
 but affect different queries.
 For example, you might have a mutation called `deleteSomething` that accepts a `tableName` and `id` variable.
-Then, a good practice to to hardcode `tableName` to `Posts` that op.
+Then, a good practice to hardcode `tableName` to `Posts` that op.
 In doing so, you reduce the # of mutations in your schema (since `deleteSomething` can delete any doc in your db).
 Additionally, because you hardcoded in the tableName, you don't have to pass that variable down via `this.props`.
 
