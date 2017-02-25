@@ -59,14 +59,16 @@ export default function processSubscriptionDoc(handler, document, oldDenormResul
       };
     } else if (safeHandler === REMOVE) {
       const oldDoc = oldDenormResult.data[idxInCache];
-      const canDelete = checkCanDelete(document, oldDenormResult, context);
-      const typeName = typeSchema.kind === UNION ? oldDoc.__typename : typeSchema.name;
+      // const canDelete = checkCanDelete(document, oldDenormResult, context);
+      // const typeName = typeSchema.kind === UNION ? oldDoc.__typename : typeSchema.name;
       return {
         actionType: REMOVE_SUBSCRIPTION,
         denormResult: immutableRemove(oldDenormResult.data, idxInCache),
         oldDoc,
         newDoc: null,
-        normEntities: canDelete ? {[typeName]: {[docId]: REMOVAL_FLAG}} : {},
+        normEntities: {},
+        // cannot safely remove here because another sub or @cached query might also use this doc
+        // normEntities: canDelete ? {[typeName]: {[docId]: REMOVAL_FLAG}} : {},
         normResult: immutableRemove(oldNormResult, idxInCache)
       }
     } else if (safeHandler === UPDATE) {
