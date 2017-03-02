@@ -115,13 +115,13 @@ const getBestCursor = (first, usefulArray, entities, doWarn) => {
       // given something like `Post:123`, return the document from the store
       const [typeName, docId] = splitNormalString(usefulArray[i]);
       storedDoc = entities[typeName][docId];
-      if (storedDoc.cursor) break;
+      if (storedDoc.cursor !== undefined) break;
     }
   } else {
     for (i = 0; i < usefulArray.length; i++) {
       const [typeName, docId] = splitNormalString(usefulArray[i]);
       storedDoc = entities[typeName][docId];
-      if (storedDoc.cursor) break;
+      if (storedDoc.cursor !== undefined) break;
     }
   }
 
