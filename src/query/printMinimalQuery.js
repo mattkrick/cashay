@@ -4,8 +4,9 @@ import {getMissingRequiredVariables} from './queryHelpers';
 import createVariableDefinitions from '../createVariableDefinitions';
 import {ensureRootType, LIVE, CACHED} from '../utils';
 
-export const printMinimalQuery = (reqAST, idFieldName, variables, op, schema) => {
+export const printMinimalQuery = (reqAST, idFieldName, variables, op, schema, forceFetch) => {
   const context = {
+    forceFetch,
     op,
     schema
   };
@@ -30,7 +31,7 @@ const minimizeQueryAST = (reqAST, idFieldName, variables, subSchema, initialVari
   for (let i = 0; i < selections.length; i++) {
     const field = selections[i];
     // if it has to go to the server, create some variable definitions and remove the pieces that don't have the required vars
-    if (field.sendToServer && safeToSendDirectives(field.directives)) {
+    if ((field.sendToServer || context.forceFetch) && safeToSendDirectives(field.directives)) {
       const fieldSchema = subSchema.fields[field.name.value];
       if (field.arguments && field.arguments.length) {
         const createVarDefContext = {...context, initialVariableDefinitions};

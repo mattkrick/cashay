@@ -281,6 +281,7 @@ class Cashay {
     const {sort, filter, resolveChannelKey, resolveCached, subscriber} = options;
     const queryDep = makeFullChannel(op, key);
     const context = buildExecutionContext(cachedQuery.ast, {
+      forceFetch,
       getState,
       coerceTypes,
       variables,
@@ -299,7 +300,6 @@ class Cashay {
       resolveCached,
       subscriber
     });
-
     // create a response with denormalized data and a function to set the variables
     cachedQuery.createResponse(context, op, key, store.dispatch, getState, forceFetch);
     const cachedResponse = cachedQuery.responses[key];
@@ -343,9 +343,9 @@ class Cashay {
    * @return {undefined}
    */
   async queryServer(transport, context, op, key) {
-    const {variables, operation, idFieldName, schema} = context;
+    const {forceFetch, variables, operation, idFieldName, schema} = context;
     const {dispatch} = this.store;
-    const minimizedQueryString = printMinimalQuery(operation, idFieldName, variables, op, schema);
+    const minimizedQueryString = printMinimalQuery(operation, idFieldName, variables, op, schema, forceFetch);
     // bail if we can't do anything with the variables that we were given
     if (!minimizedQueryString) {
       // TODO set status or error?
