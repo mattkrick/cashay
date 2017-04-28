@@ -128,7 +128,7 @@ export default function mergeStores(state, src, isMutation) {
       const key = srcKeys[i];
       const srcProp = src[key];
       const targetProp = target[key];
-      if (isObject(srcProp) && isObject(targetProp)) {
+      if (isObject(srcProp) && isObject(targetProp) && !(srcProp instanceof Date)) {
         const srcIsArray = Array.isArray(srcProp);
         const stateIsArray = Array.isArray(targetProp);
         if (!srcIsArray && !stateIsArray) {
