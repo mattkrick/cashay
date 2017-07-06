@@ -45,7 +45,7 @@
     "xo": "0.15.1"
   },
   "dependencies": {
-    "graphql": "0.7.1",
+    "graphql": "0.10.3",
     "isomorphic-fetch": "^2.2.1",
     "minimist": "^1.2.0",
     "regenerator-runtime": "^0.9.6"
